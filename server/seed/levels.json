@@ -1,0 +1,6 @@
+[
+  { "languageCode": "en", "name": "Beginner", "order": 0 },
+  { "languageCode": "en", "name": "Elementary", "order": 1 },
+  { "languageCode": "en", "name": "Pre-Intermediate", "order": 2 },
+  { "languageCode": "en", "name": "Intermediate", "order": 3 }
+]

@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# build output
+dist/
+build/
+
+# env
+.env
+**/.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# os
+.DS_Store
+Thumbs.db
+
+# director/admin/etc uploaded content images are kept (they ARE the content),
+# but ignore any accidental temp upload artifacts
+*.tmp
