@@ -11,6 +11,7 @@ const links = [
   { to: '/teachers', label: 'Teachers' },
   { to: '/groups', label: 'Groups' },
   { to: '/courses', label: 'Courses' },
+  { to: '/homework', label: 'Homework' },
   { to: '/attendance', label: 'Attendance' },
   { to: '/pricing', label: 'Pricing' },
   { to: '/settings', label: 'Settings' },

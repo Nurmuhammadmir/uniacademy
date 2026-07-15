@@ -14,6 +14,7 @@ import Teachers from './pages/Teachers.jsx'
 import Pricing from './pages/Pricing.jsx'
 import Attendance from './pages/Attendance.jsx'
 import Courses from './pages/Courses.jsx'
+import Homework from './pages/Homework.jsx'
 import Groups from './pages/Groups.jsx'
 import Settings from './pages/Settings.jsx'
 
@@ -41,6 +42,7 @@ const App = () => {
               <Route path='/pricing' element={<Pricing />} />
               <Route path='/attendance' element={<Attendance />} />
               <Route path='/courses' element={<Courses />} />
+              <Route path='/homework' element={<Homework />} />
               <Route path='/groups' element={<Groups />} />
               <Route path='/settings' element={<Settings />} />
               <Route path='*' element={<Navigate to='/' />} />

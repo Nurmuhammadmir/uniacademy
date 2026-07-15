@@ -522,8 +522,8 @@ export const updateLanguage = async (req, res) => {
 // api to add a new level within a language (e.g. Advanced, order 4)
 export const createLevel = async (req, res) => {
     try {
-        const { languageId, name, order } = req.body
-        const level = await Level.create({ languageId, name, order })
+        const { languageId, name, order, durationDays } = req.body
+        const level = await Level.create({ languageId, name, order, durationDays: durationDays || 300 })
         res.status(201).json({ level })
     } catch (error) {
         console.log(error)
@@ -533,8 +533,10 @@ export const createLevel = async (req, res) => {
 
 export const updateLevel = async (req, res) => {
     try {
-        const { name, order } = req.body
-        const level = await Level.findByIdAndUpdate(req.params.id, { name, order }, { new: true, runValidators: true })
+        const { name, order, durationDays } = req.body
+        const update = { name, order }
+        if (durationDays !== undefined) update.durationDays = durationDays
+        const level = await Level.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true })
         if (!level) return res.status(404).json({ error: 'not_found' })
         res.json({ level })
     } catch (error) {

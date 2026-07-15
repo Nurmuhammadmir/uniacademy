@@ -367,6 +367,77 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // ==== homework builder (content) ====
+    const getContentSummary = async (languageId, levelId) => {
+        try {
+            const { data } = await axios.get(backendUrl + `/api/director/content/summary?languageId=${languageId}&levelId=${levelId}`, authHeader)
+            return data.summary
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not load content summary')
+            return {}
+        }
+    }
+
+    const getDayContent = async (languageId, levelId, day) => {
+        try {
+            const { data } = await axios.get(backendUrl + `/api/director/content/day?languageId=${languageId}&levelId=${levelId}&day=${day}`, authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not load day content')
+            return null
+        }
+    }
+
+    const saveVocab = async (payload) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/content/vocab', payload, authHeader)
+            toast.success(`Vocab saved (${data.wordCount} words, ${data.exerciseCount} test questions)`)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not save vocab')
+            return false
+        }
+    }
+
+    const saveGrammar = async (payload) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/content/grammar', payload, authHeader)
+            toast.success(`Grammar saved (${data.exerciseCount} exercises)`)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not save grammar')
+            return false
+        }
+    }
+
+    const saveReading = async (payload) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/content/reading', payload, authHeader)
+            toast.success(data.cleared ? 'Reading cleared' : `Reading saved (${data.exerciseCount} exercises)`)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not save reading')
+            return false
+        }
+    }
+
+    // uploads a photo, named after `name`, into /static/images/<kind>. Returns the served path.
+    const uploadContentImage = async (kind, name, file) => {
+        try {
+            const form = new FormData()
+            form.append('image', file)
+            const { data } = await axios.post(
+                backendUrl + `/api/director/content/upload/${kind}?name=${encodeURIComponent(name)}`,
+                form,
+                { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } }
+            )
+            return data.path
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not upload image')
+            return null
+        }
+    }
+
     // ==== groups (director-wide) ====
     const getAllGroups = async () => {
         try {
@@ -408,6 +479,8 @@ const DirectorContextProvider = (props) => {
         getAttendanceOverview,
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,
+        backendUrl,
+        getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage,
     }
 
     useEffect(() => {

@@ -1,4 +1,4 @@
-// RULE #3 — group day counter, Sundays count but return as rest days
+// RULE #3 — group day counter over the level's 30 days (no rest days; every day has homework)
 export const computeDayCounter = (startDate) => {
     const start = new Date(startDate)
     const now = new Date()
@@ -8,8 +8,6 @@ export const computeDayCounter = (startDate) => {
     return diffDays
 }
 
-export const isRestDay = (startDate, dayNumber) => {
-    const date = new Date(startDate)
-    date.setDate(date.getDate() + (dayNumber - 1))
-    return date.getDay() === 0
-}
+// Rest days were removed - every one of the 30 days in a level carries homework now.
+// Kept as a function (always false) so existing imports/callers keep working unchanged.
+export const isRestDay = () => false

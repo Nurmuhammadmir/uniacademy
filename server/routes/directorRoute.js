@@ -12,9 +12,21 @@ import {
     listAllGroups, updateGroupLimits,
 } from "../controllers/directorController.js"
 import { listLanguages, listLevels, listBranches, getSettings } from "../controllers/catalogController.js"
+import {
+    getDayContent, saveVocab, saveGrammar, saveReading, getLevelContentSummary,
+} from "../controllers/contentController.js"
+import { uploadMiddleware, uploadImage } from "../controllers/uploadController.js"
 
 const directorRouter = express.Router()
 directorRouter.use(requireRole('director'))
+
+// ==== homework builder (content authoring) ====
+directorRouter.get('/content/summary', getLevelContentSummary)
+directorRouter.get('/content/day', getDayContent)
+directorRouter.put('/content/vocab', saveVocab)
+directorRouter.put('/content/grammar', saveGrammar)
+directorRouter.put('/content/reading', saveReading)
+directorRouter.post('/content/upload/:kind', uploadMiddleware, uploadImage)
 
 directorRouter.get('/branches', listBranches)
 directorRouter.get('/branches/:id', getBranchProfile)

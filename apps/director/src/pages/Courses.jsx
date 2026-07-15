@@ -10,7 +10,7 @@ const Courses = () => {
 
   const [addingLevelFor, setAddingLevelFor] = useState(null)
   const [editingLevel, setEditingLevel] = useState(null)
-  const [levelForm, setLevelForm] = useState({ name: '', order: 0 })
+  const [levelForm, setLevelForm] = useState({ name: '', order: 0, durationDays: 300 })
 
   useEffect(() => { getLevels() }, [])
 
@@ -32,16 +32,16 @@ const Courses = () => {
     e.preventDefault()
     if (editingLevel) {
       const ok = await updateLevel(editingLevel._id, levelForm, editingLevel.languageId)
-      if (ok) { setEditingLevel(null); setLevelForm({ name: '', order: 0 }) }
+      if (ok) { setEditingLevel(null); setLevelForm({ name: '', order: 0, durationDays: 300 }) }
     } else {
       const ok = await createLevel({ languageId: addingLevelFor, ...levelForm })
-      if (ok) { setAddingLevelFor(null); setLevelForm({ name: '', order: 0 }) }
+      if (ok) { setAddingLevelFor(null); setLevelForm({ name: '', order: 0, durationDays: 300 }) }
     }
   }
 
   const openEditLevel = (level, languageId) => {
     setEditingLevel({ ...level, languageId })
-    setLevelForm({ name: level.name, order: level.order })
+    setLevelForm({ name: level.name, order: level.order, durationDays: level.durationDays || 300 })
   }
 
   return (
@@ -63,14 +63,14 @@ const Courses = () => {
               </div>
               <div className='flex gap-3'>
                 <button onClick={() => openEditLanguage(lang)} className='text-accent text-xs font-medium'>Edit</button>
-                <button onClick={() => { setAddingLevelFor(lang._id); setLevelForm({ name: '', order: (levels.filter(l => l.languageId === lang._id).length) }) }} className='text-accent text-xs font-medium'>+ Add level</button>
+                <button onClick={() => { setAddingLevelFor(lang._id); setLevelForm({ name: '', order: (levels.filter(l => l.languageId === lang._id).length), durationDays: 300 }) }} className='text-accent text-xs font-medium'>+ Add level</button>
               </div>
             </div>
 
             <div className='flex flex-wrap gap-2'>
               {levels.filter(l => l.languageId === lang._id).sort((a, b) => a.order - b.order).map(level => (
                 <button key={level._id} onClick={() => openEditLevel(level, lang._id)} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-sm text-ink hover:border-accent'>
-                  {level.name} <span className='text-muted font-mono text-xs'>#{level.order}</span>
+                  {level.name} <span className='text-muted font-mono text-xs'>#{level.order} · {level.durationDays || 300}d</span>
                 </button>
               ))}
               {levels.filter(l => l.languageId === lang._id).length === 0 && <p className='text-muted text-sm'>No levels yet.</p>}
@@ -81,6 +81,8 @@ const Courses = () => {
                 <input placeholder='Level name (e.g. Advanced)' value={levelForm.name} onChange={e => setLevelForm({ ...levelForm, name: e.target.value })}
                   className='flex-1 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
                 <input placeholder='Order' type='number' value={levelForm.order} onChange={e => setLevelForm({ ...levelForm, order: Number(e.target.value) })}
+                  className='w-20 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+                <input placeholder='Days' type='number' min='1' max='300' title='Duration (days of homework)' value={levelForm.durationDays} onChange={e => setLevelForm({ ...levelForm, durationDays: Number(e.target.value) })}
                   className='w-20 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
                 <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>Add</button>
                 <button type='button' onClick={() => setAddingLevelFor(null)} className='px-3 py-2 text-muted text-sm'>Cancel</button>
@@ -111,6 +113,10 @@ const Courses = () => {
             <input placeholder='Order' type='number' value={levelForm.order} onChange={e => setLevelForm({ ...levelForm, order: Number(e.target.value) })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <p className='text-xs text-muted'>Order controls progression - a passed exam promotes a student to the next-higher order within the same language.</p>
+            <label className='text-xs text-muted -mb-1'>Duration (homework days)</label>
+            <input placeholder='Duration in days' type='number' min='1' max='300' value={levelForm.durationDays} onChange={e => setLevelForm({ ...levelForm, durationDays: Number(e.target.value) })}
+              className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
+            <p className='text-xs text-muted'>How many days of homework this level runs for. The homework builder shows exactly this many days.</p>
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>Save changes</button>
           </form>
         </Modal>
