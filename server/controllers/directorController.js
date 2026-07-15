@@ -14,6 +14,7 @@ import Attendance from "../models/Attendance.js"
 import TeacherAttendance from "../models/TeacherAttendance.js"
 import { assertNoTeacherConflict } from "../services/scheduleConflict.service.js"
 import { computeDayCounter } from "../services/dayCounter.service.js"
+import { deleteLevelContent } from "../services/contentCascade.service.js"
 
 const startOfThisMonth = () => {
     const d = new Date()
@@ -517,6 +518,27 @@ export const updateLanguage = async (req, res) => {
     }
 }
 
+// api to remove a course entirely - deletes every level under it (and each level's homework
+// content, pricing, exam) then the language itself. Meant for undoing a wrong "add language".
+export const deleteLanguage = async (req, res) => {
+    try {
+        const language = await Language.findById(req.params.id)
+        if (!language) return res.status(404).json({ error: 'not_found' })
+
+        const levelsToRemove = await Level.find({ languageId: language._id })
+        for (const level of levelsToRemove) {
+            await deleteLevelContent(language._id, level._id)
+        }
+        await Level.deleteMany({ languageId: language._id })
+        await Language.findByIdAndDelete(language._id)
+
+        res.json({ deleted: true })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 // ==== Levels ====
 
 // api to add a new level within a language (e.g. Advanced, order 4)
@@ -539,6 +561,23 @@ export const updateLevel = async (req, res) => {
         const level = await Level.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true })
         if (!level) return res.status(404).json({ error: 'not_found' })
         res.json({ level })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// api to remove a level - deletes its homework content, pricing and exam along with it. Meant for
+// undoing a wrong "add level" while setting up a course.
+export const deleteLevel = async (req, res) => {
+    try {
+        const level = await Level.findById(req.params.id)
+        if (!level) return res.status(404).json({ error: 'not_found' })
+
+        await deleteLevelContent(level.languageId, level._id)
+        await Level.findByIdAndDelete(level._id)
+
+        res.json({ deleted: true })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

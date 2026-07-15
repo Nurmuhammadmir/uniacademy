@@ -320,6 +320,20 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    const deleteLanguage = async (id) => {
+        if (!(await confirm('Delete this course? Every level under it, and all homework content built for those levels, will be deleted too. This cannot be undone.'))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/languages/' + id, authHeader)
+            toast.success('course deleted')
+            getLanguages()
+            getLevels()
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not delete course')
+            return false
+        }
+    }
+
     // ==== levels ====
     const createLevel = async (payload) => {
         try {
@@ -341,6 +355,19 @@ const DirectorContextProvider = (props) => {
             return true
         } catch (error) {
             toast.error(error.response?.data?.error || 'could not update level')
+            return false
+        }
+    }
+
+    const deleteLevel = async (id, languageId) => {
+        if (!(await confirm('Delete this level? All homework content built for it (vocab, grammar, reading) will be deleted too. This cannot be undone.'))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/levels/' + id, authHeader)
+            toast.success('level deleted')
+            getLevels(languageId)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not delete level')
             return false
         }
     }
@@ -438,6 +465,19 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // looks for a photo already sitting in server/public/images/<kind> - by word (name) for vocab,
+    // or by exact filename for reading. Returns the served path, or null if nothing matches yet.
+    const resolveContentImage = async (kind, { name, filename } = {}) => {
+        try {
+            const q = filename ? `filename=${encodeURIComponent(filename)}` : `name=${encodeURIComponent(name || '')}`
+            const { data } = await axios.get(backendUrl + `/api/director/content/resolve-image/${kind}?${q}`, authHeader)
+            return data.path
+        } catch (error) {
+            // silent - this runs automatically as the director types, "no match yet" is normal
+            return null
+        }
+    }
+
     // ==== groups (director-wide) ====
     const getAllGroups = async () => {
         try {
@@ -474,13 +514,13 @@ const DirectorContextProvider = (props) => {
         teachers, getTeachers, createTeacher, updateTeacher, deleteTeacherAccount, getTeacherProfile,
         pricing, getPricing, upsertPricing, deletePricing,
         branches, getBranches, createBranch, updateBranch,
-        languages, getLanguages, createLanguage, updateLanguage,
-        levels, getLevels, createLevel, updateLevel,
+        languages, getLanguages, createLanguage, updateLanguage, deleteLanguage,
+        levels, getLevels, createLevel, updateLevel, deleteLevel,
         getAttendanceOverview,
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,
         backendUrl,
-        getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage,
+        getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage,
     }
 
     useEffect(() => {

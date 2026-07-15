@@ -37,6 +37,33 @@ const extFor = (mimetype, originalname) => {
     return 'png'
 }
 
+// looks for a photo the director already dropped into server/public/images/<kind> by hand, matched
+// either by ?name= (slugified, tried against common extensions - used for vocab words) or by an
+// exact ?filename= (used for reading images pasted in via JSON, which name the file explicitly).
+// Returns { path: null } rather than 404 when nothing matches - "not found yet" is a normal state
+// while the director is still typing/pasting, not an error.
+export const resolveImage = async (req, res) => {
+    try {
+        const kind = req.params.kind === 'reading' ? 'reading' : 'vocab'
+        const dir = path.join(PUBLIC_ROOT, kind)
+        if (!fs.existsSync(dir)) return res.json({ path: null })
+
+        if (req.query.filename) {
+            const filename = path.basename(String(req.query.filename)) // strip any path traversal
+            const exists = fs.existsSync(path.join(dir, filename))
+            return res.json({ path: exists ? `/static/images/${kind}/${filename}` : null })
+        }
+
+        const name = slugify(req.query.name)
+        if (!name) return res.json({ path: null })
+        const match = fs.readdirSync(dir).find(f => path.parse(f).name.toLowerCase() === name)
+        res.json({ path: match ? `/static/images/${kind}/${match}` : null })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 export const uploadImage = async (req, res) => {
     try {
         const kind = req.params.kind === 'reading' ? 'reading' : 'vocab'

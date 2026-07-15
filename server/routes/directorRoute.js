@@ -6,8 +6,8 @@ import {
     createTeacher, listTeachers, updateTeacher, deleteTeacher, getTeacherProfile,
     upsertPricing, listPricing, deletePricing, getAttendanceOverview,
     createBranch, updateBranch,
-    createLanguage, updateLanguage,
-    createLevel, updateLevel,
+    createLanguage, updateLanguage, deleteLanguage,
+    createLevel, updateLevel, deleteLevel,
     updateSettings,
     listAllGroups, updateGroupLimits,
 } from "../controllers/directorController.js"
@@ -15,7 +15,7 @@ import { listLanguages, listLevels, listBranches, getSettings } from "../control
 import {
     getDayContent, saveVocab, saveGrammar, saveReading, getLevelContentSummary,
 } from "../controllers/contentController.js"
-import { uploadMiddleware, uploadImage } from "../controllers/uploadController.js"
+import { uploadMiddleware, uploadImage, resolveImage } from "../controllers/uploadController.js"
 
 const directorRouter = express.Router()
 directorRouter.use(requireRole('director'))
@@ -27,6 +27,7 @@ directorRouter.put('/content/vocab', saveVocab)
 directorRouter.put('/content/grammar', saveGrammar)
 directorRouter.put('/content/reading', saveReading)
 directorRouter.post('/content/upload/:kind', uploadMiddleware, uploadImage)
+directorRouter.get('/content/resolve-image/:kind', resolveImage)
 
 directorRouter.get('/branches', listBranches)
 directorRouter.get('/branches/:id', getBranchProfile)
@@ -36,10 +37,12 @@ directorRouter.put('/branches/:id', updateBranch)
 directorRouter.get('/languages', listLanguages)
 directorRouter.post('/languages', createLanguage)
 directorRouter.put('/languages/:id', updateLanguage)
+directorRouter.delete('/languages/:id', deleteLanguage)
 
 directorRouter.get('/levels', listLevels)
 directorRouter.post('/levels', createLevel)
 directorRouter.put('/levels/:id', updateLevel)
+directorRouter.delete('/levels/:id', deleteLevel)
 
 directorRouter.get('/settings', getSettings)
 directorRouter.put('/settings', updateSettings)

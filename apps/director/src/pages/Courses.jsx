@@ -3,7 +3,7 @@ import { DirectorContext } from '../context/DirectorContext.jsx'
 import Modal from '../components/Modal.jsx'
 
 const Courses = () => {
-  const { languages, getLanguages, createLanguage, updateLanguage, levels, getLevels, createLevel, updateLevel } = useContext(DirectorContext)
+  const { languages, getLanguages, createLanguage, updateLanguage, deleteLanguage, levels, getLevels, createLevel, updateLevel, deleteLevel } = useContext(DirectorContext)
   const [showAddLanguage, setShowAddLanguage] = useState(false)
   const [editingLanguage, setEditingLanguage] = useState(null)
   const [languageForm, setLanguageForm] = useState({ code: '', name: '' })
@@ -64,6 +64,7 @@ const Courses = () => {
               <div className='flex gap-3'>
                 <button onClick={() => openEditLanguage(lang)} className='text-accent text-xs font-medium'>Edit</button>
                 <button onClick={() => { setAddingLevelFor(lang._id); setLevelForm({ name: '', order: (levels.filter(l => l.languageId === lang._id).length), durationDays: 300 }) }} className='text-accent text-xs font-medium'>+ Add level</button>
+                <button onClick={() => deleteLanguage(lang._id)} className='text-red-500 text-xs font-medium'>Delete</button>
               </div>
             </div>
 
@@ -118,6 +119,11 @@ const Courses = () => {
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <p className='text-xs text-muted'>How many days of homework this level runs for. The homework builder shows exactly this many days.</p>
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>Save changes</button>
+            <button type='button'
+              onClick={async () => { const ok = await deleteLevel(editingLevel._id, editingLevel.languageId); if (ok) setEditingLevel(null) }}
+              className='py-2 text-red-500 text-sm font-medium'>
+              Delete level
+            </button>
           </form>
         </Modal>
       )}
