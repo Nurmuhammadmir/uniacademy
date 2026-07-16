@@ -5,7 +5,9 @@
       "Bash(npm install *)",
       "Bash(node -e \"console.log\\('multer', require\\('multer/package.json'\\).version\\)\")",
       "Bash(npx vite *)",
-      "Bash(node --input-type=module -e \"import\\('./routes/directorRoute.js'\\).then\\(\\(\\)=>console.log\\('ROUTER IMPORT OK'\\)\\).catch\\(e=>{console.error\\('IMPORT FAIL', e.message\\); process.exit\\(1\\)}\\)\")"
+      "Bash(node --input-type=module -e \"import\\('./routes/directorRoute.js'\\).then\\(\\(\\)=>console.log\\('ROUTER IMPORT OK'\\)\\).catch\\(e=>{console.error\\('IMPORT FAIL', e.message\\); process.exit\\(1\\)}\\)\")",
+      "Bash(node --check controllers/studentController.js)",
+      "Bash(node --check models/ReadingExercise.js)"
     ]
   }
 }

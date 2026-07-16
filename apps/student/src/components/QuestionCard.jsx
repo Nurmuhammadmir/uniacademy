@@ -2,7 +2,10 @@ import React, { useContext } from 'react'
 import { resolveImageUrl } from '../lib/format.js'
 import { StudentContext } from '../context/StudentContext.jsx'
 
-const QuestionCard = ({ index, question, options, value, onChange, type }) => {
+// `image` is the question's own prompt picture (e.g. a vocab picture_match concept) - never a
+// per-option picture. Options are always rendered as plain word/text choices, so every prompt
+// image renders at the same square size regardless of the source photo's aspect ratio.
+const QuestionCard = ({ index, question, image, options, value, onChange, type }) => {
   const { backendUrl } = useContext(StudentContext)
   const hasOptions = Array.isArray(options) && options.length > 0
   // true_false questions never carry an options array (they're a fixed binary choice), so they'd
@@ -14,6 +17,9 @@ const QuestionCard = ({ index, question, options, value, onChange, type }) => {
   return (
     <div className='bg-bg-card border border-hairline rounded-2xl p-4 mb-3'>
       <p className='text-xs font-mono text-muted mb-2'>Q{index + 1}</p>
+      {image && (
+        <img src={resolveImageUrl(image, backendUrl)} alt='' className='w-full aspect-square object-cover rounded-xl mb-3' />
+      )}
       <p className='text-ink font-medium mb-3'>{question}</p>
 
       {isTrueFalse ? (
@@ -30,25 +36,19 @@ const QuestionCard = ({ index, question, options, value, onChange, type }) => {
           ))}
         </div>
       ) : hasOptions ? (
-        <div className={`grid gap-2 ${options[0]?.image ? 'grid-cols-2' : ''}`}>
+        <div className='flex flex-col gap-2'>
           {options.map((option, i) => {
             const optionValue = typeof option === 'object' ? option._id : option
             const selected = value === optionValue
-            const baseClasses = `rounded-xl border ${selected ? 'border-accent bg-accent-soft' : 'border-hairline bg-bg-elevated'}`
-
-            if (option && typeof option === 'object' && option.image) {
-              return (
-                <button key={i} type='button' onClick={() => onChange(optionValue)} className={`${baseClasses} p-2 text-left`}>
-                  <img src={resolveImageUrl(option.image, backendUrl)} alt={option.category} className='w-full h-20 object-cover rounded-lg mb-1' />
-                  <span className='text-xs text-muted'>{option.category}</span>
-                </button>
-              )
-            }
-
-            const optionLabel = typeof option === 'object' ? (option.word || option.text || JSON.stringify(option)) : option
+            const label = typeof option === 'object' ? (option.word || option.text || '') : option
             return (
-              <button key={i} type='button' onClick={() => onChange(optionValue)} className={`${baseClasses} text-left px-4 py-3 col-span-2`}>
-                {optionLabel}
+              <button
+                key={i}
+                type='button'
+                onClick={() => onChange(optionValue)}
+                className={`rounded-xl border text-left px-4 py-3 ${selected ? 'border-accent bg-accent-soft' : 'border-hairline bg-bg-elevated'}`}
+              >
+                {label}
               </button>
             )
           })}

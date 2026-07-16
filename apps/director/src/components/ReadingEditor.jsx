@@ -150,8 +150,8 @@ const ReadingEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) 
       ) : (
         <>
           <div className='flex gap-3'>
-            <div className='flex flex-col items-center gap-1 w-32 shrink-0'>
-              <div className='w-32 h-24 rounded-lg bg-bg border border-hairline overflow-hidden flex items-center justify-center'>
+            <div className='flex flex-col items-center gap-1 w-28 shrink-0'>
+              <div className='w-28 h-28 rounded-lg bg-bg border border-hairline overflow-hidden flex items-center justify-center'>
                 {image ? <img src={backendUrl + image} alt='reading' className='w-full h-full object-cover' /> : <span className='text-muted text-xs'>no image</span>}
               </div>
               <label className='text-[11px] text-accent cursor-pointer'>

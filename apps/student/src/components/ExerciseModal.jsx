@@ -7,6 +7,30 @@ import { StudentContext } from '../context/StudentContext.jsx'
 const TITLES = { vocab: 'Vocabulary', grammar: 'Grammar', reading: 'Reading' }
 const ICONS = { vocab: '🔤', grammar: '✏️', reading: '📖' }
 
+const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// a VocabExercise only stores {type, conceptId, options, correct} - the actual question ("what do
+// you show the student") depends on the type: picture_match shows the concept's picture,
+// translation_match shows its native translation, fill_gap shows its example sentence with the
+// word blanked out. The 4 options are always the same - words - only what's being asked differs.
+const buildVocabPrompt = (ex) => {
+  const c = ex.conceptId || {}
+  if (ex.type === 'picture_match') {
+    return c.image
+      ? { image: c.image, question: 'Which word matches this picture?' }
+      : { image: null, question: c.word ? `Which word matches: "${c.word}"?` : 'Which word matches this picture?' }
+  }
+  if (ex.type === 'translation_match') {
+    return { image: null, question: c.translation ? `Translate: "${c.translation}"` : 'Translate the word' }
+  }
+  // fill_gap
+  if (c.example && c.word) {
+    const blanked = c.example.replace(new RegExp(`\\b${escapeRegExp(c.word)}\\b`, 'i'), '____')
+    return { image: null, question: blanked }
+  }
+  return { image: null, question: c.example || 'Fill in the blank' }
+}
+
 // 3-stage flow: intro (what's inside + how long it'll take) -> questions -> result (score + a
 // motivational quote), each a full screen so nothing feels rushed or ambiguous
 const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) => {
@@ -76,17 +100,21 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
                 ))}
               </div>
             )}
-            {exercises.map((ex, i) => (
-              <QuestionCard
-                key={ex._id}
-                index={i}
-                question={ex.question || ex.example || 'Match the correct word'}
-                options={ex.options}
-                value={answers[ex._id]}
-                onChange={(v) => setAnswer(ex._id, v)}
-                type={ex.type}
-              />
-            ))}
+            {exercises.map((ex, i) => {
+              const vocabPrompt = section === 'vocab' ? buildVocabPrompt(ex) : null
+              return (
+                <QuestionCard
+                  key={ex._id}
+                  index={i}
+                  question={vocabPrompt ? vocabPrompt.question : (ex.question || 'Match the correct word')}
+                  image={vocabPrompt?.image}
+                  options={ex.options}
+                  value={answers[ex._id]}
+                  onChange={(v) => setAnswer(ex._id, v)}
+                  type={ex.type}
+                />
+              )
+            })}
           </div>
           <div className='px-5 py-4 border-t border-hairline'>
             <button onClick={submit} disabled={!allAnswered || submitting} className='w-full py-4 rounded-2xl bg-accent text-white font-medium disabled:opacity-50'>

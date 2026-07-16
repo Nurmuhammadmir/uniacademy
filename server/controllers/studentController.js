@@ -4,6 +4,8 @@ import User from "../models/User.js"
 import StudentProgress from "../models/StudentProgress.js"
 import Curriculum from "../models/Curriculum.js"
 import Concept from "../models/Concept.js" // required so mongoose can resolve populate('conceptId'/'options'/'correct') refs below
+import WordForm from "../models/WordForm.js"
+import Translation from "../models/Translation.js"
 import VocabExercise from "../models/VocabExercise.js"
 import GrammarExercise from "../models/GrammarExercise.js"
 import ReadingText from "../models/ReadingText.js"
@@ -117,12 +119,45 @@ export const getHomeworkForDay = async (req, res) => {
             ? await ReadingExercise.find({ readingTextId: readingText._id })
             : []
 
+        // Concept only holds { image, category } - the actual word, its example sentence and its
+        // native-language translation live on WordForm/Translation. The frontend needs all three to
+        // render a vocab question (picture/word/translation), so attach them here rather than
+        // leaving the frontend to work with a bare Concept id.
+        const conceptIds = new Set()
+        ;(curriculum?.conceptIds || []).forEach(c => conceptIds.add(String(c._id)))
+        vocab.forEach(v => {
+            if (v.conceptId) conceptIds.add(String(v.conceptId._id))
+            ;(v.options || []).forEach(o => conceptIds.add(String(o._id)))
+            if (v.correct) conceptIds.add(String(v.correct._id))
+        })
+        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: group.languageId })
+        const wordFormByConceptId = Object.fromEntries(wordForms.map(w => [String(w.conceptId), w]))
+        // 'ru' is the shared default across branches - there's no per-student native-language
+        // preference stored anywhere yet, so this is the one language every student can read
+        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] }, nativeLanguageCode: 'ru' })
+        const translationByConceptId = Object.fromEntries(translations.map(t => [String(t.conceptId), t.text]))
+
+        const withWord = (concept) => {
+            if (!concept) return concept
+            const obj = concept.toObject ? concept.toObject() : concept
+            const wf = wordFormByConceptId[String(obj._id)]
+            return { ...obj, word: wf?.word || '', example: wf?.example || '', translation: translationByConceptId[String(obj._id)] || '' }
+        }
+
+        const enrichedConcepts = (curriculum?.conceptIds || []).map(withWord)
+        const enrichedVocab = vocab.map(v => ({
+            ...v.toObject(),
+            conceptId: withWord(v.conceptId),
+            options: (v.options || []).map(withWord),
+            correct: withWord(v.correct),
+        }))
+
         res.json({
             restDay: false,
             day,
             groupId: group._id,
-            concepts: curriculum?.conceptIds || [],
-            vocab,
+            concepts: enrichedConcepts,
+            vocab: enrichedVocab,
             grammar,
             readingText,
             readingExercises,
