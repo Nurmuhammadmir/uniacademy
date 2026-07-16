@@ -51,12 +51,26 @@ export const findImageByName = (kind, name) => {
     return match ? `/static/images/${kind}/${match}` : ''
 }
 
-// exact-filename lookup (used for reading images, which are named explicitly rather than derived
-// from a word) - also pure/sync so contentController's reading bank can resolve server-side
+// filename lookup (used for reading images, which are named explicitly rather than derived from a
+// word) - also pure/sync so contentController's reading bank can resolve server-side. Matched
+// case-insensitively (like findImageByName) since directors and the JSON they paste often disagree
+// with the actual on-disk casing (e.g. "Bees.png" vs "bees.png") on case-sensitive Linux hosts, and
+// trimmed since a stray leading/trailing space (easy to pick up pasting out of JSON, or typing on
+// mobile) would otherwise silently fail to match an on-disk filename that has none. Falls back to a
+// bare-name match (no extension needed) when there's no exact filename hit - directors very
+// naturally type just "giraffe" the same way they do for vocab words, not "giraffe.png", and that
+// must still find giraffe.png sitting on disk instead of reporting no match.
 export const findImageByFilename = (kind, filename) => {
     const dir = path.join(PUBLIC_ROOT, kind === 'reading' ? 'reading' : 'vocab')
-    const safeFilename = path.basename(String(filename)) // strip any path traversal
-    return fs.existsSync(path.join(dir, safeFilename)) ? `/static/images/${kind}/${safeFilename}` : ''
+    if (!fs.existsSync(dir)) return ''
+    const safeFilename = path.basename(String(filename).trim()).toLowerCase() // strip any path traversal
+    if (!safeFilename) return ''
+    const files = fs.readdirSync(dir)
+    const exact = files.find(f => f.toLowerCase() === safeFilename)
+    if (exact) return `/static/images/${kind}/${exact}`
+    const bareName = path.parse(safeFilename).name
+    const byBareName = files.find(f => path.parse(f).name.toLowerCase() === bareName)
+    return byBareName ? `/static/images/${kind}/${byBareName}` : ''
 }
 
 // HTTP wrapper for the builder UI - ?name= (vocab words) or ?filename= (reading, named explicitly)

@@ -13,7 +13,8 @@ export const getFontScale = () => {
 
 export const setFontScale = (percent) => {
     const clamped = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(percent)))
-    document.documentElement.style.fontSize = `${clamped}%`
+    // !important guards against any stylesheet rule that might otherwise win over a plain inline style
+    document.documentElement.style.setProperty('font-size', `${clamped}%`, 'important')
     localStorage.setItem(KEY, String(clamped))
     return clamped
 }

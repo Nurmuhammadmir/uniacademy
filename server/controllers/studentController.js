@@ -422,21 +422,123 @@ const shuffle = (arr) => {
     return copy
 }
 
-// draws `questionCount` random questions from the director's bank and NEVER sends `correct` to
-// the client - grading happens entirely server-side in submitExam below, against the exam
-// document's own stored answers, so a student can't read the answer key out of the network tab
+// picks `count` exercises by repeatedly choosing a random already-learned day, then one random
+// exercise from that day's pool - so a student can draw the same day more than once (there aren't
+// always 25+ learned days), but each draw is still "a random exercise from a random day" rather
+// than a flat sample across the whole level's content
+const pickOnePerRandomDay = (byDay, count) => {
+    const days = Object.keys(byDay)
+    const picked = []
+    if (days.length === 0) return picked
+    for (let i = 0; i < count; i++) {
+        const day = days[Math.floor(Math.random() * days.length)]
+        const pool = byDay[day]
+        picked.push(pool[Math.floor(Math.random() * pool.length)])
+    }
+    return picked
+}
+
+// The exam is no longer a director-curated bank - it's assembled fresh per attempt straight from
+// content the student has already been taught: 25 vocab + 25 grammar exercises (one random
+// exercise from one random already-learned day, drawn 25 times each) plus 3 whole reading texts
+// (each kept intact with all 10 of its own exercises) from already-learned days. `correct` is
+// never sent to the client - grading happens entirely server-side in submitExam, by looking the
+// same exercise ids back up in their source collections.
 export const getExam = async (req, res) => {
     try {
-        const exam = await Exam.findOne({ levelId: req.params.levelId })
-        if (!exam || exam.questions.length === 0) return res.status(404).json({ error: 'not_found' })
+        const group = await Group.findOne({ studentIds: req.auth.userId, levelId: req.params.levelId })
+        if (!group) return res.status(404).json({ error: 'not_found' })
 
-        const count = Math.min(exam.questionCount || 100, exam.questions.length)
-        const sampled = shuffle(exam.questions).slice(0, count)
-        const safeQuestions = sampled.map(q => ({
-            _id: q._id, section: q.section, type: q.type, passage: q.passage, question: q.question, image: q.image, options: q.options,
+        // exam settings (pass mark / time limit) default to 90 min / 70% the moment a level's exam
+        // is actually needed, rather than 404ing just because a director never separately visited
+        // that level's Homework page to click "Save settings" - the exam itself no longer needs any
+        // director authoring, so requiring a settings visit first would be a pointless manual step
+        let exam = await Exam.findOne({ levelId: req.params.levelId })
+        if (!exam) {
+            exam = await Exam.create({ languageId: group.languageId, levelId: req.params.levelId, durationMinutes: 90, passScore: 70 })
+        }
+
+        const level = await Level.findById(req.params.levelId).select('durationDays')
+        const durationDays = level?.durationDays || 30
+        const dayCounter = computeDayCounter(group.startDate, durationDays)
+
+        const learnedDays = []
+        for (let d = 1; d <= Math.min(dayCounter, durationDays); d++) learnedDays.push(d)
+        if (learnedDays.length === 0) return res.status(404).json({ error: 'not_enough_content' })
+
+        // ---- vocab: 25 slots ----
+        const vocabDocs = await VocabExercise.find({ languageId: exam.languageId, levelId: exam.levelId, day: { $in: learnedDays } })
+            .populate('conceptId').populate('options')
+        const vocabByDay = {}
+        vocabDocs.forEach(v => { (vocabByDay[v.day] = vocabByDay[v.day] || []).push(v) })
+        const pickedVocab = pickOnePerRandomDay(vocabByDay, 25)
+
+        // vocab prompts need each concept's word/example/translations (same enrichment
+        // getHomeworkForDay does) - batched here across every concept the 25 picks touch
+        const conceptIds = new Set()
+        pickedVocab.forEach(v => {
+            if (v.conceptId) conceptIds.add(String(v.conceptId._id))
+            ;(v.options || []).forEach(o => conceptIds.add(String(o._id)))
+        })
+        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: exam.languageId })
+        const wordFormByConceptId = Object.fromEntries(wordForms.map(w => [String(w.conceptId), w]))
+        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } })
+        const translationsByConceptId = {}
+        translations.forEach(t => {
+            const key = String(t.conceptId)
+            if (!translationsByConceptId[key]) translationsByConceptId[key] = {}
+            translationsByConceptId[key][t.nativeLanguageCode] = t.text
+        })
+        const withWord = (concept) => {
+            if (!concept) return concept
+            const obj = concept.toObject ? concept.toObject() : concept
+            const wf = wordFormByConceptId[String(obj._id)]
+            const tr = translationsByConceptId[String(obj._id)] || {}
+            return { ...obj, word: wf?.word || '', example: wf?.example || '', translations: { ru: tr.ru || '', uz: tr.uz || '', kaa: tr.kaa || '' } }
+        }
+        const vocabQuestions = pickedVocab.map(v => ({
+            _id: v._id, section: 'vocab', type: v.type,
+            conceptId: withWord(v.conceptId),
+            options: (v.options || []).map(withWord),
         }))
 
-        res.json({ examId: exam._id, durationMinutes: exam.durationMinutes, questions: safeQuestions })
+        // ---- grammar: 25 slots ----
+        const grammarDocs = await GrammarExercise.find({ languageId: exam.languageId, levelId: exam.levelId, day: { $in: learnedDays } })
+        const grammarByDay = {}
+        grammarDocs.forEach(g => { (grammarByDay[g.day] = grammarByDay[g.day] || []).push(g) })
+        const pickedGrammar = pickOnePerRandomDay(grammarByDay, 25)
+        const grammarQuestions = pickedGrammar.map(g => ({
+            _id: g._id, section: 'grammar', type: g.type, question: g.question, options: g.options,
+        }))
+
+        // ---- reading: 3 DISTINCT whole texts, each kept with all of its own exercises ----
+        const readingCandidates = await ReadingText.find({ languageId: exam.languageId, levelId: exam.levelId, day: { $in: learnedDays } })
+        const chosenReadingTexts = shuffle(readingCandidates).slice(0, 3)
+        const readingTexts = []
+        for (const rt of chosenReadingTexts) {
+            const exercises = await ReadingExercise.find({ readingTextId: rt._id })
+            readingTexts.push({
+                readingTextId: rt._id,
+                title: rt.title,
+                image: rt.image,
+                paragraphs: rt.paragraphs,
+                exercises: shuffle(exercises).map(e => ({ _id: e._id, type: e.type, question: e.question, options: e.options })),
+            })
+        }
+
+        // a level with no homework content ever built would otherwise come back as a "successful"
+        // but completely empty exam - the submit button has nothing to enable and the student gets
+        // stuck on a blank page, so treat it the same as "not enough content" instead
+        if (vocabQuestions.length === 0 && grammarQuestions.length === 0 && readingTexts.length === 0) {
+            return res.status(404).json({ error: 'not_enough_content' })
+        }
+
+        res.json({
+            examId: exam._id,
+            durationMinutes: exam.durationMinutes,
+            questions: shuffle([...vocabQuestions, ...grammarQuestions]),
+            readingTexts,
+        })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -456,18 +558,38 @@ export const submitExam = async (req, res) => {
             return res.status(403).json({ error: 'exam_already_attempted' })
         }
 
-        const questionById = new Map(exam.questions.map(q => [String(q._id), q]))
+        const list = Array.isArray(answers) ? answers : []
+        const ids = list.map(a => a.questionId)
+        // exam questions are just VocabExercise/GrammarExercise/ReadingExercise docs drawn at
+        // random - grading looks the submitted ids back up in whichever collection they came from,
+        // using the exact same per-section comparison rules as daily homework (submitVocab/
+        // submitGrammar/submitReading above) so an exam and a practice day always agree on "correct"
+        const [vocabDocs, grammarDocs, readingDocs] = await Promise.all([
+            VocabExercise.find({ _id: { $in: ids } }),
+            GrammarExercise.find({ _id: { $in: ids } }),
+            ReadingExercise.find({ _id: { $in: ids } }),
+        ])
+        const vocabById = new Map(vocabDocs.map(v => [String(v._id), v]))
+        const grammarById = new Map(grammarDocs.map(g => [String(g._id), g]))
+        const readingById = new Map(readingDocs.map(r => [String(r._id), r]))
+
         let correctCount = 0
-        for (const a of (Array.isArray(answers) ? answers : [])) {
-            const q = questionById.get(String(a.questionId))
-            if (!q) continue
-            const isStructured = typeof q.correct === 'object' && q.correct !== null
-            const isMatch = isStructured
-                ? JSON.stringify(q.correct) === JSON.stringify(a.answer)
-                : String(q.correct).trim().toLowerCase() === String(a.answer).trim().toLowerCase()
-            if (isMatch) correctCount++
+        for (const a of list) {
+            const id = String(a.questionId)
+            if (vocabById.has(id)) {
+                if (String(vocabById.get(id).correct) === String(a.answer)) correctCount++
+            } else if (grammarById.has(id)) {
+                if (String(grammarById.get(id).correct).trim().toLowerCase() === String(a.answer).trim().toLowerCase()) correctCount++
+            } else if (readingById.has(id)) {
+                const ex = readingById.get(id)
+                const isStructured = typeof ex.correct === 'object' && ex.correct !== null
+                const isMatch = isStructured
+                    ? JSON.stringify(ex.correct) === JSON.stringify(a.answer)
+                    : String(ex.correct).trim().toLowerCase() === String(a.answer).trim().toLowerCase()
+                if (isMatch) correctCount++
+            }
         }
-        const score = Math.round((correctCount / (answers?.length || 1)) * 100)
+        const score = Math.round((correctCount / (list.length || 1)) * 100)
 
         const group = await Group.findOne({ studentIds: req.auth.userId, levelId: exam.levelId })
         const student = await User.findById(req.auth.userId)

@@ -16,7 +16,7 @@ const DEFAULT_CENTER = [59.6103, 42.4531] // Nukus
 const DEFAULT_ZOOM = 11
 
 const Branches = () => {
-  const { mapData, branches, getBranchProfile, createBranch, updateBranch } = useContext(DirectorContext)
+  const { mapData, branches, getBranchProfile, createBranch, updateBranch, deleteBranch } = useContext(DirectorContext)
   const { t } = useLanguage()
   const [viewingBranchId, setViewingBranchId] = useState(null)
   const [showAddBranch, setShowAddBranch] = useState(false)
@@ -86,13 +86,15 @@ const Branches = () => {
 
       <div className='flex flex-wrap gap-2 mb-6'>
         {branches.map(b => (
-          <button
-            key={b._id}
-            onClick={() => { setEditingBranch(b); setBranchNameInput(b.name); setShowAddBranch(true) }}
-            className='px-3 py-1.5 rounded-lg bg-bg-elevated border border-hairline text-sm text-ink hover:border-accent'
-          >
-            {b.name}
-          </button>
+          <span key={b._id} className='inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 rounded-lg bg-bg-elevated border border-hairline text-sm'>
+            <button
+              onClick={() => { setEditingBranch(b); setBranchNameInput(b.name); setShowAddBranch(true) }}
+              className='text-ink hover:text-accent'
+            >
+              {b.name}
+            </button>
+            <button onClick={() => deleteBranch(b._id)} className='text-muted hover:text-red-500 px-1 leading-none' title={t('remove')}>×</button>
+          </span>
         ))}
       </div>
 

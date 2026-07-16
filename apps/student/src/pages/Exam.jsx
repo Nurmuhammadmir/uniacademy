@@ -2,6 +2,8 @@ import React, { useContext, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import { resolveImageUrl } from '../lib/format.js'
+import { buildVocabPrompt } from '../lib/vocabPrompt.js'
 import QuestionCard from '../components/QuestionCard.jsx'
 import { randomQuote } from '../lib/quotes.js'
 
@@ -13,7 +15,7 @@ const formatClock = (totalSeconds) => {
 
 const Exam = () => {
   const { levelId } = useParams()
-  const { getExam, submitExam } = useContext(StudentContext)
+  const { getExam, submitExam, backendUrl } = useContext(StudentContext)
   const { t } = useLanguage()
   const [exam, setExam] = useState(false)
   const [answers, setAnswers] = useState({})
@@ -34,15 +36,20 @@ const Exam = () => {
   useEffect(() => {
     if (secondsLeft === null || result) return
     if (secondsLeft <= 0) { submit(); return }
-    const t = setTimeout(() => setSecondsLeft(s => s - 1), 1000)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setSecondsLeft(s => s - 1), 1000)
+    return () => clearTimeout(timer)
   }, [secondsLeft, result])
+
+  // every reading exercise, across every one of the 3 texts, flattened - used for both the
+  // "everything answered" check and building the submit payload
+  const allReadingExercises = exam ? (exam.readingTexts || []).flatMap(rt => rt.exercises) : []
+  const allExerciseIds = exam ? [...exam.questions.map(q => q._id), ...allReadingExercises.map(e => e._id)] : []
 
   const submit = async () => {
     if (submittedRef.current) return
     submittedRef.current = true
     setSubmitting(true)
-    const payload = exam.questions.map(q => ({ questionId: q._id, answer: answers[q._id] }))
+    const payload = allExerciseIds.map(id => ({ questionId: id, answer: answers[id] }))
     const data = await submitExam(exam.examId, payload)
     setSubmitting(false)
     if (data) setResult(data)
@@ -68,7 +75,7 @@ const Exam = () => {
     )
   }
 
-  const allAnswered = exam.questions.length > 0 && exam.questions.every(q => answers[q._id] !== undefined && answers[q._id] !== '')
+  const allAnswered = allExerciseIds.length > 0 && allExerciseIds.every(id => answers[id] !== undefined && answers[id] !== '')
   const lowTime = secondsLeft !== null && secondsLeft <= 60
 
   return (
@@ -81,24 +88,48 @@ const Exam = () => {
           </span>
         )}
       </div>
-      {exam.questions.map((q, i) => (
-        <div key={q._id}>
-          {q.passage && (
-            <div className='bg-bg-card border border-hairline rounded-2xl p-4 mb-2'>
-              <p className='text-ink text-sm leading-relaxed'>{q.passage}</p>
-            </div>
-          )}
+
+      {exam.questions.map((q, i) => {
+        const vocabPrompt = q.section === 'vocab' ? buildVocabPrompt(q, t) : null
+        return (
           <QuestionCard
+            key={q._id}
             index={i}
-            question={q.question}
-            image={q.image}
+            question={vocabPrompt ? vocabPrompt.question : q.question}
+            image={vocabPrompt?.image}
             options={q.options}
             value={answers[q._id]}
             onChange={(v) => setAnswers(prev => ({ ...prev, [q._id]: v }))}
             type={q.type}
           />
+        )
+      })}
+
+      {(exam.readingTexts || []).map((rt, ti) => (
+        <div key={rt.readingTextId} className='mt-2'>
+          <div className='bg-bg-card border border-hairline rounded-2xl p-4 mb-2'>
+            {rt.image && (
+              <img src={resolveImageUrl(rt.image, backendUrl)} alt={rt.title} className='w-full h-32 object-contain bg-bg rounded-xl mb-3' />
+            )}
+            <p className='font-display text-lg text-ink mb-2'>{rt.title}</p>
+            {rt.paragraphs.map(p => (
+              <p key={p.id} className='text-ink text-sm mb-2 leading-relaxed'>{p.text}</p>
+            ))}
+          </div>
+          {rt.exercises.map((e, i) => (
+            <QuestionCard
+              key={e._id}
+              index={exam.questions.length + ti * 10 + i}
+              question={e.question || t('matchCorrectWord')}
+              options={e.options}
+              value={answers[e._id]}
+              onChange={(v) => setAnswers(prev => ({ ...prev, [e._id]: v }))}
+              type={e.type}
+            />
+          ))}
         </div>
       ))}
+
       <button onClick={submit} disabled={!allAnswered || submitting} className='w-full py-4 rounded-2xl bg-accent text-white font-medium mt-2 disabled:opacity-50'>
         {submitting ? t('submitting') : t('submitExam')}
       </button>

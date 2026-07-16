@@ -105,7 +105,7 @@ export const getDayContent = async (req, res) => {
             vocab,
             vocabCount: concepts.length,
             grammar,
-            reading: readingText ? { title: readingText.title, image: readingText.image, paragraphs: readingText.paragraphs, exercises: readingExercises } : null,
+            reading: readingText ? { title: readingText.title, image: readingText.image, imageHint: readingText.imageHint, paragraphs: readingText.paragraphs, exercises: readingExercises } : null,
         })
     } catch (error) {
         console.log(error)
@@ -184,9 +184,10 @@ export const saveVocab = async (req, res) => {
             return res.status(400).json({ error: 'missing_params' })
         }
 
+        // an empty `words` array is a deliberate clear (see VocabEditor's "Clear vocab" button) and
+        // must succeed, not error - the frontend's own form already refuses to submit empty via the
+        // normal Save button, so by the time this runs an empty list always means "clear this day"
         const { conceptCount, exerciseCount } = await createVocabDay({ languageId, levelId, day, words })
-        if (conceptCount === 0) return res.status(400).json({ error: 'no_words' })
-
         res.json({ saved: true, wordCount: conceptCount, exerciseCount })
     } catch (error) {
         console.log(error)
@@ -369,10 +370,16 @@ const createReadingDay = async ({ languageId, levelId, day, title, image, paragr
 
     if (!title || !title.trim()) return { created: false, exerciseCount: 0 }
 
+    // keep the raw filename hint even when the file isn't on disk yet - the director may paste the
+    // JSON before dropping the actual photo onto the server, and without this the filename would be
+    // lost forever with no way to recheck it once the file arrives
+    const resolvedImage = resolveReadingImage(image)
+    const isAlreadyAResolvedPath = image && /^(\/static\/|https?:\/\/)/.test(image)
     const readingText = await ReadingText.create({
         languageId, levelId, day,
         title: title.trim(),
-        image: resolveReadingImage(image),
+        image: resolvedImage,
+        imageHint: resolvedImage ? '' : (isAlreadyAResolvedPath ? '' : (image || '')),
         paragraphs: Array.isArray(paragraphs) ? paragraphs.filter(p => p.id && p.text && p.text.trim()) : [],
     })
 

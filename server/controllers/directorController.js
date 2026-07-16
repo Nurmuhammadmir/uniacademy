@@ -490,6 +490,29 @@ export const updateBranch = async (req, res) => {
     }
 }
 
+// api to remove a branch - only allowed once it's empty (no students, admins, teachers or active
+// groups still assigned to it) so deleting one can never silently orphan real people or classes
+export const deleteBranch = async (req, res) => {
+    try {
+        const branch = await Branch.findById(req.params.id)
+        if (!branch) return res.status(404).json({ error: 'not_found' })
+
+        const [peopleCount, activeGroupCount] = await Promise.all([
+            User.countDocuments({ branchId: branch._id, role: { $in: ['student', 'admin', 'teacher'] } }),
+            Group.countDocuments({ branchId: branch._id, status: 'active' }),
+        ])
+        if (peopleCount > 0 || activeGroupCount > 0) {
+            return res.status(409).json({ error: 'branch_not_empty', peopleCount, activeGroupCount })
+        }
+
+        await Branch.deleteOne({ _id: branch._id })
+        res.json({ deleted: true })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 // ==== Languages (courses) ====
 
 // api to add a new course language (e.g. Spanish)

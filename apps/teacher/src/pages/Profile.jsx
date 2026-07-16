@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { TeacherContext } from '../context/TeacherContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import SelfAttendanceScanner from '../components/SelfAttendanceScanner.jsx'
+import InstallAppCard from '../components/InstallAppCard.jsx'
 
 const Profile = () => {
   const { me, logout } = useContext(TeacherContext)
@@ -58,6 +59,8 @@ const Profile = () => {
           ))}
         </div>
       </div>
+
+      <InstallAppCard />
 
       <button onClick={logout} className='w-full py-4 rounded-2xl border border-hairline text-muted font-medium'>
         {t('signOut')}

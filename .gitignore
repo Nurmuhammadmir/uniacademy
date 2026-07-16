@@ -20,6 +20,14 @@ npm-debug.log*
 .DS_Store
 Thumbs.db
 
+# editors
+.vscode/
+.idea/
+*.swp
+
 # director/admin/etc uploaded content images are kept (they ARE the content),
 # but ignore any accidental temp upload artifacts
 *.tmp
+
+# Claude Code session-local runtime state - not project config
+.claude/scheduled_tasks.lock

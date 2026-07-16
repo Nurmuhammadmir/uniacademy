@@ -1,11 +1,13 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { AdminContext } from '../context/AdminContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
 import MapPicker from '../components/MapPicker.jsx'
 import StudentProfileModal from '../components/StudentProfileModal.jsx'
 
 const Students = () => {
   const { students, createStudent, updateStudent, deleteStudent, createPayment, getStudentProfile, languages, levels, getLevels, settings } = useContext(AdminContext)
+  const { t } = useLanguage()
   const [search, setSearch] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -14,6 +16,7 @@ const Students = () => {
   const [form, setForm] = useState({ name: '', phone: '', password: '', address: '', geo: { lat: null, lng: null }, languageId: '', levelId: '', passportInfo: '' })
   const [editForm, setEditForm] = useState({ name: '', phone: '', password: '', address: '', geo: { lat: null, lng: null }, passportInfo: '' })
   const [paymentForm, setPaymentForm] = useState({ languageId: '', amount: '' })
+  const [submittingPayment, setSubmittingPayment] = useState(false)
 
   useEffect(() => { if (form.languageId) getLevels(form.languageId) }, [form.languageId])
 
@@ -41,7 +44,13 @@ const Students = () => {
 
   const submitPayment = async (e) => {
     e.preventDefault()
+    // guards against a double payment being recorded from a double-click/double-tap on "Confirm
+    // payment" - without this, each extra click created a second real Payment document, silently
+    // inflating that student's balance and the branch's revenue totals by the duplicated amount
+    if (submittingPayment) return
+    setSubmittingPayment(true)
     const ok = await createPayment(payingStudent._id, paymentForm.languageId, Number(paymentForm.amount))
+    setSubmittingPayment(false)
     if (ok) { setPayingStudent(null); setPaymentForm({ languageId: '', amount: '' }) }
   }
 
@@ -57,14 +66,14 @@ const Students = () => {
   return (
     <div>
       <div className='flex justify-between items-center mb-6'>
-        <p className='font-display text-2xl text-ink'>Students</p>
-        <button onClick={() => setShowCreate(true)} className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium'>+ Add student</button>
+        <p className='font-display text-2xl text-ink'>{t('studentsTitle')}</p>
+        <button onClick={() => setShowCreate(true)} className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium'>{t('addStudent')}</button>
       </div>
 
       <input
         value={search}
         onChange={e => setSearch(e.target.value)}
-        placeholder='Search by name or phone…'
+        placeholder={t('searchByNameOrPhone')}
         className='w-full max-w-sm px-4 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm mb-4'
       />
 
@@ -72,10 +81,10 @@ const Students = () => {
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
-              <th className='px-5 py-3 font-medium'>Name</th>
-              <th className='px-5 py-3 font-medium'>Phone</th>
-              <th className='px-5 py-3 font-medium'>Courses</th>
-              <th className='px-5 py-3 font-medium'>Status</th>
+              <th className='px-5 py-3 font-medium'>{t('nameCol')}</th>
+              <th className='px-5 py-3 font-medium'>{t('phoneCol')}</th>
+              <th className='px-5 py-3 font-medium'>{t('coursesCol')}</th>
+              <th className='px-5 py-3 font-medium'>{t('statusCol')}</th>
               <th className='px-5 py-3'></th>
             </tr>
           </thead>
@@ -89,66 +98,66 @@ const Students = () => {
                 <td className='px-5 py-3 text-muted'>{courseSummary(s)}</td>
                 <td className='px-5 py-3'>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${anyActive(s) ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>
-                    {anyActive(s) ? 'active' : 'unpaid'}
+                    {anyActive(s) ? t('active') : t('unpaid')}
                   </span>
                 </td>
                 <td className='px-5 py-3 text-right whitespace-nowrap'>
-                  <button onClick={() => openEdit(s)} className='text-accent text-xs font-medium mr-3'>Edit</button>
-                  <button onClick={() => openPay(s)} className='text-accent text-xs font-medium mr-3'>Record payment</button>
-                  <button onClick={() => deleteStudent(s._id)} className='text-muted text-xs font-medium'>Remove</button>
+                  <button onClick={() => openEdit(s)} className='text-accent text-xs font-medium mr-3'>{t('edit')}</button>
+                  <button onClick={() => openPay(s)} className='text-accent text-xs font-medium mr-3'>{t('recordPayment')}</button>
+                  <button onClick={() => deleteStudent(s._id)} className='text-muted text-xs font-medium'>{t('remove')}</button>
                 </td>
               </tr>
             ))}
             {filteredStudents.length === 0 && (
-              <tr><td colSpan={5} className='px-5 py-8 text-center text-muted'>{students.length === 0 ? 'No students in this branch yet.' : 'No students match that search.'}</td></tr>
+              <tr><td colSpan={5} className='px-5 py-8 text-center text-muted'>{students.length === 0 ? t('noStudentsYet') : t('noStudentsMatchSearch')}</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       {showCreate && (
-        <Modal title='Add student' onClose={() => setShowCreate(false)}>
+        <Modal title={t('addStudentModalTitle')} onClose={() => setShowCreate(false)}>
           <form onSubmit={submitCreate} className='flex flex-col gap-3'>
-            <input placeholder='Full name' value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+            <input placeholder={t('fullName')} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
-            <input placeholder='Phone number' value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
+            <input placeholder={t('phoneNumber')} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
-            <input placeholder='Password' type='password' value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+            <input placeholder={t('password')} type='password' value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <input
-              placeholder={settings?.passportRequired === false ? 'Passport / ID info (optional)' : 'Passport / ID info'}
+              placeholder={settings?.passportRequired === false ? t('passportIdInfoOptional') : t('passportIdInfo')}
               value={form.passportInfo}
               onChange={e => setForm({ ...form, passportInfo: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline'
               required={settings?.passportRequired !== false}
             />
-            <p className='text-xs text-muted -mb-1'>First course (more languages can be added later from their profile)</p>
+            <p className='text-xs text-muted -mb-1'>{t('firstCourseHint')}</p>
             <select value={form.languageId} onChange={e => setForm({ ...form, languageId: e.target.value, levelId: '' })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required>
-              <option value=''>Course language</option>
+              <option value=''>{t('courseLanguage')}</option>
               {languages.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
             </select>
             <select value={form.levelId} onChange={e => setForm({ ...form, levelId: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required>
-              <option value=''>Course level</option>
+              <option value=''>{t('courseLevel')}</option>
               {levels.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
             </select>
             <MapPicker address={form.address} lat={form.geo.lat} lng={form.geo.lng}
               onChange={({ lat, lng, address }) => setForm({ ...form, address, geo: { lat, lng } })} />
-            <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>Create student</button>
+            <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('createStudentBtn')}</button>
           </form>
         </Modal>
       )}
 
       {editing && (
-        <Modal title={`Edit ${editing.name}`} onClose={() => setEditing(null)}>
+        <Modal title={t('editStudentModalTitle', { name: editing.name })} onClose={() => setEditing(null)}>
           <form onSubmit={submitEdit} className='flex flex-col gap-3'>
-            <input placeholder='Full name' value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+            <input placeholder={t('fullName')} value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
-            <input placeholder='Phone number' value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+            <input placeholder={t('phoneNumber')} value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
-            <input placeholder='New password (leave blank to keep current)' type='password' value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })}
+            <input placeholder={t('newPasswordOptional')} type='password' value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' />
             <input
-              placeholder={settings?.passportRequired === false ? 'Passport / ID info (optional)' : 'Passport / ID info'}
+              placeholder={settings?.passportRequired === false ? t('passportIdInfoOptional') : t('passportIdInfo')}
               value={editForm.passportInfo}
               onChange={e => setEditForm({ ...editForm, passportInfo: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline'
@@ -156,22 +165,24 @@ const Students = () => {
             />
             <MapPicker address={editForm.address} lat={editForm.geo?.lat} lng={editForm.geo?.lng}
               onChange={({ lat, lng, address }) => setEditForm({ ...editForm, address, geo: { lat, lng } })} />
-            <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>Save changes</button>
+            <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('saveChanges')}</button>
           </form>
         </Modal>
       )}
 
       {payingStudent && (
-        <Modal title={`Record payment · ${payingStudent.name}`} onClose={() => setPayingStudent(null)}>
+        <Modal title={t('recordPaymentModalTitle', { name: payingStudent.name })} onClose={() => setPayingStudent(null)}>
           <form onSubmit={submitPayment} className='flex flex-col gap-3'>
             <select value={paymentForm.languageId} onChange={e => setPaymentForm({ ...paymentForm, languageId: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required>
-              <option value=''>Which course is this for?</option>
+              <option value=''>{t('whichCourseIsThisFor')}</option>
               {payingStudent.courses.map(c => <option key={c._id} value={c.languageId._id}>{c.languageId.name} · {c.levelId.name}</option>)}
             </select>
-            <input placeholder='Amount' type='number' value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+            <input placeholder={t('amountLabel')} type='number' value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
-            <p className='text-xs text-muted'>Credited to that course's balance. The course only becomes active once its balance covers a full month at its price - you'll be told exactly how much more is needed if it isn't enough yet.</p>
-            <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>Confirm payment</button>
+            <p className='text-xs text-muted'>{t('paymentCreditNote')}</p>
+            <button type='submit' disabled={submittingPayment} className='py-3 rounded-xl bg-accent text-white font-medium disabled:opacity-50'>
+              {submittingPayment ? t('recordingPayment') : t('confirmPaymentBtn')}
+            </button>
           </form>
         </Modal>
       )}

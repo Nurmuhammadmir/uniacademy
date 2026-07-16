@@ -2,34 +2,11 @@ import React, { useContext, useState } from 'react'
 import QuestionCard from './QuestionCard.jsx'
 import { randomQuote } from '../lib/quotes.js'
 import { resolveImageUrl } from '../lib/format.js'
+import { buildVocabPrompt } from '../lib/vocabPrompt.js'
 import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const ICONS = { vocab: '🔤', grammar: '✏️', reading: '📖' }
-
-const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-// a VocabExercise only stores {type, conceptId, options, correct} - the actual question ("what do
-// you show the student") depends on the type: picture_match shows the concept's picture,
-// translation_match shows all 3 native translations at once (not just Russian - the student body
-// isn't only Russian speakers), fill_gap shows its example sentence with the word blanked out. The
-// 4 options are always the same - words - only what's being asked differs.
-const buildVocabPrompt = (ex, t) => {
-  const c = ex.conceptId || {}
-  if (ex.type === 'picture_match') {
-    return { image: c.image || null, question: t('whichWordMatches') }
-  }
-  if (ex.type === 'translation_match') {
-    const parts = [c.translations?.ru, c.translations?.uz, c.translations?.kaa].filter(Boolean)
-    return { image: null, question: parts.length ? `${t('translateWord')}: ${parts.join(' / ')}` : t('translateWord') }
-  }
-  // fill_gap
-  if (c.example && c.word) {
-    const blanked = c.example.replace(new RegExp(`\\b${escapeRegExp(c.word)}\\b`, 'i'), '____')
-    return { image: null, question: blanked }
-  }
-  return { image: null, question: c.example || t('fillInBlank') }
-}
 
 // 4-stage flow for vocab (intro -> flashcards -> questions -> result), 3-stage for grammar/reading
 // (intro -> questions -> result). The whole modal is capped at a phone-like width so nothing -
@@ -98,13 +75,14 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
             <div className='flex-1 flex flex-col items-center justify-center px-5'>
               <div className='w-full bg-bg-card border border-hairline rounded-2xl p-5 flex flex-col items-center'>
                 {card?.image && (
-                  <img src={resolveImageUrl(card.image, backendUrl)} alt='' className='w-40 h-40 object-cover rounded-xl mb-4' />
+                  <img src={resolveImageUrl(card.image, backendUrl)} alt='' className='w-36 h-36 object-contain bg-bg rounded-xl mb-4' />
                 )}
-                <p className='font-display text-2xl text-ink mb-3'>{card?.word}</p>
-                <div className='flex flex-col gap-1 text-center'>
-                  {card?.translations?.ru && <p className='text-muted text-sm'>ru: {card.translations.ru}</p>}
-                  {card?.translations?.uz && <p className='text-muted text-sm'>uz: {card.translations.uz}</p>}
-                  {card?.translations?.kaa && <p className='text-muted text-sm'>kaa: {card.translations.kaa}</p>}
+                <p className='font-display text-3xl text-ink mb-2'>{card?.word}</p>
+                {card?.example && <p className='text-muted text-base italic text-center mb-3'>{card.example}</p>}
+                <div className='flex flex-col gap-2 text-center'>
+                  {card?.translations?.ru && <p className='text-ink text-xl font-medium'>ru: {card.translations.ru}</p>}
+                  {card?.translations?.uz && <p className='text-ink text-xl font-medium'>uz: {card.translations.uz}</p>}
+                  {card?.translations?.kaa && <p className='text-ink text-xl font-medium'>kaa: {card.translations.kaa}</p>}
                 </div>
               </div>
               <p className='text-muted text-xs mt-3'>{t('card', { current: cardIndex + 1, total: concepts.length })}</p>
@@ -129,7 +107,7 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
               {section === 'reading' && dayData.readingText && (
                 <div className='bg-bg-card border border-hairline rounded-2xl p-4 mb-4'>
                   {dayData.readingText.image && (
-                    <img src={resolveImageUrl(dayData.readingText.image, backendUrl)} alt={dayData.readingText.title} className='w-full h-36 object-cover rounded-xl mb-3' />
+                    <img src={resolveImageUrl(dayData.readingText.image, backendUrl)} alt={dayData.readingText.title} className='w-full h-32 object-contain bg-bg rounded-xl mb-3' />
                   )}
                   <p className='font-display text-lg text-ink mb-2'>{dayData.readingText.title}</p>
                   {dayData.readingText.paragraphs.map(p => (

@@ -6,6 +6,9 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 // `image` is the question's own prompt picture (e.g. a vocab picture_match concept) - never a
 // per-option picture. Options are always rendered as plain word/text choices, so every prompt
 // image renders at the same square size regardless of the source photo's aspect ratio.
+// No custom translate button here - the question/option text is normal selectable DOM text (no
+// user-select/touch-callout blocking anywhere in the app), so the phone's own built-in
+// select-text-to-translate feature already works on it without anything special from us.
 const QuestionCard = ({ index, question, image, options, value, onChange, type }) => {
   const { backendUrl } = useContext(StudentContext)
   const { t } = useLanguage()
@@ -22,7 +25,7 @@ const QuestionCard = ({ index, question, image, options, value, onChange, type }
       {image && (
         <img src={resolveImageUrl(image, backendUrl)} alt='' className='w-full aspect-square object-cover rounded-xl mb-3' />
       )}
-      <p className='text-ink font-medium mb-3'>{question}</p>
+      <p className='text-ink font-medium mb-2'>{question}</p>
 
       {isTrueFalse ? (
         <div className='grid grid-cols-2 gap-2'>

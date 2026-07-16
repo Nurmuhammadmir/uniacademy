@@ -3,6 +3,7 @@ import axios from 'axios'
 import { toast } from 'react-toastify'
 import { confirm } from '../lib/confirm.js'
 import { formatMoney } from '../lib/format.js'
+import { t } from '../i18n/LanguageContext.jsx'
 
 export const AdminContext = createContext()
 
@@ -25,20 +26,20 @@ const AdminContextProvider = (props) => {
         try {
             const { data } = await axios.post(backendUrl + '/api/auth/login', { phone, password })
             if (data.user.role !== 'admin') {
-                toast.error('this account is not an admin account')
+                toast.error(t('accountNotAdmin'))
                 return false
             }
             localStorage.setItem('token', data.token)
             setToken(data.token)
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'login failed')
+            toast.error(error.response?.data?.error || t('loginFailed'))
             return false
         }
     }
 
     const logout = async () => {
-        if (!(await confirm('Sign out of UniAcademy?'))) return
+        if (!(await confirm(t('confirmSignOut')))) return
         localStorage.removeItem('token')
         setToken(false)
         setStudents([]); setGroups([]); setPayments([])
@@ -49,21 +50,21 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/students', authHeader)
             setStudents(data.students)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load students')
+            toast.error(error.response?.data?.error || t('couldNotLoadStudents'))
         }
     }
 
     const createStudent = async (payload) => {
         try {
             await axios.post(backendUrl + '/api/admin/students', payload, authHeader)
-            toast.success('student created')
+            toast.success(t('studentCreated'))
             getStudents()
             return true
         } catch (error) {
             if (error.response?.data?.error === 'passport_info_required') {
-                toast.error('passport/ID info is required for new students')
+                toast.error(t('passportRequiredError'))
             } else {
-                toast.error(error.response?.data?.error || 'could not create student')
+                toast.error(error.response?.data?.error || t('couldNotCreateStudent'))
             }
             return false
         }
@@ -72,23 +73,23 @@ const AdminContextProvider = (props) => {
     const updateStudent = async (id, payload) => {
         try {
             await axios.put(backendUrl + '/api/admin/students/' + id, payload, authHeader)
-            toast.success('student updated')
+            toast.success(t('studentUpdated'))
             getStudents()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not update student')
+            toast.error(error.response?.data?.error || t('couldNotUpdateStudent'))
             return false
         }
     }
 
     const deleteStudent = async (id) => {
-        if (!(await confirm('Remove this student? This cannot be undone.'))) return
+        if (!(await confirm(t('confirmRemoveStudent')))) return
         try {
             await axios.delete(backendUrl + '/api/admin/students/' + id, authHeader)
-            toast.success('student removed')
+            toast.success(t('studentRemoved'))
             getStudents()
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not remove student')
+            toast.error(error.response?.data?.error || t('couldNotRemoveStudent'))
         }
     }
 
@@ -97,7 +98,7 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/students/' + id, authHeader)
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load student profile')
+            toast.error(error.response?.data?.error || t('couldNotLoadStudentProfile'))
             return null
         }
     }
@@ -106,11 +107,11 @@ const AdminContextProvider = (props) => {
     const updateStudentCourse = async (studentId, courseId, levelId) => {
         try {
             await axios.put(backendUrl + `/api/admin/students/${studentId}/courses/${courseId}`, { levelId }, authHeader)
-            toast.success('course level updated')
+            toast.success(t('courseLevelUpdated'))
             getStudents()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not update course level')
+            toast.error(error.response?.data?.error || t('couldNotUpdateCourseLevel'))
             return false
         }
     }
@@ -118,14 +119,14 @@ const AdminContextProvider = (props) => {
     const addStudentCourse = async (studentId, languageId, levelId) => {
         try {
             await axios.post(backendUrl + `/api/admin/students/${studentId}/courses`, { languageId, levelId }, authHeader)
-            toast.success('course added')
+            toast.success(t('courseAdded'))
             getStudents()
             return true
         } catch (error) {
             if (error.response?.data?.error === 'language_already_enrolled') {
-                toast.error('this student already studies that language')
+                toast.error(t('alreadyEnrolledError'))
             } else {
-                toast.error(error.response?.data?.error || 'could not add course')
+                toast.error(error.response?.data?.error || t('couldNotAddCourse'))
             }
             return false
         }
@@ -135,17 +136,17 @@ const AdminContextProvider = (props) => {
         try {
             const { data } = await axios.post(backendUrl + '/api/admin/payments', { studentId, languageId, amount }, authHeader)
             if (data.isActive) {
-                toast.success('payment recorded - course is now active')
+                toast.success(t('paymentRecordedActive'))
             } else {
-                toast.success(`payment recorded - ${formatMoney(data.amountStillNeeded)} more needed to activate`)
+                toast.success(t('paymentRecordedMoreNeeded', { amount: formatMoney(data.amountStillNeeded) }))
             }
             getStudents(); getPayments()
             return true
         } catch (error) {
             if (error.response?.data?.error === 'student_has_no_course') {
-                toast.error("this student isn't enrolled in that course yet")
+                toast.error(t('studentNoCourseError'))
             } else {
-                toast.error(error.response?.data?.error || 'could not record payment')
+                toast.error(error.response?.data?.error || t('couldNotRecordPayment'))
             }
             return false
         }
@@ -156,18 +157,18 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/payments', authHeader)
             setPayments(data.payments)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load payments')
+            toast.error(error.response?.data?.error || t('couldNotLoadPayments'))
         }
     }
 
     const deletePayment = async (id) => {
-        if (!(await confirm("Void this payment? The course's balance and active status will be recalculated."))) return
+        if (!(await confirm(t('confirmVoidPayment')))) return
         try {
             await axios.delete(backendUrl + '/api/admin/payments/' + id, authHeader)
-            toast.success('payment voided')
+            toast.success(t('paymentVoided'))
             getPayments(); getStudents()
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not void payment')
+            toast.error(error.response?.data?.error || t('couldNotVoidPayment'))
         }
     }
 
@@ -176,21 +177,21 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/groups', authHeader)
             setGroups(data.groups)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load groups')
+            toast.error(error.response?.data?.error || t('couldNotLoadGroups'))
         }
     }
 
     const createGroup = async (payload) => {
         try {
             await axios.post(backendUrl + '/api/admin/groups', payload, authHeader)
-            toast.success('group created')
+            toast.success(t('groupCreated'))
             getGroups()
             return true
         } catch (error) {
             if (error.response?.data?.error === 'teacher_schedule_conflict') {
-                toast.error('this teacher already has a class at that time')
+                toast.error(t('teacherScheduleConflict'))
             } else {
-                toast.error(error.response?.data?.error || 'could not create group')
+                toast.error(error.response?.data?.error || t('couldNotCreateGroup'))
             }
             return false
         }
@@ -201,7 +202,7 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/groups/' + id, authHeader)
             return data.group
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load group')
+            toast.error(error.response?.data?.error || t('couldNotLoadGroup'))
             return null
         }
     }
@@ -209,49 +210,49 @@ const AdminContextProvider = (props) => {
     const updateGroup = async (id, payload) => {
         try {
             await axios.put(backendUrl + '/api/admin/groups/' + id, payload, authHeader)
-            toast.success('group updated')
+            toast.success(t('groupUpdated'))
             getGroups()
             return true
         } catch (error) {
             if (error.response?.data?.error === 'teacher_schedule_conflict') {
-                toast.error('this teacher already has a class at that time')
+                toast.error(t('teacherScheduleConflict'))
             } else {
-                toast.error(error.response?.data?.error || 'could not update group')
+                toast.error(error.response?.data?.error || t('couldNotUpdateGroup'))
             }
             return false
         }
     }
 
     const deleteGroup = async (id) => {
-        if (!(await confirm('Archive this group? Students keep their history but the group stops being active.'))) return
+        if (!(await confirm(t('confirmArchiveGroup')))) return
         try {
             await axios.delete(backendUrl + '/api/admin/groups/' + id, authHeader)
-            toast.success('group archived')
+            toast.success(t('groupArchived'))
             getGroups()
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not archive group')
+            toast.error(error.response?.data?.error || t('couldNotArchiveGroup'))
         }
     }
 
     const unarchiveGroup = async (id) => {
-        if (!(await confirm('Reactivate this group?'))) return
+        if (!(await confirm(t('confirmReactivateGroup')))) return
         try {
             await axios.post(backendUrl + `/api/admin/groups/${id}/unarchive`, {}, authHeader)
-            toast.success('group reactivated')
+            toast.success(t('groupReactivated'))
             getGroups()
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not reactivate group')
+            toast.error(error.response?.data?.error || t('couldNotReactivateGroup'))
         }
     }
 
     const removeStudentFromGroup = async (groupId, studentId) => {
-        if (!(await confirm('Remove this student from the group?'))) return
+        if (!(await confirm(t('confirmRemoveStudentFromGroup')))) return
         try {
             await axios.delete(backendUrl + `/api/admin/groups/${groupId}/students/${studentId}`, authHeader)
-            toast.success('student removed from group')
+            toast.success(t('studentRemovedFromGroup'))
             getGroups()
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not remove student')
+            toast.error(error.response?.data?.error || t('couldNotRemoveStudentFromGroup'))
         }
     }
 
@@ -260,7 +261,7 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + `/api/admin/groups/suggest?languageId=${languageId}&levelId=${levelId}`, authHeader)
             return data.suggestion
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not fetch suggestion')
+            toast.error(error.response?.data?.error || t('couldNotFetchSuggestion'))
             return null
         }
     }
@@ -268,18 +269,18 @@ const AdminContextProvider = (props) => {
     const addStudentToGroup = async (groupId, studentId) => {
         try {
             await axios.post(backendUrl + `/api/admin/groups/${groupId}/students`, { studentId }, authHeader)
-            toast.success('student added to group')
+            toast.success(t('studentAddedToGroup'))
             getGroups()
             return true
         } catch (error) {
             if (error.response?.data?.error === 'payment_required') {
-                toast.error("this student's course for this language/level isn't active yet")
+                toast.error(t('paymentRequiredError'))
             } else if (error.response?.data?.error === 'group_full') {
-                toast.error('this group is already full')
+                toast.error(t('groupFullError'))
             } else if (error.response?.data?.error === 'already_in_language_group') {
-                toast.error('this student is already in another active group for this same language')
+                toast.error(t('alreadyInLanguageGroupError'))
             } else {
-                toast.error(error.response?.data?.error || 'could not add student')
+                toast.error(error.response?.data?.error || t('couldNotAddStudent'))
             }
             return false
         }
@@ -288,10 +289,10 @@ const AdminContextProvider = (props) => {
     const retakeExam = async (examId, studentId, score) => {
         try {
             const { data } = await axios.post(backendUrl + `/api/admin/exams/${examId}/retake/${studentId}`, { score }, authHeader)
-            toast.success(`retake recorded: ${data.outcome}`)
+            toast.success(t('retakeRecorded', { outcome: data.outcome }))
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not record retake')
+            toast.error(error.response?.data?.error || t('couldNotRecordRetake'))
             return null
         }
     }
@@ -301,7 +302,7 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/teachers', authHeader)
             setTeachers(data.teachers)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load teachers')
+            toast.error(error.response?.data?.error || t('couldNotLoadTeachers'))
         }
     }
 
@@ -310,7 +311,7 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/languages', authHeader)
             setLanguages(data.languages)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load languages')
+            toast.error(error.response?.data?.error || t('couldNotLoadLanguages'))
         }
     }
 
@@ -319,7 +320,7 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/levels' + (languageId ? `?languageId=${languageId}` : ''), authHeader)
             setLevels(data.levels)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load levels')
+            toast.error(error.response?.data?.error || t('couldNotLoadLevels'))
         }
     }
 
@@ -328,7 +329,7 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/settings', authHeader)
             setSettings(data.settings)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load settings')
+            toast.error(error.response?.data?.error || t('couldNotLoadSettings'))
         }
     }
 
@@ -337,7 +338,7 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/me', authHeader)
             setMe(data)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load profile')
+            toast.error(error.response?.data?.error || t('couldNotLoadProfile'))
         }
     }
 
@@ -346,7 +347,7 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/teachers/' + id, authHeader)
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load teacher profile')
+            toast.error(error.response?.data?.error || t('couldNotLoadTeacherProfile'))
             return null
         }
     }
@@ -355,11 +356,11 @@ const AdminContextProvider = (props) => {
     const createTeacherAttendanceQR = async () => {
         try {
             const { data } = await axios.post(backendUrl + '/api/admin/attendance-qr', {}, authHeader)
-            toast.success('check-in QR generated')
+            toast.success(t('checkInQrGenerated'))
             getTeacherAttendanceQRs()
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not generate QR code')
+            toast.error(error.response?.data?.error || t('couldNotGenerateQr'))
             return null
         }
     }
@@ -370,7 +371,7 @@ const AdminContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/admin/attendance-qr', authHeader)
             setTeacherAttendanceQRs(data.qrs)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load QR codes')
+            toast.error(error.response?.data?.error || t('couldNotLoadQrCodes'))
         }
     }
 

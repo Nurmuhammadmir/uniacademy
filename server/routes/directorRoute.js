@@ -5,7 +5,7 @@ import {
     createAdmin, listAdmins, updateAdmin, deleteAdmin, getAdminProfile,
     createTeacher, listTeachers, updateTeacher, deleteTeacher, getTeacherProfile,
     upsertPricing, listPricing, deletePricing, getAttendanceOverview,
-    createBranch, updateBranch,
+    createBranch, updateBranch, deleteBranch,
     createLanguage, updateLanguage, deleteLanguage,
     createLevel, updateLevel, deleteLevel,
     updateSettings,
@@ -17,7 +17,7 @@ import {
     fillVocabWordBank, fillGrammarBank, fillReadingBank,
 } from "../controllers/contentController.js"
 import { uploadMiddleware, uploadImage, resolveImage } from "../controllers/uploadController.js"
-import { getExamConfig, saveExamConfig, addExamQuestions, clearExamQuestions } from "../controllers/examBuilderController.js"
+import { getExamConfig, saveExamConfig } from "../controllers/examBuilderController.js"
 
 const directorRouter = express.Router()
 directorRouter.use(requireRole('director'))
@@ -34,16 +34,16 @@ directorRouter.put('/content/reading/word-bank', fillReadingBank)
 directorRouter.post('/content/upload/:kind', uploadMiddleware, uploadImage)
 directorRouter.get('/content/resolve-image/:kind', resolveImage)
 
-// ==== exam builder (level-wide question bank, independent of the daily curriculum) ====
+// ==== exam settings (pass mark + time limit) - the exam itself is auto-assembled from already-
+// learned daily content, see studentController.getExam ====
 directorRouter.get('/exam', getExamConfig)
 directorRouter.put('/exam', saveExamConfig)
-directorRouter.put('/exam/questions', addExamQuestions)
-directorRouter.delete('/exam/questions', clearExamQuestions)
 
 directorRouter.get('/branches', listBranches)
 directorRouter.get('/branches/:id', getBranchProfile)
 directorRouter.post('/branches', createBranch)
 directorRouter.put('/branches/:id', updateBranch)
+directorRouter.delete('/branches/:id', deleteBranch)
 
 directorRouter.get('/languages', listLanguages)
 directorRouter.post('/languages', createLanguage)

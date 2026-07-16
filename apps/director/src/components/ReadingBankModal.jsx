@@ -1,5 +1,6 @@
 import React, { useContext, useState } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { toast } from 'react-toastify'
 import BankFillResult from './BankFillResult.jsx'
 
@@ -35,6 +36,7 @@ const JSON_EXAMPLE = `{
 // and it's fine to omit while the photo isn't ready yet.
 const ReadingBankModal = ({ languageId, levelId, levelName, onClose, onFilled }) => {
   const { fillReadingBank } = useContext(DirectorContext)
+  const { t } = useLanguage()
   const [jsonText, setJsonText] = useState('')
   const [filling, setFilling] = useState(false)
   const [result, setResult] = useState(null)
@@ -44,11 +46,11 @@ const ReadingBankModal = ({ languageId, levelId, levelName, onClose, onFilled })
     try {
       parsed = JSON.parse(jsonText)
     } catch {
-      toast.error('That is not valid JSON')
+      toast.error(t('notValidJson'))
       return
     }
     const readings = Array.isArray(parsed) ? parsed : parsed.readings
-    if (!Array.isArray(readings) || readings.length === 0) { toast.error('Expected a "readings" array'); return }
+    if (!Array.isArray(readings) || readings.length === 0) { toast.error(t('expectedReadingsArray')); return }
 
     setFilling(true)
     const data = await fillReadingBank(languageId, levelId, readings)
@@ -61,22 +63,19 @@ const ReadingBankModal = ({ languageId, levelId, levelName, onClose, onFilled })
 
   return (
     <div className='flex flex-col gap-3'>
-      <p className='text-xs text-muted'>
-        Paste as many complete readings as you like for <span className='text-ink font-medium'>{levelName}</span> - each one is a whole day (1 text + 10 exercises), so filling puts one reading into every day that's still empty, skipping any day you've already built.
-        "image" names a file you've dropped into <span className='font-mono'>server/public/images/reading/</span> - it attaches automatically if found, and it's fine to leave out.
-      </p>
+      <p className='text-xs text-muted'>{t('readingBankHint', { level: levelName })}</p>
 
       <textarea value={jsonText} onChange={e => setJsonText(e.target.value)} placeholder={JSON_EXAMPLE}
         rows={16} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-xs font-mono' />
 
       <BankFillResult daysFilled={result?.daysFilled} used={result?.readingsUsed} remaining={result?.readingsRemaining}
-        emptyDaysRemaining={result?.emptyDaysRemaining} filled={result?.filled?.map(f => ({ day: f.day, count: f.title }))} skipped={result?.skipped} unitLabel='reading' />
+        emptyDaysRemaining={result?.emptyDaysRemaining} filled={result?.filled?.map(f => ({ day: f.day, count: f.title }))} skipped={result?.skipped} unitKey='reading' />
 
       <div className='flex gap-2 justify-end'>
-        <button onClick={() => setJsonText(JSON_EXAMPLE)} className='px-3 py-2 text-muted text-sm'>Insert example</button>
-        <button onClick={onClose} className='px-4 py-2 text-muted text-sm'>Close</button>
+        <button onClick={() => setJsonText(JSON_EXAMPLE)} className='px-3 py-2 text-muted text-sm'>{t('insertExample')}</button>
+        <button onClick={onClose} className='px-4 py-2 text-muted text-sm'>{t('close')}</button>
         <button onClick={submit} disabled={filling} className='px-5 py-2 rounded-lg bg-accent text-white text-sm font-medium disabled:opacity-50'>
-          {filling ? 'Filling…' : 'Fill empty days'}
+          {filling ? t('filling') : t('fillEmptyDays')}
         </button>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import React, { useContext, useState } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { toast } from 'react-toastify'
 import BankFillResult from './BankFillResult.jsx'
 
@@ -25,6 +26,7 @@ const JSON_EXAMPLE = `{
 // server/public/images/vocab/ by hand and the backend matches them by word name at fill time.
 const WordBankModal = ({ languageId, levelId, levelName, onClose, onFilled }) => {
   const { fillVocabWordBank } = useContext(DirectorContext)
+  const { t } = useLanguage()
   const [jsonText, setJsonText] = useState('')
   const [filling, setFilling] = useState(false)
   const [result, setResult] = useState(null)
@@ -34,11 +36,11 @@ const WordBankModal = ({ languageId, levelId, levelName, onClose, onFilled }) =>
     try {
       parsed = JSON.parse(jsonText)
     } catch {
-      toast.error('That is not valid JSON')
+      toast.error(t('notValidJson'))
       return
     }
     const words = Array.isArray(parsed) ? parsed : parsed.words
-    if (!Array.isArray(words) || words.length === 0) { toast.error('Expected a "words" array'); return }
+    if (!Array.isArray(words) || words.length === 0) { toast.error(t('expectedWordsArray')); return }
 
     setFilling(true)
     const data = await fillVocabWordBank(languageId, levelId, words)
@@ -51,22 +53,19 @@ const WordBankModal = ({ languageId, levelId, levelName, onClose, onFilled }) =>
 
   return (
     <div className='flex flex-col gap-3'>
-      <p className='text-xs text-muted'>
-        Paste as many words as you like for <span className='text-ink font-medium'>{levelName}</span> - no day limit here.
-        Filling walks day 1 upward and drops 10 words into every day that's still empty, skipping any day you've already built. Photos are matched automatically from <span className='font-mono'>server/public/images/vocab/</span> by word name - nothing to upload here.
-      </p>
+      <p className='text-xs text-muted'>{t('wordBankHint', { level: levelName })}</p>
 
       <textarea value={jsonText} onChange={e => setJsonText(e.target.value)} placeholder={JSON_EXAMPLE}
         rows={16} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-xs font-mono' />
 
       <BankFillResult daysFilled={result?.daysFilled} used={result?.wordsUsed} remaining={result?.wordsRemaining}
-        emptyDaysRemaining={result?.emptyDaysRemaining} filled={result?.filled} skipped={result?.skipped} unitLabel='word' />
+        emptyDaysRemaining={result?.emptyDaysRemaining} filled={result?.filled} skipped={result?.skipped} unitKey='word' />
 
       <div className='flex gap-2 justify-end'>
-        <button onClick={() => setJsonText(JSON_EXAMPLE)} className='px-3 py-2 text-muted text-sm'>Insert example</button>
-        <button onClick={onClose} className='px-4 py-2 text-muted text-sm'>Close</button>
+        <button onClick={() => setJsonText(JSON_EXAMPLE)} className='px-3 py-2 text-muted text-sm'>{t('insertExample')}</button>
+        <button onClick={onClose} className='px-4 py-2 text-muted text-sm'>{t('close')}</button>
         <button onClick={submit} disabled={filling} className='px-5 py-2 rounded-lg bg-accent text-white text-sm font-medium disabled:opacity-50'>
-          {filling ? 'Filling…' : 'Fill empty days'}
+          {filling ? t('filling') : t('fillEmptyDays')}
         </button>
       </div>
     </div>

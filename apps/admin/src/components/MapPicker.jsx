@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN
 
@@ -13,6 +14,7 @@ const DEFAULT_ZOOM = 11
 // address search (Mapbox Geocoding API) + a draggable pin on a live map. onChange fires with
 // { lat, lng, address } every time the pin moves.
 const MapPicker = ({ address, lat, lng, onChange }) => {
+  const { t } = useLanguage()
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const markerRef = useRef(null)
@@ -95,7 +97,7 @@ const MapPicker = ({ address, lat, lng, onChange }) => {
   return (
     <div>
       <div className='relative mb-2'>
-        <input value={query} onChange={(e) => search(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }} placeholder='Search address'
+        <input value={query} onChange={(e) => search(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') e.preventDefault() }} placeholder={t('searchAddress')}
           className='w-full px-4 py-3 rounded-xl bg-bg border border-hairline' />
         {suggestions.length > 0 && (
           <div className='absolute z-10 w-full bg-bg-elevated border border-hairline rounded-xl mt-1 max-h-48 overflow-y-auto'>
@@ -106,7 +108,7 @@ const MapPicker = ({ address, lat, lng, onChange }) => {
         )}
       </div>
       <div ref={containerRef} className='w-full h-56 rounded-xl border border-hairline' />
-      <p className='text-xs text-muted mt-1'>Search or tap the map to set the student's location.</p>
+      <p className='text-xs text-muted mt-1'>{t('searchOrTapHint')}</p>
     </div>
   )
 }

@@ -1,5 +1,7 @@
 import React, { useContext, useState } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
+import { confirm } from '../lib/confirm.js'
 import { toast } from 'react-toastify'
 
 const emptyRow = () => ({ word: '', example: '', image: '', translations: { ru: '', uz: '', kaa: '' } })
@@ -25,6 +27,7 @@ const JSON_EXAMPLE = `{
 // questions are generated automatically on save - the director never writes them by hand.
 const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) => {
   const { saveVocab, uploadContentImage, resolveContentImage, backendUrl } = useContext(DirectorContext)
+  const { t } = useLanguage()
 
   const seed = () => {
     const rows = (initial && initial.length ? initial : []).map(w => ({
@@ -66,13 +69,13 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
     }))
     setRows(updated)
     setRecheckingAll(false)
-    toast.success('Rechecked photos')
+    toast.success(t('rechkedPhotosToast'))
   }
 
   const onPickImage = async (i, file) => {
     if (!file) return
     const word = rows[i].word.trim()
-    if (!word) { toast.error('Type the English word first - the photo is saved under that name'); return }
+    if (!word) { toast.error(t('typeWordFirst')); return }
     setUploadingIdx(i)
     const path = await uploadContentImage('vocab', word, file)
     setUploadingIdx(null)
@@ -84,11 +87,11 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
     try {
       parsed = JSON.parse(jsonText)
     } catch {
-      toast.error('That is not valid JSON')
+      toast.error(t('notValidJson'))
       return
     }
     const words = Array.isArray(parsed) ? parsed : parsed.words
-    if (!Array.isArray(words)) { toast.error('Expected a "words" array'); return }
+    if (!Array.isArray(words)) { toast.error(t('expectedWordsArray')); return }
 
     const built = words.slice(0, 10).map(w => ({
       word: w.word || '', example: w.example || '', image: '',
@@ -110,14 +113,25 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
 
     setRows(resolved)
     setMode('form')
-    toast.success(`Loaded ${words.length} word${words.length === 1 ? '' : 's'} from JSON`)
+    toast.success(t('loadedWordsFromJson', { count: words.length, plural: words.length === 1 ? '' : 's' }))
   }
 
   const submit = async () => {
     const words = rows.filter(r => r.word.trim())
-    if (words.length === 0) { toast.error('Add at least one word'); return }
+    if (words.length === 0) { toast.error(t('addAtLeastOneWord')); return }
     setSaving(true)
     const ok = await saveVocab({ languageId, levelId, day, words })
+    setSaving(false)
+    if (ok) { onSaved?.(); onClose() }
+  }
+
+  // deliberately bypasses the "at least one word" guard above - this is the one place an empty
+  // save is intended, to wipe just this day's vocabulary (and its auto-generated test) without
+  // touching that day's grammar or reading
+  const clearVocab = async () => {
+    if (!(await confirm(t('confirmClearVocab')))) return
+    setSaving(true)
+    const ok = await saveVocab({ languageId, levelId, day, words: [] })
     setSaving(false)
     if (ok) { onSaved?.(); onClose() }
   }
@@ -125,15 +139,15 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
   return (
     <div className='flex flex-col gap-3'>
       <div className='flex justify-between items-center'>
-        <p className='text-xs text-muted'>10 words for day {day}. Photos are never typed here - drop the file into <span className='font-mono'>server/public/images/vocab/</span> named after the word (e.g. <span className='font-mono'>market-stall.png</span>) and it attaches automatically.</p>
+        <p className='text-xs text-muted'>{t('vocabHint', { day })}</p>
         <div className='flex gap-1 shrink-0 ml-3'>
           {mode === 'form' && (
             <button onClick={recheckAllPhotos} disabled={recheckingAll} className='px-2.5 py-1 rounded-lg text-xs font-medium bg-bg text-muted disabled:opacity-50'>
-              {recheckingAll ? 'Rechecking…' : '🔄 Recheck all photos'}
+              {recheckingAll ? t('rechecking') : t('recheckAllPhotos')}
             </button>
           )}
-          <button onClick={() => setMode('form')} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${mode === 'form' ? 'bg-accent text-white' : 'bg-bg text-muted'}`}>Form</button>
-          <button onClick={() => setMode('json')} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${mode === 'json' ? 'bg-accent text-white' : 'bg-bg text-muted'}`}>Paste JSON</button>
+          <button onClick={() => setMode('form')} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${mode === 'form' ? 'bg-accent text-white' : 'bg-bg text-muted'}`}>{t('formTab')}</button>
+          <button onClick={() => setMode('json')} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${mode === 'json' ? 'bg-accent text-white' : 'bg-bg text-muted'}`}>{t('pasteJsonTab')}</button>
         </div>
       </div>
 
@@ -142,8 +156,8 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
           <textarea value={jsonText} onChange={e => setJsonText(e.target.value)} placeholder={JSON_EXAMPLE}
             rows={14} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-xs font-mono' />
           <div className='flex gap-2 justify-end'>
-            <button onClick={() => setJsonText(JSON_EXAMPLE)} className='px-3 py-2 text-muted text-sm'>Insert example</button>
-            <button onClick={loadJson} className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>Load into form</button>
+            <button onClick={() => setJsonText(JSON_EXAMPLE)} className='px-3 py-2 text-muted text-sm'>{t('insertExample')}</button>
+            <button onClick={loadJson} className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>{t('loadIntoForm')}</button>
           </div>
         </div>
       ) : (
@@ -157,22 +171,22 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
                     : <span className='text-muted text-2xl'>{i + 1}</span>}
                 </div>
                 <label className='text-[11px] text-accent cursor-pointer'>
-                  {uploadingIdx === i ? 'Uploading…' : (r.image ? 'Change photo' : 'Upload photo')}
+                  {uploadingIdx === i ? t('uploadingLabel') : (r.image ? t('changePhoto') : t('uploadPhoto'))}
                   <input type='file' accept='image/*' className='hidden' onChange={e => onPickImage(i, e.target.files[0])} />
                 </label>
-                {resolvingIdx === i && <span className='text-[10px] text-muted'>checking…</span>}
+                {resolvingIdx === i && <span className='text-[10px] text-muted'>{t('checkingLabel')}</span>}
                 {!r.image && resolvingIdx !== i && r.word.trim() && (
-                  <button onClick={() => autoMatchPhoto(i, r.word)} className='text-[10px] text-muted underline'>recheck</button>
+                  <button onClick={() => autoMatchPhoto(i, r.word)} className='text-[10px] text-muted underline'>{t('recheckLink')}</button>
                 )}
               </div>
 
               <div className='flex-1 flex flex-col gap-2'>
                 <div className='flex gap-2'>
-                  <input placeholder='Word (English)' value={r.word}
+                  <input placeholder={t('wordPlaceholder')} value={r.word}
                     onChange={e => setRow(i, { word: e.target.value })}
                     onBlur={e => autoMatchPhoto(i, e.target.value)}
                     className='flex-1 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
-                  <input placeholder='Example sentence' value={r.example} onChange={e => setRow(i, { example: e.target.value })}
+                  <input placeholder={t('examplePlaceholder')} value={r.example} onChange={e => setRow(i, { example: e.target.value })}
                     className='flex-1 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
                 </div>
                 <div className='flex gap-2'>
@@ -190,9 +204,12 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
       )}
 
       <div className='flex gap-2 justify-end sticky bottom-0 bg-bg-elevated pt-2'>
-        <button onClick={onClose} className='px-4 py-2 text-muted text-sm'>Cancel</button>
+        <button onClick={clearVocab} disabled={saving} className='px-4 py-2 text-red-500 text-sm font-medium disabled:opacity-50 mr-auto'>
+          {t('clearVocabBtn')}
+        </button>
+        <button onClick={onClose} className='px-4 py-2 text-muted text-sm'>{t('cancel')}</button>
         <button onClick={submit} disabled={saving} className='px-5 py-2 rounded-lg bg-accent text-white text-sm font-medium disabled:opacity-50'>
-          {saving ? 'Saving…' : 'Save vocab'}
+          {saving ? t('saving') : t('saveVocab')}
         </button>
       </div>
     </div>

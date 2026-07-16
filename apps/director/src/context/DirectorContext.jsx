@@ -296,6 +296,25 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    const deleteBranch = async (id) => {
+        if (!(await confirm(t('confirmDeleteBranch')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/branches/' + id, authHeader)
+            toast.success(t('branchDeleted'))
+            getBranches()
+            return true
+        } catch (error) {
+            const errCode = error.response?.data?.error
+            if (errCode === 'branch_not_empty') {
+                const { peopleCount, activeGroupCount } = error.response.data
+                toast.error(t('branchNotEmpty', { people: peopleCount, groups: activeGroupCount }))
+            } else {
+                toast.error(errCode || t('couldNotDeleteBranch'))
+            }
+            return false
+        }
+    }
+
     // ==== languages (courses) ====
     const createLanguage = async (payload) => {
         try {
@@ -515,31 +534,6 @@ const DirectorContextProvider = (props) => {
         }
     }
 
-    // paste-and-add: grows the exam's question bank, skipping duplicates already in it
-    const addExamQuestions = async (languageId, levelId, questions) => {
-        try {
-            const { data } = await axios.put(backendUrl + '/api/director/exam/questions', { languageId, levelId, questions }, authHeader)
-            const skipNote = data.skippedCount > 0 ? t('skippedAsDuplicates', { count: data.skippedCount }) : ''
-            toast.success(t('addedQuestionsMsg', { added: data.addedCount, plural: data.addedCount === 1 ? '' : 's', total: data.totalInBank, skipNote }))
-            return data
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotAddExamQuestions'))
-            return null
-        }
-    }
-
-    const clearExamQuestions = async (languageId, levelId) => {
-        if (!(await confirm(t('confirmClearExamBank')))) return false
-        try {
-            await axios.delete(backendUrl + `/api/director/exam/questions?languageId=${languageId}&levelId=${levelId}`, authHeader)
-            toast.success(t('examBankCleared'))
-            return true
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotClearExamQuestions'))
-            return false
-        }
-    }
-
     // uploads a photo, named after `name`, into /static/images/<kind>. Returns the served path.
     const uploadContentImage = async (kind, name, file) => {
         try {
@@ -605,7 +599,7 @@ const DirectorContextProvider = (props) => {
         admins, getAdmins, createAdmin, updateAdmin, deleteAdminAccount, getAdminProfile,
         teachers, getTeachers, createTeacher, updateTeacher, deleteTeacherAccount, getTeacherProfile,
         pricing, getPricing, upsertPricing, deletePricing,
-        branches, getBranches, createBranch, updateBranch,
+        branches, getBranches, createBranch, updateBranch, deleteBranch,
         languages, getLanguages, createLanguage, updateLanguage, deleteLanguage,
         levels, getLevels, createLevel, updateLevel, deleteLevel,
         getAttendanceOverview,
@@ -614,7 +608,7 @@ const DirectorContextProvider = (props) => {
         backendUrl,
         getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage,
         fillVocabWordBank, fillGrammarBank, fillReadingBank,
-        getExamConfig, saveExamConfig, addExamQuestions, clearExamQuestions,
+        getExamConfig, saveExamConfig,
     }
 
     useEffect(() => {

@@ -1,6 +1,8 @@
 import React, { useContext } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import FontSizeControl from '../components/FontSizeControl.jsx'
+import InstallAppCard from '../components/InstallAppCard.jsx'
 
 const STUDENT_LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -13,7 +15,7 @@ const Settings = () => {
   const { settings, updateSettings } = useContext(DirectorContext)
   const { t, lang, setLang, availableLanguages } = useLanguage()
 
-  if (!settings) return <p className='text-muted'>Loading settings…</p>
+  if (!settings) return <p className='text-muted'>{t('loading')}</p>
 
   const enabledLanguages = settings.enabledStudentLanguages || ['en', 'ru', 'uz', 'kaa']
 
@@ -27,7 +29,7 @@ const Settings = () => {
 
   return (
     <div>
-      <p className='font-display text-2xl text-ink mb-6'>Settings</p>
+      <p className='font-display text-2xl text-ink mb-6'>{t('settingsTitle')}</p>
 
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 max-w-lg mb-6'>
         <p className='text-ink font-medium mb-3'>{t('language')}</p>
@@ -42,10 +44,16 @@ const Settings = () => {
       </div>
 
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 max-w-lg mb-6'>
+        <FontSizeControl label={t('textSize')} />
+      </div>
+
+      <InstallAppCard />
+
+      <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 max-w-lg mb-6'>
         <div className='flex justify-between items-center'>
           <div>
-            <p className='text-ink font-medium'>Require passport info for new students</p>
-            <p className='text-muted text-sm mt-1'>When on, an admin can't register a student without entering their passport/ID details. Defaults to on.</p>
+            <p className='text-ink font-medium'>{t('requirePassport')}</p>
+            <p className='text-muted text-sm mt-1'>{t('requirePassportHint')}</p>
           </div>
           <button
             onClick={() => updateSettings({ passportRequired: !settings.passportRequired })}
@@ -57,8 +65,8 @@ const Settings = () => {
       </div>
 
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 max-w-lg'>
-        <p className='text-ink font-medium mb-1'>Student app languages</p>
-        <p className='text-muted text-sm mb-4'>Which languages a student can switch their app's interface into. This only affects the app's own menus/buttons - homework content stays in whatever language you wrote it in.</p>
+        <p className='text-ink font-medium mb-1'>{t('studentAppLanguages')}</p>
+        <p className='text-muted text-sm mb-4'>{t('studentAppLanguagesHint')}</p>
         <div className='flex flex-col gap-3'>
           {STUDENT_LANGUAGES.map(l => {
             const on = enabledLanguages.includes(l.code)

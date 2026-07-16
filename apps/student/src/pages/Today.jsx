@@ -7,7 +7,7 @@ import ExerciseModal from '../components/ExerciseModal.jsx'
 import AttendanceScanner from '../components/AttendanceScanner.jsx'
 
 const Today = () => {
-  const { week, getHomeworkWeek, getHomeworkForDay, submitVocab, submitGrammar, submitReading, progress } = useContext(StudentContext)
+  const { week, getHomeworkWeek, getHomeworkForDay, submitVocab, submitGrammar, submitReading, progress, me } = useContext(StudentContext)
   const { t } = useLanguage()
   const [selectedDay, setSelectedDay] = useState(null)
   const [dayData, setDayData] = useState(false)
@@ -52,9 +52,12 @@ const Today = () => {
     }
   }
 
+  const firstName = me?.student?.name?.split(' ')[0]
+
   if (!week) {
     return (
       <div className='px-6 pt-16 text-center'>
+        {firstName && <p className='text-muted mb-1'>{t('helloName', { name: firstName })}</p>}
         <p className='text-muted'>{t('noActiveGroup')}</p>
         <p className='text-muted text-sm mt-2'>{t('askAdminEnroll')}</p>
       </div>
@@ -69,6 +72,7 @@ const Today = () => {
 
   return (
     <div className='px-5 pt-10'>
+      {firstName && <p className='text-muted text-sm mb-1'>{t('helloName', { name: firstName })}</p>}
       <p className='font-display text-2xl text-ink mb-1'>{t('today')}</p>
       <p className='text-muted text-sm mb-5'>{t('dayOf', { current: week.groupDayCounter, total: week.durationDays })}</p>
 
@@ -124,20 +128,20 @@ const Today = () => {
                   key={key}
                   disabled={done || locked}
                   onClick={() => setOpenSection(key)}
-                  className={`px-5 py-4 rounded-2xl border text-left ${done ? 'border-hairline bg-bg-card opacity-90' : locked ? 'border-hairline bg-bg-card opacity-40' : 'border-hairline bg-bg-card'}`}
+                  className={`px-5 py-4 rounded-2xl border text-left ${locked ? 'border-hairline bg-bg-card opacity-40' : 'border-transparent bg-[#D3E6FF]'}`}
                 >
                   <div className='flex items-center justify-between mb-1'>
                     <span className='flex items-center gap-3'>
                       <span className='text-xl'>{meta.icon}</span>
                       <span className='text-ink font-medium'>{meta.label}</span>
                     </span>
-                    <span className={`text-xs font-medium px-3 py-1 rounded-full ${done ? 'bg-accent-soft text-accent' : locked ? 'bg-hairline text-muted' : 'bg-accent text-white'}`}>
+                    <span className={`text-xs font-medium px-3 py-1 rounded-full ${locked ? 'bg-hairline text-muted' : 'bg-[#5B93F5] text-white'}`}>
                       {done ? `${score}%` : locked ? t('missed') : t('start')}
                     </span>
                   </div>
                   {done && (
-                    <div className='h-1.5 rounded-full bg-hairline overflow-hidden mt-2'>
-                      <div className='h-full bg-accent rounded-full' style={{ width: `${score || 0}%` }} />
+                    <div className='h-1.5 rounded-full bg-white overflow-hidden mt-2'>
+                      <div className='h-full bg-[#F2542D] rounded-full' style={{ width: `${score || 0}%` }} />
                     </div>
                   )}
                 </button>

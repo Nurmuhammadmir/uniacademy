@@ -3,6 +3,7 @@ import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
 import FontSizeControl from '../components/FontSizeControl.jsx'
+import InstallAppCard from '../components/InstallAppCard.jsx'
 
 const CourseCard = ({ course, t }) => {
   const remaining = course.price ? Math.max(0, course.price - course.balance) : null
@@ -62,6 +63,8 @@ const Profile = () => {
       <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-4'>
         <FontSizeControl label={t('textSize')} />
       </div>
+
+      <InstallAppCard t={t} />
 
       <p className='text-ink font-medium mb-2'>{t('myCourses')}</p>
       {courses.map(c => <CourseCard key={c._id} course={c} t={t} />)}
