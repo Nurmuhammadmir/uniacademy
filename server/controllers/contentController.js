@@ -39,6 +39,31 @@ const shuffle = (arr) => {
     return copy
 }
 
+// bulk-paste banks (word bank / grammar bank) can be huge, and duplicates - a word or question
+// that's already sitting on some other day in this same level - shouldn't stop the whole paste or
+// silently vanish. This filters them out and reports each one back to the director instead, so a
+// batch of hundreds keeps going and nothing gets lost without a trace.
+// `existingByKey` is Map<normalizedKey, day> for everything already saved in this level;
+// `extract(item)` returns { key, raw } - key is the normalized identity used to compare, raw is
+// the original text shown back in the skip notice.
+const dedupeAgainstExisting = (items, existingByKey, extract) => {
+    const seen = new Map(existingByKey)
+    const unique = []
+    const skipped = []
+    for (const item of items) {
+        const { key, raw } = extract(item)
+        if (!key) continue
+        if (seen.has(key)) {
+            const where = seen.get(key)
+            skipped.push({ text: raw, reason: where === 'this paste' ? 'duplicate within the pasted list' : `already exists on day ${where}` })
+            continue
+        }
+        seen.set(key, 'this paste')
+        unique.push(item)
+    }
+    return { unique, skipped }
+}
+
 // ==== read one day's content for the builder ====
 export const getDayContent = async (req, res) => {
     try {
@@ -170,7 +195,9 @@ export const saveVocab = async (req, res) => {
 }
 
 // ==== word bank: paste an unlimited list of words and auto-fill every EMPTY day in this level,
-// 10 words per day, in day order, until either the words or the empty days run out ====
+// 10 words per day, in day order, until either the words or the empty days run out. A word that's
+// already used somewhere else in this level (or repeated within the same paste) is skipped and
+// reported, not silently dropped or allowed to stop the rest of the batch. ====
 export const fillVocabWordBank = async (req, res) => {
     try {
         const { languageId, levelId, words } = req.body
@@ -182,19 +209,31 @@ export const fillVocabWordBank = async (req, res) => {
         if (!level) return res.status(404).json({ error: 'level_not_found' })
         const durationDays = level.durationDays || 30
 
-        const existing = await Curriculum.find({ languageId, levelId }).select('day')
-        const filledDays = new Set(existing.map(c => c.day))
+        const curricula = await Curriculum.find({ languageId, levelId })
+        const filledDays = new Set(curricula.map(c => c.day))
         const emptyDays = []
         for (let d = 1; d <= durationDays; d++) {
             if (!filledDays.has(d)) emptyDays.push(d)
         }
 
-        const validWords = words.filter(w => w.word && w.word.trim())
+        // every word already sitting on some day in this level, so the bank can skip it instead of
+        // creating a second copy of the same word on a different day
+        const conceptIdToDay = {}
+        curricula.forEach(c => c.conceptIds.forEach(cid => { conceptIdToDay[String(cid)] = c.day }))
+        const existingWordForms = await WordForm.find({ conceptId: { $in: Object.keys(conceptIdToDay) }, languageId })
+        const existingByKey = new Map(existingWordForms.map(wf => [wf.word.trim().toLowerCase(), conceptIdToDay[String(wf.conceptId)]]))
+
+        const { unique: uniqueWords, skipped } = dedupeAgainstExisting(
+            words.filter(w => w.word && w.word.trim()),
+            existingByKey,
+            (w) => ({ key: w.word.trim().toLowerCase(), raw: w.word.trim() })
+        )
+
         const filled = []
         let cursor = 0
         for (const day of emptyDays) {
-            if (cursor >= validWords.length) break
-            const batch = validWords.slice(cursor, cursor + 10)
+            if (cursor >= uniqueWords.length) break
+            const batch = uniqueWords.slice(cursor, cursor + 10)
             const { conceptCount } = await createVocabDay({ languageId, levelId, day, words: batch })
             if (conceptCount > 0) {
                 cursor += conceptCount
@@ -206,8 +245,10 @@ export const fillVocabWordBank = async (req, res) => {
             filled,
             daysFilled: filled.length,
             wordsUsed: cursor,
-            wordsRemaining: validWords.length - cursor,
+            wordsRemaining: uniqueWords.length - cursor,
             emptyDaysRemaining: Math.max(0, emptyDays.length - filled.length),
+            skipped,
+            skippedCount: skipped.length,
         })
     } catch (error) {
         console.log(error)
@@ -237,6 +278,68 @@ export const saveGrammar = async (req, res) => {
         if (docs.length) await GrammarExercise.insertMany(docs)
 
         res.json({ saved: true, exerciseCount: docs.length })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// ==== grammar bank: paste an unlimited list of grammar exercises and auto-fill every EMPTY day in
+// this level, 5 per day, in day order, until either the bank or the empty days run out. A question
+// that's already used somewhere else in this level (or repeated within the same paste) is skipped
+// and reported, not silently dropped or allowed to stop the rest of the batch. ====
+export const fillGrammarBank = async (req, res) => {
+    try {
+        const { languageId, levelId, exercises } = req.body
+        if (!languageId || !levelId || !Array.isArray(exercises) || exercises.length === 0) {
+            return res.status(400).json({ error: 'missing_params' })
+        }
+
+        const level = await Level.findById(levelId).select('durationDays')
+        if (!level) return res.status(404).json({ error: 'level_not_found' })
+        const durationDays = level.durationDays || 30
+
+        const existingDocs = await GrammarExercise.find({ languageId, levelId }).select('day question')
+        const filledDays = new Set(existingDocs.map(d => d.day))
+        const emptyDays = []
+        for (let d = 1; d <= durationDays; d++) {
+            if (!filledDays.has(d)) emptyDays.push(d)
+        }
+
+        const existingByKey = new Map(existingDocs.map(d => [d.question.trim().toLowerCase(), d.day]))
+        const validExercises = exercises.filter(e => e.question && e.question.trim() && e.correct !== undefined && String(e.correct).trim() !== '')
+        const { unique: uniqueExercises, skipped } = dedupeAgainstExisting(
+            validExercises,
+            existingByKey,
+            (e) => ({ key: e.question.trim().toLowerCase(), raw: e.question.trim() })
+        )
+
+        const filled = []
+        let cursor = 0
+        for (const day of emptyDays) {
+            if (cursor >= uniqueExercises.length) break
+            const batch = uniqueExercises.slice(cursor, cursor + 5)
+            const docs = batch.map(e => ({
+                languageId, levelId, day,
+                type: e.type,
+                question: e.question.trim(),
+                options: Array.isArray(e.options) ? e.options.filter(o => String(o).trim() !== '') : [],
+                correct: String(e.correct),
+            }))
+            await GrammarExercise.insertMany(docs)
+            cursor += docs.length
+            filled.push({ day, count: docs.length })
+        }
+
+        res.json({
+            filled,
+            daysFilled: filled.length,
+            questionsUsed: cursor,
+            questionsRemaining: uniqueExercises.length - cursor,
+            emptyDaysRemaining: Math.max(0, emptyDays.length - filled.length),
+            skipped,
+            skippedCount: skipped.length,
+        })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

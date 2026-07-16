@@ -1,6 +1,7 @@
 import React, { useContext, useState } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { toast } from 'react-toastify'
+import BankFillResult from './BankFillResult.jsx'
 
 const JSON_EXAMPLE = `{
   "words": [
@@ -58,16 +59,8 @@ const WordBankModal = ({ languageId, levelId, levelName, onClose, onFilled }) =>
       <textarea value={jsonText} onChange={e => setJsonText(e.target.value)} placeholder={JSON_EXAMPLE}
         rows={16} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-xs font-mono' />
 
-      {result && (
-        <div className='bg-accent-soft rounded-xl p-3 text-sm text-ink'>
-          <p>Filled <span className='font-mono'>{result.daysFilled}</span> day{result.daysFilled === 1 ? '' : 's'} using <span className='font-mono'>{result.wordsUsed}</span> word{result.wordsUsed === 1 ? '' : 's'}.</p>
-          {result.wordsRemaining > 0 && <p className='text-muted mt-1'>{result.wordsRemaining} word{result.wordsRemaining === 1 ? '' : 's'} left over - no empty days remained to put them in.</p>}
-          {result.emptyDaysRemaining > 0 && <p className='text-muted mt-1'>{result.emptyDaysRemaining} day{result.emptyDaysRemaining === 1 ? '' : 's'} still empty - the bank ran out first.</p>}
-          {result.filled?.length > 0 && (
-            <p className='text-muted mt-1 font-mono text-xs'>Days: {result.filled.map(f => `${f.day} (${f.count})`).join(', ')}</p>
-          )}
-        </div>
-      )}
+      <BankFillResult daysFilled={result?.daysFilled} used={result?.wordsUsed} remaining={result?.wordsRemaining}
+        emptyDaysRemaining={result?.emptyDaysRemaining} filled={result?.filled} skipped={result?.skipped} unitLabel='word' />
 
       <div className='flex gap-2 justify-end'>
         <button onClick={() => setJsonText(JSON_EXAMPLE)} className='px-3 py-2 text-muted text-sm'>Insert example</button>

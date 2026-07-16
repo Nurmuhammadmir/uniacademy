@@ -454,10 +454,25 @@ const DirectorContextProvider = (props) => {
     const fillVocabWordBank = async (languageId, levelId, words) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/content/vocab/word-bank', { languageId, levelId, words }, authHeader)
-            toast.success(data.daysFilled > 0 ? `Filled ${data.daysFilled} day${data.daysFilled === 1 ? '' : 's'} (${data.wordsUsed} words used)` : 'No empty days to fill')
+            const skipNote = data.skippedCount > 0 ? `, ${data.skippedCount} skipped as duplicates` : ''
+            toast.success(data.daysFilled > 0 ? `Filled ${data.daysFilled} day${data.daysFilled === 1 ? '' : 's'} (${data.wordsUsed} words used${skipNote})` : 'No empty days to fill')
             return data
         } catch (error) {
             toast.error(error.response?.data?.error || 'could not fill word bank')
+            return null
+        }
+    }
+
+    // same idea as the vocab word bank, but for grammar - paste an unlimited list of exercises and
+    // it fills every day in the level that has no grammar yet, 5 per day, in day order.
+    const fillGrammarBank = async (languageId, levelId, exercises) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/content/grammar/word-bank', { languageId, levelId, exercises }, authHeader)
+            const skipNote = data.skippedCount > 0 ? `, ${data.skippedCount} skipped as duplicates` : ''
+            toast.success(data.daysFilled > 0 ? `Filled ${data.daysFilled} day${data.daysFilled === 1 ? '' : 's'} (${data.questionsUsed} questions used${skipNote})` : 'No empty days to fill')
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not fill grammar bank')
             return null
         }
     }
@@ -534,7 +549,7 @@ const DirectorContextProvider = (props) => {
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,
         backendUrl,
-        getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage, fillVocabWordBank,
+        getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage, fillVocabWordBank, fillGrammarBank,
     }
 
     useEffect(() => {
