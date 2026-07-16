@@ -1,8 +1,10 @@
 import React, { useContext } from 'react'
 import { AdminContext } from '../context/AdminContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const Profile = () => {
   const { me, logout } = useContext(AdminContext)
+  const { t, lang, setLang, availableLanguages } = useLanguage()
   if (!me) return <p className='text-muted'>Loading…</p>
 
   return (
@@ -29,8 +31,20 @@ const Profile = () => {
         </div>
       </div>
 
+      <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 max-w-md mb-6'>
+        <p className='text-muted text-xs mb-2'>{t('language')}</p>
+        <div className='flex flex-wrap gap-2'>
+          {availableLanguages.map(l => (
+            <button key={l.code} onClick={() => setLang(l.code)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${lang === l.code ? 'bg-accent text-white' : 'bg-bg border border-hairline text-ink'}`}>
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <button onClick={logout} className='max-w-md w-full py-3 rounded-xl border border-hairline text-muted font-medium'>
-        Sign out
+        {t('signOut')}
       </button>
     </div>
   )

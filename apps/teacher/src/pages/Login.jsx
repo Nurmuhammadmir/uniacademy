@@ -1,9 +1,11 @@
 import React, { useContext, useState } from 'react'
 import { TeacherContext } from '../context/TeacherContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Logo from '../components/Logo.jsx'
 
 const Login = () => {
   const { login } = useContext(TeacherContext)
+  const { t, lang, setLang, availableLanguages } = useLanguage()
   const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,15 +19,20 @@ const Login = () => {
 
   return (
     <div className='min-h-screen flex flex-col justify-center px-6'>
-      <div className='mb-1'><Logo size={40} /></div>
-      <p className='text-muted mb-8 ml-[50px]'>teacher sign in</p>
+      <div className='flex justify-between items-start mb-1'>
+        <Logo size={40} />
+        <select value={lang} onChange={e => setLang(e.target.value)} className='px-2 py-1.5 rounded-lg bg-bg-elevated border border-hairline text-xs text-ink'>
+          {availableLanguages.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+        </select>
+      </div>
+      <p className='text-muted mb-8 ml-[50px]'>{t('teacherSignIn')}</p>
       <form onSubmit={onSubmit} className='flex flex-col gap-4'>
-        <input type='tel' inputMode='tel' placeholder='Phone number' value={phone} onChange={(e) => setPhone(e.target.value)}
+        <input type='tel' inputMode='tel' placeholder={t('phone')} value={phone} onChange={(e) => setPhone(e.target.value)}
           className='w-full px-4 py-4 rounded-2xl bg-bg-elevated border border-hairline text-ink placeholder:text-muted' required />
-        <input type='password' placeholder='Password' value={password} onChange={(e) => setPassword(e.target.value)}
+        <input type='password' placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)}
           className='w-full px-4 py-4 rounded-2xl bg-bg-elevated border border-hairline text-ink placeholder:text-muted' required />
         <button type='submit' disabled={loading} className='w-full py-4 rounded-2xl bg-accent text-white font-medium text-base disabled:opacity-60'>
-          {loading ? 'Signing in…' : 'Sign in'}
+          {loading ? t('signingIn') : t('signIn')}
         </button>
       </form>
     </div>

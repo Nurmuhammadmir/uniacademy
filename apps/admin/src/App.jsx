@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { AdminContext } from './context/AdminContext.jsx'
+import { LanguageProvider } from './i18n/LanguageContext.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import ConfirmHost from './components/ConfirmHost.jsx'
 import Login from './pages/Login.jsx'
@@ -16,7 +17,7 @@ const App = () => {
   const { token } = useContext(AdminContext)
 
   return (
-    <>
+    <LanguageProvider>
       <ToastContainer position='top-right' autoClose={2500} />
       <ConfirmHost />
       {!token ? (
@@ -38,7 +39,7 @@ const App = () => {
           </main>
         </div>
       )}
-    </>
+    </LanguageProvider>
   )
 }
 

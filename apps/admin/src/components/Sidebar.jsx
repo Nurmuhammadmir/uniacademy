@@ -1,18 +1,21 @@
 import React, { useContext } from 'react'
 import { NavLink } from 'react-router-dom'
 import { AdminContext } from '../context/AdminContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Logo from './Logo.jsx'
-
-const links = [
-  { to: '/', label: 'Students' },
-  { to: '/groups', label: 'Groups' },
-  { to: '/payments', label: 'Payments' },
-  { to: '/teachers', label: 'Teachers' },
-  { to: '/profile', label: 'Profile' },
-]
 
 const Sidebar = () => {
   const { logout } = useContext(AdminContext)
+  const { t } = useLanguage()
+
+  const links = [
+    { to: '/', label: t('navStudents') },
+    { to: '/groups', label: t('navGroups') },
+    { to: '/payments', label: t('navPayments') },
+    { to: '/teachers', label: t('navTeachers') },
+    { to: '/profile', label: t('navProfile') },
+  ]
+
   return (
     <aside className='w-60 fixed inset-y-0 left-0 bg-bg-elevated border-r border-hairline p-6 flex flex-col'>
       <div className='mb-8'><Logo size={30} /></div>
@@ -24,7 +27,7 @@ const Sidebar = () => {
           </NavLink>
         ))}
       </nav>
-      <button onClick={logout} className='text-sm text-muted text-left px-3 py-2'>Sign out</button>
+      <button onClick={logout} className='text-sm text-muted text-left px-3 py-2'>{t('signOut')}</button>
     </aside>
   )
 }

@@ -1,5 +1,6 @@
 import React, { useContext } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const STUDENT_LANGUAGES = [
   { code: 'en', label: 'English' },
@@ -10,6 +11,7 @@ const STUDENT_LANGUAGES = [
 
 const Settings = () => {
   const { settings, updateSettings } = useContext(DirectorContext)
+  const { t, lang, setLang, availableLanguages } = useLanguage()
 
   if (!settings) return <p className='text-muted'>Loading settings…</p>
 
@@ -26,6 +28,18 @@ const Settings = () => {
   return (
     <div>
       <p className='font-display text-2xl text-ink mb-6'>Settings</p>
+
+      <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 max-w-lg mb-6'>
+        <p className='text-ink font-medium mb-3'>{t('language')}</p>
+        <div className='flex gap-2 mb-1'>
+          {availableLanguages.map(l => (
+            <button key={l.code} onClick={() => setLang(l.code)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${lang === l.code ? 'bg-accent text-white' : 'bg-bg border border-hairline text-ink'}`}>
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 max-w-lg mb-6'>
         <div className='flex justify-between items-center'>

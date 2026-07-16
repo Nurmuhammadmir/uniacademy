@@ -1,17 +1,19 @@
 import React, { useContext, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { TeacherContext } from '../context/TeacherContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import SelfAttendanceScanner from '../components/SelfAttendanceScanner.jsx'
 
 const Profile = () => {
   const { me, logout } = useContext(TeacherContext)
+  const { t, lang, setLang, availableLanguages } = useLanguage()
   const navigate = useNavigate()
   const [showScanner, setShowScanner] = useState(false)
 
   return (
     <div className='px-5 pt-10 pb-10'>
       <button onClick={() => navigate('/')} className='text-muted text-sm mb-4'>‹ Back</button>
-      <p className='font-display text-2xl text-ink mb-6'>Profile</p>
+      <p className='font-display text-2xl text-ink mb-6'>{t('profile')}</p>
 
       {!me ? (
         <p className='text-muted'>Loading…</p>
@@ -45,8 +47,20 @@ const Profile = () => {
         </>
       )}
 
+      <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-4'>
+        <p className='text-muted text-xs mb-2'>{t('language')}</p>
+        <div className='flex flex-wrap gap-2'>
+          {availableLanguages.map(l => (
+            <button key={l.code} onClick={() => setLang(l.code)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${lang === l.code ? 'bg-accent text-white' : 'bg-bg border border-hairline text-ink'}`}>
+              {l.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <button onClick={logout} className='w-full py-4 rounded-2xl border border-hairline text-muted font-medium'>
-        Sign out
+        {t('signOut')}
       </button>
 
       {showScanner && <SelfAttendanceScanner onClose={() => setShowScanner(false)} />}

@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { TeacherContext } from './context/TeacherContext.jsx'
+import { LanguageProvider } from './i18n/LanguageContext.jsx'
 import ConfirmHost from './components/ConfirmHost.jsx'
 import Login from './pages/Login.jsx'
 import MyGroups from './pages/MyGroups.jsx'
@@ -15,7 +16,7 @@ const App = () => {
   const { token } = useContext(TeacherContext)
 
   return (
-    <>
+    <LanguageProvider>
       <ToastContainer position='top-center' autoClose={2500} />
       <ConfirmHost />
       {!token ? (
@@ -34,7 +35,7 @@ const App = () => {
           </Routes>
         </div>
       )}
-    </>
+    </LanguageProvider>
   )
 }
 
