@@ -39,6 +39,7 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
   const [jsonText, setJsonText] = useState('')
   const [uploadingIdx, setUploadingIdx] = useState(null)
   const [resolvingIdx, setResolvingIdx] = useState(null)
+  const [recheckingAll, setRecheckingAll] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const setRow = (i, patch) => setRows(rows.map((r, idx) => idx === i ? { ...r, ...patch } : r))
@@ -51,6 +52,21 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
     const path = await resolveContentImage('vocab', { name: word })
     setResolvingIdx(null)
     if (path) setRow(i, { image: path })
+  }
+
+  // rechecks every row's photo against server/public/images/vocab in one go, even rows that
+  // already show an image - covers "I just dropped in a replacement/late-arriving file" without
+  // retyping every word one at a time
+  const recheckAllPhotos = async () => {
+    setRecheckingAll(true)
+    const updated = await Promise.all(rows.map(async (r) => {
+      if (!r.word.trim()) return r
+      const path = await resolveContentImage('vocab', { name: r.word })
+      return path ? { ...r, image: path } : r
+    }))
+    setRows(updated)
+    setRecheckingAll(false)
+    toast.success('Rechecked photos')
   }
 
   const onPickImage = async (i, file) => {
@@ -111,6 +127,11 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
       <div className='flex justify-between items-center'>
         <p className='text-xs text-muted'>10 words for day {day}. Photos are never typed here - drop the file into <span className='font-mono'>server/public/images/vocab/</span> named after the word (e.g. <span className='font-mono'>market-stall.png</span>) and it attaches automatically.</p>
         <div className='flex gap-1 shrink-0 ml-3'>
+          {mode === 'form' && (
+            <button onClick={recheckAllPhotos} disabled={recheckingAll} className='px-2.5 py-1 rounded-lg text-xs font-medium bg-bg text-muted disabled:opacity-50'>
+              {recheckingAll ? 'Rechecking…' : '🔄 Recheck all photos'}
+            </button>
+          )}
           <button onClick={() => setMode('form')} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${mode === 'form' ? 'bg-accent text-white' : 'bg-bg text-muted'}`}>Form</button>
           <button onClick={() => setMode('json')} className={`px-2.5 py-1 rounded-lg text-xs font-medium ${mode === 'json' ? 'bg-accent text-white' : 'bg-bg text-muted'}`}>Paste JSON</button>
         </div>

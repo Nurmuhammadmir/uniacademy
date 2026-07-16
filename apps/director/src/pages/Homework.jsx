@@ -6,6 +6,7 @@ import GrammarEditor from '../components/GrammarEditor.jsx'
 import ReadingEditor from '../components/ReadingEditor.jsx'
 import WordBankModal from '../components/WordBankModal.jsx'
 import GrammarBankModal from '../components/GrammarBankModal.jsx'
+import ReadingBankModal from '../components/ReadingBankModal.jsx'
 
 // The director builds the fixed daily programme students see: pick a course (language) -> a level ->
 // a day, then author the day's Vocab / Grammar / Reading. Content is stored per (language, level, day)
@@ -22,6 +23,7 @@ const Homework = () => {
   const [editor, setEditor] = useState(null) // 'vocab' | 'grammar' | 'reading'
   const [showWordBank, setShowWordBank] = useState(false)
   const [showGrammarBank, setShowGrammarBank] = useState(false)
+  const [showReadingBank, setShowReadingBank] = useState(false)
 
   useEffect(() => { if (!languages.length) getLanguages() }, [])
 
@@ -85,6 +87,9 @@ const Homework = () => {
             </button>
             <button onClick={() => setShowGrammarBank(true)} className='px-4 py-2.5 rounded-xl border border-hairline text-sm text-accent font-medium'>
               ✏️ Grammar bank
+            </button>
+            <button onClick={() => setShowReadingBank(true)} className='px-4 py-2.5 rounded-xl border border-hairline text-sm text-accent font-medium'>
+              📖 Reading bank
             </button>
           </>
         )}
@@ -158,6 +163,13 @@ const Homework = () => {
         <Modal wide title='Grammar bank' onClose={() => setShowGrammarBank(false)}>
           <GrammarBankModal languageId={languageId} levelId={levelId} levelName={selectedLevel?.name || ''}
             onClose={() => setShowGrammarBank(false)} onFilled={refreshAfterSave} />
+        </Modal>
+      )}
+
+      {showReadingBank && (
+        <Modal wide title='Reading bank' onClose={() => setShowReadingBank(false)}>
+          <ReadingBankModal languageId={languageId} levelId={levelId} levelName={selectedLevel?.name || ''}
+            onClose={() => setShowReadingBank(false)} onFilled={refreshAfterSave} />
         </Modal>
       )}
     </div>

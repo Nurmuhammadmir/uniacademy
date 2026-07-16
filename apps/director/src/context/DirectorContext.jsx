@@ -477,6 +477,21 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // same idea again, for reading - paste an unlimited list of complete readings (title,
+    // paragraphs, exercises, image filename) and it fills every day in the level that has no
+    // reading yet, ONE reading per day since a reading is already a whole day's content.
+    const fillReadingBank = async (languageId, levelId, readings) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/content/reading/word-bank', { languageId, levelId, readings }, authHeader)
+            const skipNote = data.skippedCount > 0 ? `, ${data.skippedCount} skipped as duplicates` : ''
+            toast.success(data.daysFilled > 0 ? `Filled ${data.daysFilled} day${data.daysFilled === 1 ? '' : 's'} (${data.readingsUsed} reading${data.readingsUsed === 1 ? '' : 's'} used${skipNote})` : 'No empty days to fill')
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not fill reading bank')
+            return null
+        }
+    }
+
     // uploads a photo, named after `name`, into /static/images/<kind>. Returns the served path.
     const uploadContentImage = async (kind, name, file) => {
         try {
@@ -549,7 +564,8 @@ const DirectorContextProvider = (props) => {
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,
         backendUrl,
-        getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage, fillVocabWordBank, fillGrammarBank,
+        getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage,
+        fillVocabWordBank, fillGrammarBank, fillReadingBank,
     }
 
     useEffect(() => {

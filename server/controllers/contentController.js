@@ -15,7 +15,7 @@ import GrammarExercise from "../models/GrammarExercise.js"
 import ReadingText from "../models/ReadingText.js"
 import ReadingExercise from "../models/ReadingExercise.js"
 import Level from "../models/Level.js"
-import { findImageByName } from "./uploadController.js"
+import { findImageByName, findImageByFilename } from "./uploadController.js"
 
 const NATIVE_CODES = ['ru', 'uz', 'kaa']
 
@@ -346,6 +346,51 @@ export const fillGrammarBank = async (req, res) => {
     }
 }
 
+// a reading's `image` is a filename the director named explicitly (not derived from a word like
+// vocab), so it's resolved by exact filename rather than a slugified match. Accepts either an
+// already-resolved served path (from the single-day form, which resolves client-side before
+// submit) or a bare filename hint (from the reading bank, which never touches the frontend) -
+// only ever stores a real, existing file's path, never an unresolved filename that would 404.
+const resolveReadingImage = (image) => {
+    if (!image) return ''
+    if (/^(\/static\/|https?:\/\/)/.test(image)) return image
+    return findImageByFilename('reading', image)
+}
+
+// creates one day's reading content (1 text + up to 10 exercises) - shared by saveReading (one
+// day, from the builder form/JSON paste) and fillReadingBank (many days at once, from a bulk
+// reading-bank paste). Fully replaces whatever reading content already exists for that day.
+const createReadingDay = async ({ languageId, levelId, day, title, image, paragraphs, exercises }) => {
+    const old = await ReadingText.findOne({ languageId, levelId, day })
+    if (old) {
+        await ReadingExercise.deleteMany({ readingTextId: old._id })
+        await ReadingText.deleteOne({ _id: old._id })
+    }
+
+    if (!title || !title.trim()) return { created: false, exerciseCount: 0 }
+
+    const readingText = await ReadingText.create({
+        languageId, levelId, day,
+        title: title.trim(),
+        image: resolveReadingImage(image),
+        paragraphs: Array.isArray(paragraphs) ? paragraphs.filter(p => p.id && p.text && p.text.trim()) : [],
+    })
+
+    const docs = (Array.isArray(exercises) ? exercises : [])
+        .filter(e => e.question !== undefined || e.items !== undefined)
+        .map(e => ({
+            readingTextId: readingText._id,
+            type: e.type,
+            paragraphRef: e.paragraphRef || '',
+            question: e.question || '',
+            options: e.options !== undefined ? e.options : (e.items !== undefined ? e.items : []),
+            correct: e.correct !== undefined ? e.correct : (e.correctOrder !== undefined ? e.correctOrder : ''),
+        }))
+    if (docs.length) await ReadingExercise.insertMany(docs)
+
+    return { created: true, exerciseCount: docs.length }
+}
+
 // ==== save the reading text (+ its 10 exercises) for a day ====
 export const saveReading = async (req, res) => {
     try {
@@ -354,37 +399,64 @@ export const saveReading = async (req, res) => {
             return res.status(400).json({ error: 'missing_params' })
         }
 
-        // remove the day's existing reading text and its exercises before re-creating
-        const old = await ReadingText.findOne({ languageId, levelId, day })
-        if (old) {
-            await ReadingExercise.deleteMany({ readingTextId: old._id })
-            await ReadingText.deleteOne({ _id: old._id })
+        const { created, exerciseCount } = await createReadingDay({ languageId, levelId, day, title, image, paragraphs, exercises })
+        res.json({ saved: true, cleared: !created, exerciseCount })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// ==== reading bank: paste an unlimited list of complete readings and auto-fill every EMPTY day
+// in this level, ONE reading per day (a reading is already a complete atomic day, unlike vocab
+// words or grammar questions which get batched), in day order, until the bank or the empty days
+// run out. A title that's already used somewhere else in this level (or repeated within the same
+// paste) is skipped and reported, not silently dropped or allowed to stop the rest of the batch. ====
+export const fillReadingBank = async (req, res) => {
+    try {
+        const { languageId, levelId, readings } = req.body
+        if (!languageId || !levelId || !Array.isArray(readings) || readings.length === 0) {
+            return res.status(400).json({ error: 'missing_params' })
         }
 
-        if (!title || !title.trim()) {
-            return res.json({ saved: true, cleared: true })
+        const level = await Level.findById(levelId).select('durationDays')
+        if (!level) return res.status(404).json({ error: 'level_not_found' })
+        const durationDays = level.durationDays || 30
+
+        const existingDocs = await ReadingText.find({ languageId, levelId }).select('day title')
+        const filledDays = new Set(existingDocs.map(d => d.day))
+        const emptyDays = []
+        for (let d = 1; d <= durationDays; d++) {
+            if (!filledDays.has(d)) emptyDays.push(d)
         }
 
-        const readingText = await ReadingText.create({
-            languageId, levelId, day,
-            title: title.trim(),
-            image: image || '',
-            paragraphs: Array.isArray(paragraphs) ? paragraphs.filter(p => p.id && p.text && p.text.trim()) : [],
+        const existingByKey = new Map(existingDocs.map(d => [d.title.trim().toLowerCase(), d.day]))
+        const validReadings = readings.filter(r => r.title && r.title.trim())
+        const { unique: uniqueReadings, skipped } = dedupeAgainstExisting(
+            validReadings,
+            existingByKey,
+            (r) => ({ key: r.title.trim().toLowerCase(), raw: r.title.trim() })
+        )
+
+        const filled = []
+        let cursor = 0
+        for (const day of emptyDays) {
+            if (cursor >= uniqueReadings.length) break
+            const r = uniqueReadings[cursor]
+            cursor += 1
+            const { created } = await createReadingDay({ languageId, levelId, day, title: r.title, image: r.image, paragraphs: r.paragraphs, exercises: r.exercises })
+            if (created) filled.push({ day, title: r.title.trim() })
+        }
+
+        res.json({
+            filled,
+            daysFilled: filled.length,
+            readingsUsed: cursor,
+            readingsRemaining: uniqueReadings.length - cursor,
+            emptyDaysRemaining: Math.max(0, emptyDays.length - filled.length),
+            skipped,
+            skippedCount: skipped.length,
         })
-
-        const docs = (Array.isArray(exercises) ? exercises : [])
-            .filter(e => e.question !== undefined || e.items !== undefined)
-            .map(e => ({
-                readingTextId: readingText._id,
-                type: e.type,
-                paragraphRef: e.paragraphRef || '',
-                question: e.question || '',
-                options: e.options !== undefined ? e.options : (e.items !== undefined ? e.items : []),
-                correct: e.correct !== undefined ? e.correct : (e.correctOrder !== undefined ? e.correctOrder : ''),
-            }))
-        if (docs.length) await ReadingExercise.insertMany(docs)
-
-        res.json({ saved: true, exerciseCount: docs.length })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

@@ -51,7 +51,9 @@ export const findImageByName = (kind, name) => {
     return match ? `/static/images/${kind}/${match}` : ''
 }
 
-const findImageByFilename = (kind, filename) => {
+// exact-filename lookup (used for reading images, which are named explicitly rather than derived
+// from a word) - also pure/sync so contentController's reading bank can resolve server-side
+export const findImageByFilename = (kind, filename) => {
     const dir = path.join(PUBLIC_ROOT, kind === 'reading' ? 'reading' : 'vocab')
     const safeFilename = path.basename(String(filename)) // strip any path traversal
     return fs.existsSync(path.join(dir, safeFilename)) ? `/static/images/${kind}/${safeFilename}` : ''

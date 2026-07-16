@@ -4,7 +4,8 @@
       "Bash(node --check controllers/contentController.js)",
       "Bash(node --check routes/directorRoute.js)",
       "Bash(node --input-type=module -e \"import\\('./routes/directorRoute.js'\\).then\\(\\(\\)=>console.log\\('ROUTER OK'\\)\\).catch\\(e=>{console.error\\('FAIL',e.message\\);process.exit\\(1\\)}\\)\")",
-      "Bash(npx vite *)"
+      "Bash(npx vite *)",
+      "Bash(node --check controllers/uploadController.js)"
     ]
   }
 }

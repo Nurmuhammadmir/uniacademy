@@ -64,7 +64,9 @@ const ReadingEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) 
 
   const [title, setTitle] = useState(initial?.title || '')
   const [image, setImage] = useState(initial?.image || '')
+  const [imageName, setImageName] = useState(() => initial?.image ? initial.image.split('/').pop() : '')
   const [uploading, setUploading] = useState(false)
+  const [recheckingImage, setRecheckingImage] = useState(false)
   const [saving, setSaving] = useState(false)
   const [mode, setMode] = useState('form') // 'form' | 'json'
   const [jsonText, setJsonText] = useState('')
@@ -79,11 +81,25 @@ const ReadingEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) 
 
   const onPickImage = async (file) => {
     if (!file) return
-    const name = title.trim() ? `reading-day${day}-${title}` : `reading-day${day}`
+    // an explicitly typed photo name wins (so upload and manual-drop-then-recheck save under the
+    // same filename); otherwise derive one from the title like before
+    const name = imageName.trim() || (title.trim() ? `reading-day${day}-${title}` : `reading-day${day}`)
     setUploading(true)
     const path = await uploadContentImage('reading', name, file)
     setUploading(false)
-    if (path) setImage(path)
+    if (path) { setImage(path); setImageName(path.split('/').pop()) }
+  }
+
+  // looks for a photo the director already dropped into server/public/images/reading/ by hand,
+  // matched by the exact filename typed here
+  const recheckImage = async (filename) => {
+    const name = (filename ?? imageName).trim()
+    if (!name) { toast.error('Type the photo filename first'); return }
+    setRecheckingImage(true)
+    const path = await resolveContentImage('reading', { filename: name })
+    setRecheckingImage(false)
+    if (path) { setImage(path); toast.success('Photo found and attached') }
+    else toast.error(`No file named "${name}" in server/public/images/reading/ yet`)
   }
 
   const buildParagraphs = () => paraText.split(/\n\s*\n/).map(t => t.trim()).filter(Boolean).map((text, i) => ({ id: `p${i + 1}`, text }))
@@ -103,6 +119,7 @@ const ReadingEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) 
     // the JSON names its image file explicitly (director drops it into
     // server/public/images/reading/ by hand) - check whether it's there already
     if (parsed.image) {
+      setImageName(parsed.image)
       const path = await resolveContentImage('reading', { filename: parsed.image })
       if (path) setImage(path)
     }
@@ -159,9 +176,20 @@ const ReadingEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) 
                 <input type='file' accept='image/*' className='hidden' onChange={e => onPickImage(e.target.files[0])} />
               </label>
             </div>
-            <div className='flex-1'>
+            <div className='flex-1 flex flex-col gap-2'>
               <input placeholder='Reading title (e.g. A Day at the Market)' value={title} onChange={e => setTitle(e.target.value)}
-                className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm mb-2' />
+                className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+              <div className='flex gap-2'>
+                <input placeholder='Photo filename (e.g. reading-day6-market.png)' value={imageName}
+                  onChange={e => setImageName(e.target.value)}
+                  onBlur={() => imageName.trim() && recheckImage(imageName)}
+                  className='flex-1 px-3 py-2 rounded-lg bg-bg border border-hairline text-xs' />
+                <button type='button' onClick={() => recheckImage(imageName)} disabled={recheckingImage}
+                  className='px-3 py-2 rounded-lg border border-hairline text-xs text-accent font-medium shrink-0 disabled:opacity-50'>
+                  {recheckingImage ? 'Checking…' : '🔄 Recheck'}
+                </button>
+              </div>
+              <p className='text-[10px] text-muted'>Type the exact filename you'll drop into <span className='font-mono'>server/public/images/reading/</span> - it attaches as soon as it's found there.</p>
             </div>
           </div>
 
