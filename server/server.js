@@ -27,13 +27,30 @@ app.use(compression())
 // bank (hundreds of entries) as one JSON request can comfortably exceed 100kb
 app.use(express.json({ limit: '15mb' }))
 
-const allowedOrigins = (process.env.CLIENT_ORIGINS || '').split(',').map(origin => origin.trim())
+// Parse the comma-separated client origins from environment variables
+const allowedOrigins = (process.env.CLIENT_ORIGINS || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(origin => origin !== '');
+
 app.use(cors({
     origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) return callback(null, true)
-        callback(new Error('not_allowed_by_cors'))
+        // Logs incoming requests to Render console so you can see exactly what is being evaluated
+        console.log("Incoming Origin:", origin);
+        console.log("Allowed Origins List:", allowedOrigins);
+
+        // Allow requests with no origin (like mobile apps, Postman, or server-to-server requests)
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        
+        console.warn(`Blocked by CORS: ${origin}`);
+        callback(new Error('not_allowed_by_cors'));
     },
-}))
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 // serves everything in /server/public at /static - this is where vocab/reading concept images
 // actually live on disk (see public/images/concepts/README.md). A Concept's `image` field should
@@ -50,4 +67,4 @@ app.use('/api/student', studentRouter)
 
 app.get('/', (req, res) => res.send('uniacademy api working'))
 
-app.listen(port, () => console.log('server started', port))
+app.listen(port, () => console.log('server started on port', port))
