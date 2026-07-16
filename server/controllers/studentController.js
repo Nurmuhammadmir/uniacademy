@@ -129,7 +129,7 @@ export const getHomeworkForDay = async (req, res) => {
             : []
 
         // Concept only holds { image, category } - the actual word, its example sentence and its
-        // native-language translation live on WordForm/Translation. The frontend needs all three to
+        // native-language translations live on WordForm/Translation. The frontend needs all three to
         // render a vocab question (picture/word/translation), so attach them here rather than
         // leaving the frontend to work with a bare Concept id.
         const conceptIds = new Set()
@@ -141,16 +141,23 @@ export const getHomeworkForDay = async (req, res) => {
         })
         const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: group.languageId })
         const wordFormByConceptId = Object.fromEntries(wordForms.map(w => [String(w.conceptId), w]))
-        // 'ru' is the shared default across branches - there's no per-student native-language
-        // preference stored anywhere yet, so this is the one language every student can read
-        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] }, nativeLanguageCode: 'ru' })
-        const translationByConceptId = Object.fromEntries(translations.map(t => [String(t.conceptId), t.text]))
+        // every native language (ru/uz/kaa), not just one - a translation question shows all three
+        // at once (e.g. "день / kun / kún") so it works for the whole student body, not just Russian
+        // speakers
+        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } })
+        const translationsByConceptId = {}
+        translations.forEach(t => {
+            const key = String(t.conceptId)
+            if (!translationsByConceptId[key]) translationsByConceptId[key] = {}
+            translationsByConceptId[key][t.nativeLanguageCode] = t.text
+        })
 
         const withWord = (concept) => {
             if (!concept) return concept
             const obj = concept.toObject ? concept.toObject() : concept
             const wf = wordFormByConceptId[String(obj._id)]
-            return { ...obj, word: wf?.word || '', example: wf?.example || '', translation: translationByConceptId[String(obj._id)] || '' }
+            const tr = translationsByConceptId[String(obj._id)] || {}
+            return { ...obj, word: wf?.word || '', example: wf?.example || '', translations: { ru: tr.ru || '', uz: tr.uz || '', kaa: tr.kaa || '' } }
         }
 
         const enrichedConcepts = (curriculum?.conceptIds || []).map(withWord)

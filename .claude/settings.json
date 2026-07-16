@@ -5,7 +5,9 @@
       "Bash(node --check routes/directorRoute.js)",
       "Bash(node --input-type=module -e \"import\\('./routes/directorRoute.js'\\).then\\(\\(\\)=>console.log\\('ROUTER OK'\\)\\).catch\\(e=>{console.error\\('FAIL',e.message\\);process.exit\\(1\\)}\\)\")",
       "Bash(npx vite *)",
-      "Bash(node --check controllers/uploadController.js)"
+      "Bash(node --check controllers/uploadController.js)",
+      "Bash(node --check controllers/studentController.js)",
+      "Bash(node --input-type=module -e \"import\\('./routes/studentRoute.js'\\).then\\(\\(\\)=>console.log\\('OK'\\)\\).catch\\(e=>{console.error\\('FAIL',e.message\\);process.exit\\(1\\)}\\)\")"
     ]
   }
 }
