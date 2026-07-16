@@ -22,7 +22,12 @@
       "Bash(node -e \"require\\('./src/i18n/translations.js'\\)\")",
       "Bash(node --check controllers/examBuilderController.js)",
       "Bash(node --check models/Exam.js)",
-      "Bash(node _diagnose_exam_404_tmp.mjs)"
+      "Bash(node _diagnose_exam_404_tmp.mjs)",
+      "Bash(node --check services/groupPromotion.service.js)",
+      "Bash(node --check services/examPromotion.service.js)",
+      "Bash(node --check models/ExamSession.js)",
+      "Bash(node --check controllers/adminController.js)",
+      "Bash(node -e \"console.log\\(new Date\\(\\).toString\\(\\)\\); console.log\\(new Date\\(\\).getTimezoneOffset\\(\\)\\); console.log\\(process.env.TZ\\)\")"
     ]
   }
 }

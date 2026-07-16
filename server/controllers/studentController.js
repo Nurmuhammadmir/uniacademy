@@ -13,6 +13,7 @@ import ReadingText from "../models/ReadingText.js"
 import ReadingExercise from "../models/ReadingExercise.js"
 import Exam from "../models/Exam.js"
 import ExamAttempt from "../models/ExamAttempt.js"
+import ExamSession from "../models/ExamSession.js"
 import Pricing from "../models/Pricing.js"
 import Payment from "../models/Payment.js"
 import Attendance from "../models/Attendance.js"
@@ -20,17 +21,29 @@ import AttendanceSession from "../models/AttendanceSession.js"
 import { computeDayCounter, isRestDay } from "../services/dayCounter.service.js"
 import { resolveDayStatus } from "../services/homeworkWindow.service.js"
 import { handleExamResult } from "../services/examPromotion.service.js"
+import { promoteGroupIfLevelComplete } from "../services/groupPromotion.service.js"
 
 // a level's homework window is however many days the director set (Level.durationDays), not a
 // fixed 30 - resolved here so every caller below gets a dayCounter capped against the level this
 // group actually belongs to
 const getGroupAndSyncWindow = async (studentId) => {
-    const group = await Group.findOne({ studentIds: studentId, status: 'active' })
+    let group = await Group.findOne({ studentIds: studentId, status: 'active' })
     if (!group) return null
 
     const level = await Level.findById(group.levelId).select('durationDays')
     const durationDays = level?.durationDays || 30
     group.dayCounter = computeDayCounter(group.startDate, durationDays)
+
+    // the whole group moves to the next level together once it finishes this one - independent of
+    // any individual exam result (see groupPromotion.service.js) - so re-fetch afterwards in case
+    // this request is what just tipped the group over that line and this student landed elsewhere
+    await promoteGroupIfLevelComplete(group, durationDays)
+    if (group.status !== 'active') {
+        group = await Group.findOne({ studentIds: studentId, status: 'active' })
+        if (!group) return null
+        const newLevel = await Level.findById(group.levelId).select('durationDays')
+        return { group, durationDays: newLevel?.durationDays || 30 }
+    }
 
     const rows = await StudentProgress.find({ studentId, groupId: group._id })
     for (const row of rows) {
@@ -615,10 +628,12 @@ export const submitExam = async (req, res) => {
         }
         const score = Math.round((correctCount / (list.length || 1)) * 100)
 
-        const group = await Group.findOne({ studentIds: req.auth.userId, levelId: exam.levelId })
         const student = await User.findById(req.auth.userId)
 
-        const result = await handleExamResult({ student, exam, group, score })
+        const result = await handleExamResult({ student, exam, score })
+        // the in-progress snapshot is fully consumed now that a real ExamAttempt exists - clear it
+        // so nothing is left lying around once this attempt is done
+        await ExamSession.deleteOne({ studentId: req.auth.userId, examId: exam._id })
         res.json({ score, ...result })
     } catch (error) {
         console.log(error)

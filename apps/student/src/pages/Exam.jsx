@@ -26,9 +26,13 @@ const Exam = () => {
 
   useEffect(() => { getExam(levelId).then(setExam) }, [levelId])
 
+  // the countdown is anchored to the server's `startedAt`, not to whenever this page happens to
+  // mount - reopening/refreshing resumes the same attempt's real remaining time instead of
+  // handing out a fresh 90 minutes every time
   useEffect(() => {
     if (!exam) return
-    setSecondsLeft(exam.durationMinutes * 60)
+    const elapsed = Math.floor((Date.now() - new Date(exam.startedAt).getTime()) / 1000)
+    setSecondsLeft(Math.max(0, exam.durationMinutes * 60 - elapsed))
   }, [exam])
 
   // ticks the countdown and auto-submits (with whatever's answered so far) the moment it hits zero -
@@ -39,6 +43,16 @@ const Exam = () => {
     const timer = setTimeout(() => setSecondsLeft(s => s - 1), 1000)
     return () => clearTimeout(timer)
   }, [secondsLeft, result])
+
+  // warns before a tab close/refresh mid-exam - closing doesn't grant a fresh attempt (the same
+  // question set and countdown just resume next time), so leaving without submitting only risks
+  // running out the clock on unanswered questions
+  useEffect(() => {
+    if (!exam || result) return
+    const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [exam, result])
 
   // every reading exercise, across every one of the 3 texts, flattened - used for both the
   // "everything answered" check and building the submit payload
@@ -60,16 +74,12 @@ const Exam = () => {
   if (!exam) return <div className='px-6 pt-16 text-center text-muted'>{t('noExamYet')}</div>
 
   if (result) {
-    const passed = result.outcome === 'promoted' || result.outcome === 'course_completed'
+    const passed = result.outcome === 'passed'
     return (
       <div className='min-h-screen flex flex-col items-center justify-center px-6 text-center'>
         <p className={`font-mono text-5xl mb-2 ${passed ? 'text-gold' : 'text-accent'}`}>{result.score}%</p>
-        <p className='font-display text-xl text-ink mb-3'>
-          {result.outcome === 'promoted' ? t('levelPassed') :
-           result.outcome === 'course_completed' ? t('courseCompleted') :
-           result.outcome === 'failed_awaiting_manual_retake' ? t('notQuiteRetake') :
-           t('notQuiteThisTime')}
-        </p>
+        <p className='font-display text-xl text-ink mb-3'>{passed ? t('levelPassed') : t('notQuiteThisTime')}</p>
+        <p className='text-muted text-sm mb-4 max-w-xs'>{t('examResultNote')}</p>
         <p className='text-ink italic max-w-xs'>"{randomQuote()}"</p>
       </div>
     )
@@ -79,8 +89,8 @@ const Exam = () => {
   const lowTime = secondsLeft !== null && secondsLeft <= 60
 
   return (
-    <div className='px-5 pt-10 pb-10'>
-      <div className='flex items-center justify-between mb-6'>
+    <div className='px-5 pt-10 pb-10 max-w-md mx-auto'>
+      <div className='flex items-center justify-between mb-3'>
         <p className='font-display text-2xl text-ink'>{t('levelExam')}</p>
         {secondsLeft !== null && (
           <span className={`font-mono text-lg px-3 py-1 rounded-full ${lowTime ? 'bg-red-100 text-red-500' : 'bg-accent-soft text-accent'}`}>
@@ -88,6 +98,7 @@ const Exam = () => {
           </span>
         )}
       </div>
+      <p className='text-xs text-muted mb-6'>{t('examNoRestartNote')}</p>
 
       {exam.questions.map((q, i) => {
         const vocabPrompt = q.section === 'vocab' ? buildVocabPrompt(q, t) : null

@@ -360,7 +360,7 @@ export const updateGroup = async (req, res) => {
         const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId })
         if (!group) return res.status(404).json({ error: 'not_found' })
 
-        const { teacherId, schedulePattern, time, capacity } = req.body
+        const { teacherId, schedulePattern, time, capacity, day } = req.body
         const nextTeacherId = teacherId || group.teacherId
         const nextSchedule = schedulePattern || group.schedulePattern
         const nextTime = time || group.time
@@ -373,9 +373,25 @@ export const updateGroup = async (req, res) => {
         group.schedulePattern = nextSchedule
         group.time = nextTime
         if (capacity) group.capacity = capacity
+
+        const level = await Level.findById(group.levelId).select('durationDays')
+        const durationDays = level?.durationDays || 30
+
+        // the group's day counter is never stored as its own source of truth - it's always
+        // recomputed from `startDate` (see dayCounter.service.computeDayCounter), so "editing the
+        // day" really means back-dating startDate so that TODAY computes out to the requested day.
+        // e.g. asking for "day 10" on a 30-day level sets startDate to 9 days ago.
+        if (day !== undefined && day !== null && day !== '') {
+            const targetDay = Math.min(Math.max(1, Number(day)), durationDays)
+            const newStartDate = new Date()
+            newStartDate.setHours(0, 0, 0, 0)
+            newStartDate.setDate(newStartDate.getDate() - (targetDay - 1))
+            group.startDate = newStartDate
+        }
+
         await group.save()
 
-        res.json({ group })
+        res.json({ group: { ...group.toObject(), dayCounter: computeDayCounter(group.startDate, durationDays) } })
     } catch (error) {
         if (error.code === 'teacher_schedule_conflict') return res.status(409).json({ error: error.code })
         console.log(error)

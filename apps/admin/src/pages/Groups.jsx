@@ -30,7 +30,7 @@ const Groups = () => {
   const [viewingStudentId, setViewingStudentId] = useState(null)
   const [viewingTeacherId, setViewingTeacherId] = useState(null)
   const [form, setForm] = useState({ languageId: '', levelId: '', teacherId: '', schedulePattern: SCHEDULES[0], time: '18:00', startDate: '' })
-  const [editForm, setEditForm] = useState({ teacherId: '', schedulePattern: '', time: '', capacity: 20 })
+  const [editForm, setEditForm] = useState({ teacherId: '', schedulePattern: '', time: '', capacity: 20, day: 1 })
   const [studentId, setStudentId] = useState('')
   const [suggestion, setSuggestion] = useState(null)
 
@@ -60,7 +60,7 @@ const Groups = () => {
 
   const openEdit = (group) => {
     setEditing(group)
-    setEditForm({ teacherId: group.teacherId?._id, schedulePattern: group.schedulePattern, time: group.time, capacity: group.capacity })
+    setEditForm({ teacherId: group.teacherId?._id, schedulePattern: group.schedulePattern, time: group.time, capacity: group.capacity, day: group.dayCounter || 1 })
   }
 
   const submitEdit = async (e) => {
@@ -195,6 +195,13 @@ const Groups = () => {
             </select>
             <input type='time' value={editForm.time} onChange={e => setEditForm({ ...editForm, time: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <input type='number' placeholder={t('capacityPlaceholder')} value={editForm.capacity} onChange={e => setEditForm({ ...editForm, capacity: Number(e.target.value) })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
+            <div>
+              <label className='block text-xs text-muted mb-1'>{t('currentDayLabel', { total: editing.levelId?.durationDays || 30 })}</label>
+              <input type='number' min='1' max={editing.levelId?.durationDays || 30} value={editForm.day}
+                onChange={e => setEditForm({ ...editForm, day: Number(e.target.value) })}
+                className='w-full px-4 py-3 rounded-xl bg-bg border border-hairline' required />
+              <p className='text-[11px] text-muted mt-1'>{t('editDayHint')}</p>
+            </div>
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('saveChanges')}</button>
           </form>
         </Modal>
