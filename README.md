@@ -249,3 +249,5 @@ fixed the one real gap (attendance percentage wasn't in the API response yet).
   working path to the backend at all, even a locally-hosted one). Seed data updated to match.
   **To answer directly: before this, nothing was actually stored anywhere real** - MongoDB only ever
   held a URL string, and the seed used a fake placeholder CDN link that led nowhere.
+#   u n i a c a d e m y  
+ 
