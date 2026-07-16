@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import StudentContextProvider from './context/StudentContext.jsx'
+import './lib/fontScale.js'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(

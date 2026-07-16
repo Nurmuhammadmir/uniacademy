@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from 'react'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import { DirectorContext } from '../context/DirectorContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import BranchProfileModal from '../components/BranchProfileModal.jsx'
 import Modal from '../components/Modal.jsx'
 
@@ -16,6 +17,7 @@ const DEFAULT_ZOOM = 11
 
 const Branches = () => {
   const { mapData, branches, getBranchProfile, createBranch, updateBranch } = useContext(DirectorContext)
+  const { t } = useLanguage()
   const [viewingBranchId, setViewingBranchId] = useState(null)
   const [showAddBranch, setShowAddBranch] = useState(false)
   const [editingBranch, setEditingBranch] = useState(null)
@@ -23,7 +25,7 @@ const Branches = () => {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
   const markersRef = useRef([])
-  const branchName = (id) => branches.find(b => b._id === id)?.name || 'Unassigned'
+  const branchName = (id) => branches.find(b => b._id === id)?.name || t('unassigned')
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
@@ -69,18 +71,18 @@ const Branches = () => {
     if (hasPoints) mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 13 })
   }, [mapData, branches])
 
-  if (!mapData) return <p className='text-muted'>Loading map data…</p>
+  if (!mapData) return <p className='text-muted'>{t('loadingMapData')}</p>
   const entries = Object.entries(mapData)
 
   return (
     <div>
       <div className='flex justify-between items-center mb-1'>
-        <p className='font-display text-2xl text-ink'>Branches map</p>
+        <p className='font-display text-2xl text-ink'>{t('branchesMapTitle')}</p>
         <button onClick={() => { setEditingBranch(null); setBranchNameInput(''); setShowAddBranch(true) }} className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium'>
-          + Add branch
+          {t('addBranch')}
         </button>
       </div>
-      <p className='text-muted mb-4'>every geo-tagged student, color-coded by branch</p>
+      <p className='text-muted mb-4'>{t('branchesMapSubtitle')}</p>
 
       <div className='flex flex-wrap gap-2 mb-6'>
         {branches.map(b => (
@@ -102,7 +104,7 @@ const Branches = () => {
             {branchName(branchId)} · {mapData[branchId].length}
           </button>
         ))}
-        {entries.length === 0 && <p className='text-muted'>No student locations recorded yet.</p>}
+        {entries.length === 0 && <p className='text-muted'>{t('noStudentLocationsYet')}</p>}
       </div>
 
       {viewingBranchId && (
@@ -110,7 +112,7 @@ const Branches = () => {
       )}
 
       {showAddBranch && (
-        <Modal title={editingBranch ? `Edit ${editingBranch.name}` : 'Add branch'} onClose={() => { setShowAddBranch(false); setEditingBranch(null) }}>
+        <Modal title={editingBranch ? t('editX', { name: editingBranch.name }) : t('addNewBranch')} onClose={() => { setShowAddBranch(false); setEditingBranch(null) }}>
           <form
             onSubmit={async (e) => {
               e.preventDefault()
@@ -119,9 +121,9 @@ const Branches = () => {
             }}
             className='flex flex-col gap-3'
           >
-            <input placeholder='Branch name' value={branchNameInput} onChange={e => setBranchNameInput(e.target.value)}
+            <input placeholder={t('branchName')} value={branchNameInput} onChange={e => setBranchNameInput(e.target.value)}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
-            <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{editingBranch ? 'Save changes' : 'Add branch'}</button>
+            <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{editingBranch ? t('saveChanges') : t('addNewBranch')}</button>
           </form>
         </Modal>
       )}

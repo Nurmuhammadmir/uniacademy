@@ -1,9 +1,11 @@
 import React, { useContext, useMemo, useState } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import StudentProfileModal from '../components/StudentProfileModal.jsx'
 
 const Students = () => {
   const { allStudents, getStudentProfile, branches, languages, levels, getLevels } = useContext(DirectorContext)
+  const { t } = useLanguage()
   const [viewingId, setViewingId] = useState(null)
   const [search, setSearch] = useState('')
   const [branchFilter, setBranchFilter] = useState('')
@@ -27,25 +29,25 @@ const Students = () => {
 
   return (
     <div>
-      <p className='font-display text-2xl text-ink mb-4'>All students</p>
+      <p className='font-display text-2xl text-ink mb-4'>{t('allStudentsTitle')}</p>
 
       <div className='flex flex-wrap gap-3 mb-4'>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder='Search by name or phone…'
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('searchStudents')}
           className='flex-1 max-w-sm px-4 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm' />
         <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)} className='px-3 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm'>
-          <option value=''>Any branch</option>
+          <option value=''>{t('anyBranch')}</option>
           {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
         </select>
         <select value={languageFilter} onChange={e => { setLanguageFilter(e.target.value); if (e.target.value) getLevels(e.target.value) }} className='px-3 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm'>
-          <option value=''>Any language</option>
+          <option value=''>{t('anyLanguage')}</option>
           {languages.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
         </select>
         <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} className='px-3 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm'>
-          <option value=''>Any level</option>
+          <option value=''>{t('anyLevel')}</option>
           {levels.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
         </select>
         {(search || branchFilter || languageFilter || levelFilter) && (
-          <button onClick={() => { setSearch(''); setBranchFilter(''); setLanguageFilter(''); setLevelFilter('') }} className='text-muted text-sm'>Clear</button>
+          <button onClick={() => { setSearch(''); setBranchFilter(''); setLanguageFilter(''); setLevelFilter('') }} className='text-muted text-sm'>{t('clear')}</button>
         )}
       </div>
 
@@ -53,11 +55,11 @@ const Students = () => {
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
-              <th className='px-5 py-3 font-medium'>Name</th>
-              <th className='px-5 py-3 font-medium'>Phone</th>
-              <th className='px-5 py-3 font-medium'>Branch</th>
-              <th className='px-5 py-3 font-medium'>Courses</th>
-              <th className='px-5 py-3 font-medium'>Status</th>
+              <th className='px-5 py-3 font-medium'>{t('nameCol')}</th>
+              <th className='px-5 py-3 font-medium'>{t('phoneCol')}</th>
+              <th className='px-5 py-3 font-medium'>{t('branch')}</th>
+              <th className='px-5 py-3 font-medium'>{t('coursesCol')}</th>
+              <th className='px-5 py-3 font-medium'>{t('status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -71,13 +73,13 @@ const Students = () => {
                 <td className='px-5 py-3 text-muted'>{courseSummary(s)}</td>
                 <td className='px-5 py-3'>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${anyActive(s) ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>
-                    {anyActive(s) ? 'active' : 'unpaid'}
+                    {anyActive(s) ? t('active') : t('unpaid')}
                   </span>
                 </td>
               </tr>
             ))}
             {visibleStudents.length === 0 && (
-              <tr><td colSpan={5} className='px-5 py-8 text-center text-muted'>{allStudents.length === 0 ? 'No students yet.' : 'No students match these filters.'}</td></tr>
+              <tr><td colSpan={5} className='px-5 py-8 text-center text-muted'>{allStudents.length === 0 ? t('noStudentsYetPlain') : t('noStudentsMatchFilters')}</td></tr>
             )}
           </tbody>
         </table>

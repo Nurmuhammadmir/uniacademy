@@ -17,7 +17,9 @@
       "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
       "Bash(node --check models/Settings.js)",
       "Bash(node --check controllers/directorController.js)",
-      "Bash(node --check routes/studentRoute.js)"
+      "Bash(node --check routes/studentRoute.js)",
+      "Bash(node --check src/i18n/translations.js)",
+      "Bash(node -e \"require\\('./src/i18n/translations.js'\\)\")"
     ]
   }
 }

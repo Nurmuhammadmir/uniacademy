@@ -2,6 +2,7 @@ import React, { useContext } from 'react'
 import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
+import FontSizeControl from '../components/FontSizeControl.jsx'
 
 const CourseCard = ({ course, t }) => {
   const remaining = course.price ? Math.max(0, course.price - course.balance) : null
@@ -56,6 +57,10 @@ const Profile = () => {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-4'>
+        <FontSizeControl label={t('textSize')} />
       </div>
 
       <p className='text-ink font-medium mb-2'>{t('myCourses')}</p>

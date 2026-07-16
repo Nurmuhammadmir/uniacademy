@@ -2,6 +2,7 @@ import { createContext, useEffect, useState } from "react"
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { confirm } from '../lib/confirm.js'
+import { t } from '../i18n/LanguageContext.jsx'
 
 export const DirectorContext = createContext()
 
@@ -26,20 +27,20 @@ const DirectorContextProvider = (props) => {
         try {
             const { data } = await axios.post(backendUrl + '/api/auth/login', { phone, password })
             if (data.user.role !== 'director') {
-                toast.error('this account is not a director account')
+                toast.error(t('accountNotDirector'))
                 return false
             }
             localStorage.setItem('token', data.token)
             setToken(data.token)
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'login failed')
+            toast.error(error.response?.data?.error || t('loginFailed'))
             return false
         }
     }
 
     const logout = async () => {
-        if (!(await confirm('Sign out of UniAcademy?'))) return
+        if (!(await confirm(t('confirmSignOut')))) return
         localStorage.removeItem('token')
         setToken(false)
         setStats(false); setMapData(false); setAdmins([]); setTeachers([]); setPricing([]); setAllStudents([])
@@ -50,7 +51,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/stats', authHeader)
             setStats(data)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load stats')
+            toast.error(error.response?.data?.error || t('couldNotLoadStats'))
         }
     }
 
@@ -59,7 +60,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/map-data', authHeader)
             setMapData(data.byBranch)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load map data')
+            toast.error(error.response?.data?.error || t('couldNotLoadMapData'))
         }
     }
 
@@ -68,7 +69,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/students', authHeader)
             setAllStudents(data.students)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load students')
+            toast.error(error.response?.data?.error || t('couldNotLoadStudents'))
         }
     }
 
@@ -77,7 +78,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/students/' + id, authHeader)
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load student profile')
+            toast.error(error.response?.data?.error || t('couldNotLoadStudentProfile'))
             return null
         }
     }
@@ -88,7 +89,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/branches/' + id, authHeader)
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load branch profile')
+            toast.error(error.response?.data?.error || t('couldNotLoadBranchProfile'))
             return null
         }
     }
@@ -98,18 +99,18 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/admins', authHeader)
             setAdmins(data.admins)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load admins')
+            toast.error(error.response?.data?.error || t('couldNotLoadAdmins'))
         }
     }
 
     const createAdmin = async (payload) => {
         try {
             await axios.post(backendUrl + '/api/director/admins', payload, authHeader)
-            toast.success('admin created')
+            toast.success(t('adminCreated'))
             getAdmins()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not create admin')
+            toast.error(error.response?.data?.error || t('couldNotCreateAdmin'))
             return false
         }
     }
@@ -117,23 +118,23 @@ const DirectorContextProvider = (props) => {
     const updateAdmin = async (id, payload) => {
         try {
             await axios.put(backendUrl + '/api/director/admins/' + id, payload, authHeader)
-            toast.success('admin updated')
+            toast.success(t('adminUpdated'))
             getAdmins()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not update admin')
+            toast.error(error.response?.data?.error || t('couldNotUpdateAdmin'))
             return false
         }
     }
 
     const deleteAdminAccount = async (id) => {
-        if (!(await confirm('Remove this admin account?'))) return
+        if (!(await confirm(t('confirmRemoveAdmin')))) return
         try {
             await axios.delete(backendUrl + '/api/director/admins/' + id, authHeader)
-            toast.success('admin removed')
+            toast.success(t('adminRemoved'))
             getAdmins()
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not remove admin')
+            toast.error(error.response?.data?.error || t('couldNotRemoveAdmin'))
         }
     }
 
@@ -142,7 +143,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/teachers', authHeader)
             setTeachers(data.teachers)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load teachers')
+            toast.error(error.response?.data?.error || t('couldNotLoadTeachers'))
         }
     }
 
@@ -151,7 +152,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/teachers/' + id, authHeader)
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load teacher profile')
+            toast.error(error.response?.data?.error || t('couldNotLoadTeacherProfile'))
             return null
         }
     }
@@ -159,11 +160,11 @@ const DirectorContextProvider = (props) => {
     const createTeacher = async (payload) => {
         try {
             await axios.post(backendUrl + '/api/director/teachers', payload, authHeader)
-            toast.success('teacher created')
+            toast.success(t('teacherCreated'))
             getTeachers()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not create teacher')
+            toast.error(error.response?.data?.error || t('couldNotCreateTeacher'))
             return false
         }
     }
@@ -171,23 +172,23 @@ const DirectorContextProvider = (props) => {
     const updateTeacher = async (id, payload) => {
         try {
             await axios.put(backendUrl + '/api/director/teachers/' + id, payload, authHeader)
-            toast.success('teacher updated')
+            toast.success(t('teacherUpdated'))
             getTeachers()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not update teacher')
+            toast.error(error.response?.data?.error || t('couldNotUpdateTeacher'))
             return false
         }
     }
 
     const deleteTeacherAccount = async (id) => {
-        if (!(await confirm('Remove this teacher account? Their existing groups will keep running but stay assigned to them until reassigned.'))) return
+        if (!(await confirm(t('confirmRemoveTeacher')))) return
         try {
             await axios.delete(backendUrl + '/api/director/teachers/' + id, authHeader)
-            toast.success('teacher removed')
+            toast.success(t('teacherRemoved'))
             getTeachers()
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not remove teacher')
+            toast.error(error.response?.data?.error || t('couldNotRemoveTeacher'))
         }
     }
 
@@ -196,30 +197,30 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/pricing', authHeader)
             setPricing(data.pricing)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load pricing')
+            toast.error(error.response?.data?.error || t('couldNotLoadPricing'))
         }
     }
 
     const upsertPricing = async (payload) => {
         try {
             await axios.post(backendUrl + '/api/director/pricing', payload, authHeader)
-            toast.success('pricing saved')
+            toast.success(t('pricingSaved'))
             getPricing()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not save pricing')
+            toast.error(error.response?.data?.error || t('couldNotSavePricing'))
             return false
         }
     }
 
     const deletePricing = async (id) => {
-        if (!(await confirm('Remove this price? Students on this course will not activate on new payments until a price is set again.'))) return
+        if (!(await confirm(t('confirmRemovePricing')))) return
         try {
             await axios.delete(backendUrl + '/api/director/pricing/' + id, authHeader)
-            toast.success('pricing removed')
+            toast.success(t('pricingRemoved'))
             getPricing()
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not remove pricing')
+            toast.error(error.response?.data?.error || t('couldNotRemovePricing'))
         }
     }
 
@@ -228,7 +229,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/branches', authHeader)
             setBranches(data.branches)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load branches')
+            toast.error(error.response?.data?.error || t('couldNotLoadBranches'))
         }
     }
 
@@ -237,7 +238,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/languages', authHeader)
             setLanguages(data.languages)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load languages')
+            toast.error(error.response?.data?.error || t('couldNotLoadLanguages'))
         }
     }
 
@@ -246,7 +247,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/levels' + (languageId ? `?languageId=${languageId}` : ''), authHeader)
             setLevels(data.levels)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load levels')
+            toast.error(error.response?.data?.error || t('couldNotLoadLevels'))
         }
     }
 
@@ -255,7 +256,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/admins/' + id, authHeader)
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load admin profile')
+            toast.error(error.response?.data?.error || t('couldNotLoadAdminProfile'))
             return null
         }
     }
@@ -265,7 +266,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/attendance' + (date ? `?date=${date}` : ''), authHeader)
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load attendance overview')
+            toast.error(error.response?.data?.error || t('couldNotLoadAttendance'))
             return null
         }
     }
@@ -274,11 +275,11 @@ const DirectorContextProvider = (props) => {
     const createBranch = async (name) => {
         try {
             await axios.post(backendUrl + '/api/director/branches', { name }, authHeader)
-            toast.success('branch added')
+            toast.success(t('branchAdded'))
             getBranches()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not add branch')
+            toast.error(error.response?.data?.error || t('couldNotAddBranch'))
             return false
         }
     }
@@ -286,11 +287,11 @@ const DirectorContextProvider = (props) => {
     const updateBranch = async (id, name) => {
         try {
             await axios.put(backendUrl + '/api/director/branches/' + id, { name }, authHeader)
-            toast.success('branch updated')
+            toast.success(t('branchUpdated'))
             getBranches()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not update branch')
+            toast.error(error.response?.data?.error || t('couldNotUpdateBranch'))
             return false
         }
     }
@@ -299,11 +300,11 @@ const DirectorContextProvider = (props) => {
     const createLanguage = async (payload) => {
         try {
             await axios.post(backendUrl + '/api/director/languages', payload, authHeader)
-            toast.success('course added')
+            toast.success(t('courseAdded'))
             getLanguages()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not add course')
+            toast.error(error.response?.data?.error || t('couldNotAddCourse'))
             return false
         }
     }
@@ -311,25 +312,25 @@ const DirectorContextProvider = (props) => {
     const updateLanguage = async (id, payload) => {
         try {
             await axios.put(backendUrl + '/api/director/languages/' + id, payload, authHeader)
-            toast.success('course updated')
+            toast.success(t('courseUpdated'))
             getLanguages()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not update course')
+            toast.error(error.response?.data?.error || t('couldNotUpdateCourse'))
             return false
         }
     }
 
     const deleteLanguage = async (id) => {
-        if (!(await confirm('Delete this course? Every level under it, and all homework content built for those levels, will be deleted too. This cannot be undone.'))) return false
+        if (!(await confirm(t('confirmDeleteCourse')))) return false
         try {
             await axios.delete(backendUrl + '/api/director/languages/' + id, authHeader)
-            toast.success('course deleted')
+            toast.success(t('courseDeleted'))
             getLanguages()
             getLevels()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not delete course')
+            toast.error(error.response?.data?.error || t('couldNotDeleteCourse'))
             return false
         }
     }
@@ -338,11 +339,11 @@ const DirectorContextProvider = (props) => {
     const createLevel = async (payload) => {
         try {
             await axios.post(backendUrl + '/api/director/levels', payload, authHeader)
-            toast.success('level added')
+            toast.success(t('levelAdded'))
             getLevels(payload.languageId)
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not add level')
+            toast.error(error.response?.data?.error || t('couldNotAddLevel'))
             return false
         }
     }
@@ -350,24 +351,24 @@ const DirectorContextProvider = (props) => {
     const updateLevel = async (id, payload, languageId) => {
         try {
             await axios.put(backendUrl + '/api/director/levels/' + id, payload, authHeader)
-            toast.success('level updated')
+            toast.success(t('levelUpdated'))
             getLevels(languageId)
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not update level')
+            toast.error(error.response?.data?.error || t('couldNotUpdateLevel'))
             return false
         }
     }
 
     const deleteLevel = async (id, languageId) => {
-        if (!(await confirm('Delete this level? All homework content built for it (vocab, grammar, reading) will be deleted too. This cannot be undone.'))) return false
+        if (!(await confirm(t('confirmDeleteLevel')))) return false
         try {
             await axios.delete(backendUrl + '/api/director/levels/' + id, authHeader)
-            toast.success('level deleted')
+            toast.success(t('levelDeleted'))
             getLevels(languageId)
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not delete level')
+            toast.error(error.response?.data?.error || t('couldNotDeleteLevel'))
             return false
         }
     }
@@ -378,7 +379,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/settings', authHeader)
             setSettings(data.settings)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load settings')
+            toast.error(error.response?.data?.error || t('couldNotLoadSettings'))
         }
     }
 
@@ -386,10 +387,10 @@ const DirectorContextProvider = (props) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/settings', payload, authHeader)
             setSettings(data.settings)
-            toast.success('settings saved')
+            toast.success(t('settingsSaved'))
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not save settings')
+            toast.error(error.response?.data?.error || t('couldNotSaveSettings'))
             return false
         }
     }
@@ -400,7 +401,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + `/api/director/content/summary?languageId=${languageId}&levelId=${levelId}`, authHeader)
             return data.summary
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load content summary')
+            toast.error(error.response?.data?.error || t('couldNotLoadContentSummary'))
             return {}
         }
     }
@@ -410,7 +411,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + `/api/director/content/day?languageId=${languageId}&levelId=${levelId}&day=${day}`, authHeader)
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load day content')
+            toast.error(error.response?.data?.error || t('couldNotLoadDayContent'))
             return null
         }
     }
@@ -418,10 +419,10 @@ const DirectorContextProvider = (props) => {
     const saveVocab = async (payload) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/content/vocab', payload, authHeader)
-            toast.success(`Vocab saved (${data.wordCount} words, ${data.exerciseCount} test questions)`)
+            toast.success(t('vocabSaved', { words: data.wordCount, exercises: data.exerciseCount }))
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not save vocab')
+            toast.error(error.response?.data?.error || t('couldNotSaveVocab'))
             return false
         }
     }
@@ -429,10 +430,10 @@ const DirectorContextProvider = (props) => {
     const saveGrammar = async (payload) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/content/grammar', payload, authHeader)
-            toast.success(`Grammar saved (${data.exerciseCount} exercises)`)
+            toast.success(t('grammarSaved', { exercises: data.exerciseCount }))
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not save grammar')
+            toast.error(error.response?.data?.error || t('couldNotSaveGrammar'))
             return false
         }
     }
@@ -440,10 +441,10 @@ const DirectorContextProvider = (props) => {
     const saveReading = async (payload) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/content/reading', payload, authHeader)
-            toast.success(data.cleared ? 'Reading cleared' : `Reading saved (${data.exerciseCount} exercises)`)
+            toast.success(data.cleared ? t('readingClearedMsg') : t('readingSaved', { exercises: data.exerciseCount }))
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not save reading')
+            toast.error(error.response?.data?.error || t('couldNotSaveReading'))
             return false
         }
     }
@@ -454,11 +455,11 @@ const DirectorContextProvider = (props) => {
     const fillVocabWordBank = async (languageId, levelId, words) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/content/vocab/word-bank', { languageId, levelId, words }, authHeader)
-            const skipNote = data.skippedCount > 0 ? `, ${data.skippedCount} skipped as duplicates` : ''
-            toast.success(data.daysFilled > 0 ? `Filled ${data.daysFilled} day${data.daysFilled === 1 ? '' : 's'} (${data.wordsUsed} words used${skipNote})` : 'No empty days to fill')
+            const skipNote = data.skippedCount > 0 ? t('skippedAsDuplicates', { count: data.skippedCount }) : ''
+            toast.success(data.daysFilled > 0 ? t('filledDaysMsg', { days: data.daysFilled, plural: data.daysFilled === 1 ? '' : 's', used: data.wordsUsed, unit: 'words', skipNote }) : t('noEmptyDaysMsg'))
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not fill word bank')
+            toast.error(error.response?.data?.error || t('couldNotFillWordBank'))
             return null
         }
     }
@@ -468,11 +469,11 @@ const DirectorContextProvider = (props) => {
     const fillGrammarBank = async (languageId, levelId, exercises) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/content/grammar/word-bank', { languageId, levelId, exercises }, authHeader)
-            const skipNote = data.skippedCount > 0 ? `, ${data.skippedCount} skipped as duplicates` : ''
-            toast.success(data.daysFilled > 0 ? `Filled ${data.daysFilled} day${data.daysFilled === 1 ? '' : 's'} (${data.questionsUsed} questions used${skipNote})` : 'No empty days to fill')
+            const skipNote = data.skippedCount > 0 ? t('skippedAsDuplicates', { count: data.skippedCount }) : ''
+            toast.success(data.daysFilled > 0 ? t('filledDaysMsg', { days: data.daysFilled, plural: data.daysFilled === 1 ? '' : 's', used: data.questionsUsed, unit: 'questions', skipNote }) : t('noEmptyDaysMsg'))
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not fill grammar bank')
+            toast.error(error.response?.data?.error || t('couldNotFillGrammarBank'))
             return null
         }
     }
@@ -483,11 +484,11 @@ const DirectorContextProvider = (props) => {
     const fillReadingBank = async (languageId, levelId, readings) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/content/reading/word-bank', { languageId, levelId, readings }, authHeader)
-            const skipNote = data.skippedCount > 0 ? `, ${data.skippedCount} skipped as duplicates` : ''
-            toast.success(data.daysFilled > 0 ? `Filled ${data.daysFilled} day${data.daysFilled === 1 ? '' : 's'} (${data.readingsUsed} reading${data.readingsUsed === 1 ? '' : 's'} used${skipNote})` : 'No empty days to fill')
+            const skipNote = data.skippedCount > 0 ? t('skippedAsDuplicates', { count: data.skippedCount }) : ''
+            toast.success(data.daysFilled > 0 ? t('filledDaysMsg', { days: data.daysFilled, plural: data.daysFilled === 1 ? '' : 's', used: data.readingsUsed, unit: 'readings', skipNote }) : t('noEmptyDaysMsg'))
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not fill reading bank')
+            toast.error(error.response?.data?.error || t('couldNotFillReadingBank'))
             return null
         }
     }
@@ -498,7 +499,7 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + `/api/director/exam?languageId=${languageId}&levelId=${levelId}`, authHeader)
             return data.exam
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load exam')
+            toast.error(error.response?.data?.error || t('couldNotLoadExam'))
             return null
         }
     }
@@ -506,10 +507,10 @@ const DirectorContextProvider = (props) => {
     const saveExamConfig = async (payload) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/exam', payload, authHeader)
-            toast.success('Exam settings saved')
+            toast.success(t('examSettingsSaved'))
             return data.exam
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not save exam settings')
+            toast.error(error.response?.data?.error || t('couldNotSaveExamSettings'))
             return null
         }
     }
@@ -518,23 +519,23 @@ const DirectorContextProvider = (props) => {
     const addExamQuestions = async (languageId, levelId, questions) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/exam/questions', { languageId, levelId, questions }, authHeader)
-            const skipNote = data.skippedCount > 0 ? `, ${data.skippedCount} skipped as duplicates` : ''
-            toast.success(`Added ${data.addedCount} question${data.addedCount === 1 ? '' : 's'} (${data.totalInBank} total in bank${skipNote})`)
+            const skipNote = data.skippedCount > 0 ? t('skippedAsDuplicates', { count: data.skippedCount }) : ''
+            toast.success(t('addedQuestionsMsg', { added: data.addedCount, plural: data.addedCount === 1 ? '' : 's', total: data.totalInBank, skipNote }))
             return data
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not add exam questions')
+            toast.error(error.response?.data?.error || t('couldNotAddExamQuestions'))
             return null
         }
     }
 
     const clearExamQuestions = async (languageId, levelId) => {
-        if (!(await confirm('Clear every question in this exam bank? This cannot be undone - exam settings (quantity, pass mark, time limit) are kept.'))) return false
+        if (!(await confirm(t('confirmClearExamBank')))) return false
         try {
             await axios.delete(backendUrl + `/api/director/exam/questions?languageId=${languageId}&levelId=${levelId}`, authHeader)
-            toast.success('Exam question bank cleared')
+            toast.success(t('examBankCleared'))
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not clear exam questions')
+            toast.error(error.response?.data?.error || t('couldNotClearExamQuestions'))
             return false
         }
     }
@@ -551,7 +552,7 @@ const DirectorContextProvider = (props) => {
             )
             return data.path
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not upload image')
+            toast.error(error.response?.data?.error || t('couldNotUploadImage'))
             return null
         }
     }
@@ -575,21 +576,21 @@ const DirectorContextProvider = (props) => {
             const { data } = await axios.get(backendUrl + '/api/director/groups', authHeader)
             setAllGroups(data.groups)
         } catch (error) {
-            toast.error(error.response?.data?.error || 'could not load groups')
+            toast.error(error.response?.data?.error || t('couldNotLoadGroups'))
         }
     }
 
     const updateGroupLimits = async (id, payload) => {
         try {
             await axios.put(backendUrl + '/api/director/groups/' + id, payload, authHeader)
-            toast.success('group updated')
+            toast.success(t('groupUpdated'))
             getAllGroups()
             return true
         } catch (error) {
             if (error.response?.data?.error === 'teacher_schedule_conflict') {
-                toast.error('this teacher already has a class at that time')
+                toast.error(t('teacherScheduleConflict'))
             } else {
-                toast.error(error.response?.data?.error || 'could not update group')
+                toast.error(error.response?.data?.error || t('couldNotUpdateGroup'))
             }
             return false
         }

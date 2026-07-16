@@ -1,16 +1,18 @@
 import React, { useContext, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { DirectorContext } from '../context/DirectorContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import BranchProfileModal from '../components/BranchProfileModal.jsx'
 import { formatMoney } from '../lib/format.js'
 
 const Overview = () => {
   const { stats, branches, languages, getBranchProfile } = useContext(DirectorContext)
+  const { t } = useLanguage()
   const [viewingBranchId, setViewingBranchId] = useState(null)
-  const branchName = (id) => branches.find(b => b._id === id)?.name || 'Unassigned'
-  const languageName = (id) => languages.find(l => l._id === id)?.name || 'Unknown'
+  const branchName = (id) => branches.find(b => b._id === id)?.name || t('unassigned')
+  const languageName = (id) => languages.find(l => l._id === id)?.name || t('unknown')
 
-  if (!stats) return <p className='text-muted'>Loading stats…</p>
+  if (!stats) return <p className='text-muted'>{t('loading')}</p>
 
   const revenueChartData = stats.revenueByBranch.map(row => ({ name: branchName(row._id), revenue: row.revenue }))
   const newStudentsByBranchMap = Object.fromEntries((stats.monthlyNewStudentsByBranch || []).map(r => [String(r._id), r.count]))
@@ -19,14 +21,14 @@ const Overview = () => {
   return (
     <div>
       <div className='flex justify-between items-center mb-6'>
-        <p className='font-display text-2xl text-ink'>Overview</p>
+        <p className='font-display text-2xl text-ink'>{t('navOverview')}</p>
         <div className='bg-accent-soft rounded-xl px-4 py-2 text-right'>
-          <p className='text-xs text-muted'>Revenue this month</p>
+          <p className='text-xs text-muted'>{t('revenueThisMonth')}</p>
           <p className='font-mono text-lg text-accent'>{formatMoney(stats.monthlyRevenue || 0)}</p>
         </div>
       </div>
 
-      <p className='text-ink font-medium mb-3'>Revenue by branch</p>
+      <p className='text-ink font-medium mb-3'>{t('revenueByBranch')}</p>
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 mb-8' style={{ height: 260 }}>
         <ResponsiveContainer width='100%' height='100%'>
           <BarChart data={revenueChartData}>
@@ -41,24 +43,24 @@ const Overview = () => {
 
       <div className='grid grid-cols-2 gap-6 mb-8'>
         <div>
-          <p className='text-ink font-medium mb-3'>🏆 Top teachers (active students)</p>
+          <p className='text-ink font-medium mb-3'>🏆 {t('topTeachersActive')}</p>
           <div className='flex flex-col gap-2'>
-            {stats.topTeachers?.map((t, i) => (
-              <div key={t.teacherId} className='bg-bg-elevated border border-hairline rounded-xl p-4 flex justify-between items-center'>
+            {stats.topTeachers?.map((tt, i) => (
+              <div key={tt.teacherId} className='bg-bg-elevated border border-hairline rounded-xl p-4 flex justify-between items-center'>
                 <span className='flex items-center gap-3'>
                   <span className='font-mono text-lg text-gold'>#{i + 1}</span>
-                  <span className='text-ink font-medium'>{t.teacher?.name}</span>
-                  <span className='text-muted text-xs'>{t.teacher?.branchId?.name}</span>
+                  <span className='text-ink font-medium'>{tt.teacher?.name}</span>
+                  <span className='text-muted text-xs'>{tt.teacher?.branchId?.name}</span>
                 </span>
-                <span className='font-mono text-accent'>{t.count} students</span>
+                <span className='font-mono text-accent'>{t('studentsSuffix', { count: tt.count })}</span>
               </div>
             ))}
-            {(!stats.topTeachers || stats.topTeachers.length === 0) && <p className='text-muted text-sm'>No active groups yet.</p>}
+            {(!stats.topTeachers || stats.topTeachers.length === 0) && <p className='text-muted text-sm'>{t('noActiveGroupsYet')}</p>}
           </div>
         </div>
 
         <div>
-          <p className='text-ink font-medium mb-3'>New students this month, by branch</p>
+          <p className='text-ink font-medium mb-3'>{t('newStudentsThisMonth')}</p>
           <div className='flex flex-col gap-2'>
             {branches.map(b => (
               <button key={b._id} onClick={() => setViewingBranchId(b._id)} className='bg-bg-elevated border border-hairline rounded-xl p-4 flex justify-between items-center hover:underline text-left'>
@@ -70,7 +72,7 @@ const Overview = () => {
         </div>
       </div>
 
-      <p className='text-ink font-medium mb-3'>New enrollments this month, by language</p>
+      <p className='text-ink font-medium mb-3'>{t('newEnrollmentsByLang')}</p>
       <div className='grid grid-cols-4 gap-4 mb-8'>
         {languages.map(l => (
           <div key={l._id} className='bg-bg-elevated border border-hairline rounded-2xl p-5'>
@@ -80,40 +82,40 @@ const Overview = () => {
         ))}
       </div>
 
-      <p className='text-ink font-medium mb-3'>Teacher attendance quality (all-time average)</p>
+      <p className='text-ink font-medium mb-3'>{t('teacherAttendanceQuality')}</p>
       <div className='bg-bg-elevated border border-hairline rounded-2xl overflow-hidden mb-8'>
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
-              <th className='px-5 py-3 font-medium'>Teacher</th>
-              <th className='px-5 py-3 font-medium'>Branch</th>
-              <th className='px-5 py-3 font-medium'>Sessions recorded</th>
-              <th className='px-5 py-3 font-medium'>Average attendance</th>
+              <th className='px-5 py-3 font-medium'>{t('teacherCol')}</th>
+              <th className='px-5 py-3 font-medium'>{t('branchCol')}</th>
+              <th className='px-5 py-3 font-medium'>{t('sessionsRecorded')}</th>
+              <th className='px-5 py-3 font-medium'>{t('averageAttendance')}</th>
             </tr>
           </thead>
           <tbody>
-            {stats.teacherAttendanceRates?.map(t => (
-              <tr key={t.teacherId} className='border-b border-hairline last:border-0'>
-                <td className='px-5 py-3 text-ink'>{t.name}</td>
-                <td className='px-5 py-3 text-muted'>{t.branchName}</td>
-                <td className='px-5 py-3 text-muted font-mono'>{t.sessionCount}</td>
+            {stats.teacherAttendanceRates?.map(row => (
+              <tr key={row.teacherId} className='border-b border-hairline last:border-0'>
+                <td className='px-5 py-3 text-ink'>{row.name}</td>
+                <td className='px-5 py-3 text-muted'>{row.branchName}</td>
+                <td className='px-5 py-3 text-muted font-mono'>{row.sessionCount}</td>
                 <td className='px-5 py-3'>
-                  {t.averageAttendancePercent === null ? (
-                    <span className='text-muted text-xs'>no data yet</span>
+                  {row.averageAttendancePercent === null ? (
+                    <span className='text-muted text-xs'>{t('noDataYet')}</span>
                   ) : (
-                    <span className='font-mono text-accent'>{t.averageAttendancePercent}%</span>
+                    <span className='font-mono text-accent'>{row.averageAttendancePercent}%</span>
                   )}
                 </td>
               </tr>
             ))}
             {(!stats.teacherAttendanceRates || stats.teacherAttendanceRates.length === 0) && (
-              <tr><td colSpan={4} className='px-5 py-8 text-center text-muted'>No teachers yet.</td></tr>
+              <tr><td colSpan={4} className='px-5 py-8 text-center text-muted'>{t('noTeachersYet')}</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      <p className='text-ink font-medium mb-3'>Students by language (all-time)</p>
+      <p className='text-ink font-medium mb-3'>{t('studentsByLanguage')}</p>
       <div className='grid grid-cols-4 gap-4'>
         {stats.studentsByLanguage.map(row => (
           <div key={row._id} className='bg-bg-elevated border border-hairline rounded-2xl p-5'>
@@ -121,7 +123,7 @@ const Overview = () => {
             <p className='font-mono text-2xl text-ink'>{row.students}</p>
           </div>
         ))}
-        {stats.studentsByLanguage.length === 0 && <p className='text-muted col-span-4'>No group enrollments yet.</p>}
+        {stats.studentsByLanguage.length === 0 && <p className='text-muted col-span-4'>{t('noGroupEnrollmentsYet')}</p>}
       </div>
 
       {viewingBranchId && (
