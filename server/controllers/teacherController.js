@@ -1,6 +1,7 @@
 // teacher can only ever see their own groups - filtered by req.auth.userId, never trusts a client-supplied id
 import crypto from "crypto"
 import Group from "../models/Group.js"
+import Level from "../models/Level.js"
 import User from "../models/User.js"
 import StudentProgress from "../models/StudentProgress.js"
 import ExamAttempt from "../models/ExamAttempt.js"
@@ -14,7 +15,7 @@ export const getMyGroups = async (req, res) => {
     try {
         const groups = await Group.find({ teacherId: req.auth.userId })
             .populate('languageId', 'name code')
-            .populate('levelId', 'name order')
+            .populate('levelId', 'name order durationDays')
 
         const groupIds = groups.map(g => g._id)
         const doneRows = await StudentProgress.find({ groupId: { $in: groupIds }, status: 'done' })
@@ -24,7 +25,7 @@ export const getMyGroups = async (req, res) => {
             const averageScore = rowsForGroup.length > 0
                 ? Math.round(rowsForGroup.reduce((sum, r) => sum + ((r.vocabScore || 0) + (r.grammarScore || 0) + (r.readingScore || 0)) / 3, 0) / rowsForGroup.length)
                 : null
-            return { ...g.toObject(), dayCounter: computeDayCounter(g.startDate), averageScore }
+            return { ...g.toObject(), dayCounter: computeDayCounter(g.startDate, g.levelId?.durationDays || 30), averageScore }
         })
         res.json({ groups: withFreshDay })
     } catch (error) {
@@ -88,7 +89,8 @@ export const createAttendanceSession = async (req, res) => {
         const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId })
         if (!group) return res.status(404).json({ error: 'not_found' })
 
-        const day = computeDayCounter(group.startDate)
+        const level = await Level.findById(group.levelId).select('durationDays')
+        const day = computeDayCounter(group.startDate, level?.durationDays || 30)
         const token = crypto.randomBytes(16).toString('hex')
         const expiresAt = new Date(Date.now() + 2 * 60 * 1000)
 

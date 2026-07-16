@@ -38,26 +38,31 @@ const extFor = (mimetype, originalname) => {
 }
 
 // looks for a photo the director already dropped into server/public/images/<kind> by hand, matched
-// either by ?name= (slugified, tried against common extensions - used for vocab words) or by an
-// exact ?filename= (used for reading images pasted in via JSON, which name the file explicitly).
-// Returns { path: null } rather than 404 when nothing matches - "not found yet" is a normal state
-// while the director is still typing/pasting, not an error.
+// by a slugified word against common extensions. Pure/sync so it can be called directly from other
+// controllers (e.g. the vocab word-bank filler) as well as from the resolveImage HTTP handler below.
+// Returns '' rather than throwing when nothing matches - "not found yet" is a normal state while
+// the director is still typing/pasting, not an error.
+export const findImageByName = (kind, name) => {
+    const dir = path.join(PUBLIC_ROOT, kind === 'reading' ? 'reading' : 'vocab')
+    if (!fs.existsSync(dir)) return ''
+    const slug = slugify(name)
+    if (!slug) return ''
+    const match = fs.readdirSync(dir).find(f => path.parse(f).name.toLowerCase() === slug)
+    return match ? `/static/images/${kind}/${match}` : ''
+}
+
+const findImageByFilename = (kind, filename) => {
+    const dir = path.join(PUBLIC_ROOT, kind === 'reading' ? 'reading' : 'vocab')
+    const safeFilename = path.basename(String(filename)) // strip any path traversal
+    return fs.existsSync(path.join(dir, safeFilename)) ? `/static/images/${kind}/${safeFilename}` : ''
+}
+
+// HTTP wrapper for the builder UI - ?name= (vocab words) or ?filename= (reading, named explicitly)
 export const resolveImage = async (req, res) => {
     try {
         const kind = req.params.kind === 'reading' ? 'reading' : 'vocab'
-        const dir = path.join(PUBLIC_ROOT, kind)
-        if (!fs.existsSync(dir)) return res.json({ path: null })
-
-        if (req.query.filename) {
-            const filename = path.basename(String(req.query.filename)) // strip any path traversal
-            const exists = fs.existsSync(path.join(dir, filename))
-            return res.json({ path: exists ? `/static/images/${kind}/${filename}` : null })
-        }
-
-        const name = slugify(req.query.name)
-        if (!name) return res.json({ path: null })
-        const match = fs.readdirSync(dir).find(f => path.parse(f).name.toLowerCase() === name)
-        res.json({ path: match ? `/static/images/${kind}/${match}` : null })
+        const found = req.query.filename ? findImageByFilename(kind, req.query.filename) : findImageByName(kind, req.query.name)
+        res.json({ path: found || null })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

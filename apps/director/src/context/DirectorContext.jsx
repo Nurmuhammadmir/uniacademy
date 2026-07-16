@@ -448,6 +448,20 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // pastes an unlimited word bank for one level - fills every day in that level that has no
+    // vocab yet, 10 words per day in day order, until either the bank or the empty days run out.
+    // Returns the fill summary (or null on failure) so the caller can show it to the director.
+    const fillVocabWordBank = async (languageId, levelId, words) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/content/vocab/word-bank', { languageId, levelId, words }, authHeader)
+            toast.success(data.daysFilled > 0 ? `Filled ${data.daysFilled} day${data.daysFilled === 1 ? '' : 's'} (${data.wordsUsed} words used)` : 'No empty days to fill')
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not fill word bank')
+            return null
+        }
+    }
+
     // uploads a photo, named after `name`, into /static/images/<kind>. Returns the served path.
     const uploadContentImage = async (kind, name, file) => {
         try {
@@ -520,7 +534,7 @@ const DirectorContextProvider = (props) => {
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,
         backendUrl,
-        getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage,
+        getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage, fillVocabWordBank,
     }
 
     useEffect(() => {

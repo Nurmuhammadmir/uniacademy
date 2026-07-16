@@ -127,7 +127,7 @@ const Groups = () => {
                 <p className='text-ink font-medium'>{g.languageId?.name} · {g.levelId?.name}</p>
                 <p className='text-muted text-sm'>{g.teacherId?.name} · {g.schedulePattern.replaceAll('_', '/')} {g.time}</p>
               </button>
-              <span className='font-mono text-xs text-accent bg-accent-soft px-2 py-1 rounded-full'>day {g.dayCounter}/30</span>
+              <span className='font-mono text-xs text-accent bg-accent-soft px-2 py-1 rounded-full'>day {g.dayCounter}/{g.levelId?.durationDays || 30}</span>
             </div>
 
             <p className='text-muted text-xs mb-3'>{g.studentIds.length}/{g.capacity} students</p>

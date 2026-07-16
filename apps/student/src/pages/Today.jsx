@@ -63,12 +63,12 @@ const Today = () => {
 
   const examButtonLabel = week.examAttempted ? '🎓 Exam already taken - ask your admin about a retake'
     : week.examAvailable ? '🎓 Level exam is open - tap to start'
-    : '🎓 Level exam (opens on day 30)'
+    : `🎓 Level exam (opens on day ${week.durationDays})`
 
   return (
     <div className='px-5 pt-10'>
       <p className='font-display text-2xl text-ink mb-1'>Today</p>
-      <p className='text-muted text-sm mb-5'>day {week.groupDayCounter} of 30</p>
+      <p className='text-muted text-sm mb-5'>day {week.groupDayCounter} of {week.durationDays}</p>
 
       <DayRow days={week.days} selectedDay={selectedDay} onSelect={setSelectedDay} groupDayCounter={week.groupDayCounter} />
 
@@ -186,10 +186,10 @@ const Today = () => {
           <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 max-w-xs text-center' onClick={e => e.stopPropagation()}>
             <span className='text-4xl mb-3 block'>🎓</span>
             <p className='font-display text-lg text-ink mb-2'>
-              {week.examAttempted ? "You've already taken this level's exam" : 'Exam opens on day 30'}
+              {week.examAttempted ? "You've already taken this level's exam" : `Exam opens on day ${week.durationDays}`}
             </p>
             <p className='text-muted text-sm mb-4'>
-              {week.examAttempted ? 'A retake can only be arranged by your branch admin.' : `You're currently on day ${week.groupDayCounter} of 30 - keep going!`}
+              {week.examAttempted ? 'A retake can only be arranged by your branch admin.' : `You're currently on day ${week.groupDayCounter} of ${week.durationDays} - keep going!`}
             </p>
             <button onClick={() => setShowExamInfo(false)} className='w-full py-3 rounded-xl bg-accent text-white font-medium'>Got it</button>
           </div>

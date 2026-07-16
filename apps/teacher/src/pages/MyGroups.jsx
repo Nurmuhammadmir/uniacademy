@@ -43,7 +43,7 @@ const MyGroups = () => {
                   <p className='text-muted text-sm'>{g.schedulePattern.replaceAll('_', '/')} · {g.time}</p>
                 </div>
                 <div className='flex flex-col items-end gap-1'>
-                  <span className='font-mono text-xs text-accent bg-accent-soft px-2 py-1 rounded-full'>day {g.dayCounter}/30</span>
+                  <span className='font-mono text-xs text-accent bg-accent-soft px-2 py-1 rounded-full'>day {g.dayCounter}/{g.levelId?.durationDays || 30}</span>
                   {g.averageScore !== null && g.averageScore !== undefined && (
                     <span className='font-mono text-xs text-muted'>avg {g.averageScore}%</span>
                   )}

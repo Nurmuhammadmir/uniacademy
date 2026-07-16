@@ -13,7 +13,7 @@ import {
 } from "../controllers/directorController.js"
 import { listLanguages, listLevels, listBranches, getSettings } from "../controllers/catalogController.js"
 import {
-    getDayContent, saveVocab, saveGrammar, saveReading, getLevelContentSummary,
+    getDayContent, saveVocab, saveGrammar, saveReading, getLevelContentSummary, fillVocabWordBank,
 } from "../controllers/contentController.js"
 import { uploadMiddleware, uploadImage, resolveImage } from "../controllers/uploadController.js"
 
@@ -24,6 +24,7 @@ directorRouter.use(requireRole('director'))
 directorRouter.get('/content/summary', getLevelContentSummary)
 directorRouter.get('/content/day', getDayContent)
 directorRouter.put('/content/vocab', saveVocab)
+directorRouter.put('/content/vocab/word-bank', fillVocabWordBank)
 directorRouter.put('/content/grammar', saveGrammar)
 directorRouter.put('/content/reading', saveReading)
 directorRouter.post('/content/upload/:kind', uploadMiddleware, uploadImage)

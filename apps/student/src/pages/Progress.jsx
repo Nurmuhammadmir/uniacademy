@@ -35,6 +35,7 @@ const Progress = () => {
   const rowByDay = Object.fromEntries(progress.days.map(r => [r.day, r]))
   const lastKnownDay = progress.days.length ? Math.max(...progress.days.map(d => d.day)) : 1
   const monthDone = progress.days.filter(d => d.status === 'done').length
+  const durationDays = progress.durationDays || 30
 
   return (
     <div className='px-5 pt-10'>
@@ -51,11 +52,11 @@ const Progress = () => {
 
       <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-6'>
         <div className='flex justify-between items-center mb-3'>
-          <p className='text-ink font-medium'>This course (30 days)</p>
-          <span className='font-mono text-sm text-accent'>{monthDone}/30 done</span>
+          <p className='text-ink font-medium'>This course ({durationDays} days)</p>
+          <span className='font-mono text-sm text-accent'>{monthDone}/{durationDays} done</span>
         </div>
         <div ref={scrollRef} className='flex gap-2 overflow-x-auto pb-1'>
-          {Array.from({ length: 30 }, (_, i) => i + 1).map(day => {
+          {Array.from({ length: durationDays }, (_, i) => i + 1).map(day => {
             const row = rowByDay[day]
             const score = dayScore(row)
             const isToday = day === lastKnownDay

@@ -311,11 +311,12 @@ export const createGroup = async (req, res) => {
         const { languageId, levelId, teacherId, schedulePattern, time, startDate, capacity } = req.body
         await assertNoTeacherConflict(teacherId, schedulePattern, time)
 
+        const level = await Level.findById(levelId).select('durationDays')
         const group = await Group.create({
             branchId: req.auth.branchId,
             languageId, levelId, teacherId, schedulePattern, time, startDate,
             capacity: capacity || 20,
-            dayCounter: computeDayCounter(startDate),
+            dayCounter: computeDayCounter(startDate, level?.durationDays || 30),
         })
         res.status(201).json({ group })
     } catch (error) {
@@ -329,9 +330,9 @@ export const listGroups = async (req, res) => {
     try {
         const groups = await Group.find({ branchId: req.auth.branchId })
             .populate('languageId', 'name code')
-            .populate('levelId', 'name order')
+            .populate('levelId', 'name order durationDays')
             .populate('teacherId', 'name')
-        const withFreshDay = groups.map(g => ({ ...g.toObject(), dayCounter: computeDayCounter(g.startDate) }))
+        const withFreshDay = groups.map(g => ({ ...g.toObject(), dayCounter: computeDayCounter(g.startDate, g.levelId?.durationDays || 30) }))
         res.json({ groups: withFreshDay })
     } catch (error) {
         console.log(error)
@@ -343,11 +344,11 @@ export const getGroupProfile = async (req, res) => {
     try {
         const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId })
             .populate('languageId', 'name')
-            .populate('levelId', 'name')
+            .populate('levelId', 'name durationDays')
             .populate('teacherId', 'name phone')
             .populate('studentIds', 'name phone')
         if (!group) return res.status(404).json({ error: 'not_found' })
-        res.json({ group: { ...group.toObject(), dayCounter: computeDayCounter(group.startDate) } })
+        res.json({ group: { ...group.toObject(), dayCounter: computeDayCounter(group.startDate, group.levelId?.durationDays || 30) } })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

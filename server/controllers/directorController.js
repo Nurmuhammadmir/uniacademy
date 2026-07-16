@@ -611,9 +611,9 @@ export const listAllGroups = async (req, res) => {
         const groups = await Group.find({})
             .populate('branchId', 'name')
             .populate('languageId', 'name')
-            .populate('levelId', 'name order')
+            .populate('levelId', 'name order durationDays')
             .populate('teacherId', 'name')
-        const withFreshDay = groups.map(g => ({ ...g.toObject(), dayCounter: computeDayCounter(g.startDate) }))
+        const withFreshDay = groups.map(g => ({ ...g.toObject(), dayCounter: computeDayCounter(g.startDate, g.levelId?.durationDays || 30) }))
         res.json({ groups: withFreshDay })
     } catch (error) {
         console.log(error)

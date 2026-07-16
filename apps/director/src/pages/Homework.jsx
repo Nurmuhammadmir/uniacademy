@@ -4,6 +4,7 @@ import Modal from '../components/Modal.jsx'
 import VocabEditor from '../components/VocabEditor.jsx'
 import GrammarEditor from '../components/GrammarEditor.jsx'
 import ReadingEditor from '../components/ReadingEditor.jsx'
+import WordBankModal from '../components/WordBankModal.jsx'
 
 // The director builds the fixed daily programme students see: pick a course (language) -> a level ->
 // a day, then author the day's Vocab / Grammar / Reading. Content is stored per (language, level, day)
@@ -18,6 +19,7 @@ const Homework = () => {
   const [dayContent, setDayContent] = useState(null)
   const [loadingDay, setLoadingDay] = useState(false)
   const [editor, setEditor] = useState(null) // 'vocab' | 'grammar' | 'reading'
+  const [showWordBank, setShowWordBank] = useState(false)
 
   useEffect(() => { if (!languages.length) getLanguages() }, [])
 
@@ -73,6 +75,12 @@ const Homework = () => {
           <option value=''>Select level…</option>
           {levelsForLanguage.sort((a, b) => a.order - b.order).map(l => <option key={l._id} value={l._id}>{l.name} · {l.durationDays || 300}d</option>)}
         </select>
+
+        {levelId && (
+          <button onClick={() => setShowWordBank(true)} className='px-4 py-2.5 rounded-xl border border-hairline text-sm text-accent font-medium'>
+            📚 Word bank
+          </button>
+        )}
       </div>
 
       {/* day grid */}
@@ -129,6 +137,13 @@ const Homework = () => {
         <Modal wide title={`Day ${day} · Reading`} onClose={() => setEditor(null)}>
           <ReadingEditor languageId={languageId} levelId={levelId} day={day} initial={dayContent?.reading}
             onClose={() => setEditor(null)} onSaved={refreshAfterSave} />
+        </Modal>
+      )}
+
+      {showWordBank && (
+        <Modal wide title='Word bank' onClose={() => setShowWordBank(false)}>
+          <WordBankModal languageId={languageId} levelId={levelId} levelName={selectedLevel?.name || ''}
+            onClose={() => setShowWordBank(false)} onFilled={refreshAfterSave} />
         </Modal>
       )}
     </div>

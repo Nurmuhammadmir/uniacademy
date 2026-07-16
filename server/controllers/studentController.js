@@ -1,5 +1,6 @@
 // every route in this file sits behind requireRole('student') AND requireActiveSubscription (rule #2)
 import Group from "../models/Group.js"
+import Level from "../models/Level.js"
 import User from "../models/User.js"
 import StudentProgress from "../models/StudentProgress.js"
 import Curriculum from "../models/Curriculum.js"
@@ -20,11 +21,16 @@ import { computeDayCounter, isRestDay } from "../services/dayCounter.service.js"
 import { resolveDayStatus } from "../services/homeworkWindow.service.js"
 import { handleExamResult } from "../services/examPromotion.service.js"
 
+// a level's homework window is however many days the director set (Level.durationDays), not a
+// fixed 30 - resolved here so every caller below gets a dayCounter capped against the level this
+// group actually belongs to
 const getGroupAndSyncWindow = async (studentId) => {
     const group = await Group.findOne({ studentIds: studentId, status: 'active' })
     if (!group) return null
 
-    group.dayCounter = computeDayCounter(group.startDate)
+    const level = await Level.findById(group.levelId).select('durationDays')
+    const durationDays = level?.durationDays || 30
+    group.dayCounter = computeDayCounter(group.startDate, durationDays)
 
     const rows = await StudentProgress.find({ studentId, groupId: group._id })
     for (const row of rows) {
@@ -36,13 +42,14 @@ const getGroupAndSyncWindow = async (studentId) => {
         }
     }
 
-    return group
+    return { group, durationDays }
 }
 
 export const getHomeworkWeek = async (req, res) => {
     try {
-        const group = await getGroupAndSyncWindow(req.auth.userId)
-        if (!group) return res.status(404).json({ error: 'no_active_group' })
+        const result = await getGroupAndSyncWindow(req.auth.userId)
+        if (!result) return res.status(404).json({ error: 'no_active_group' })
+        const { group, durationDays } = result
 
         const windowStart = Math.max(1, group.dayCounter - 2)
         const dayNumbers = []
@@ -70,8 +77,9 @@ export const getHomeworkWeek = async (req, res) => {
         res.json({
             groupId: group._id,
             groupDayCounter: group.dayCounter,
+            durationDays,
             days,
-            examAvailable: group.dayCounter >= 30,
+            examAvailable: group.dayCounter >= durationDays,
             examAttempted: !!examAttempted,
             levelId: group.levelId,
         })
@@ -84,8 +92,9 @@ export const getHomeworkWeek = async (req, res) => {
 // api to get one specific day's homework content - day must be inside the open window, or already done
 export const getHomeworkForDay = async (req, res) => {
     try {
-        const group = await getGroupAndSyncWindow(req.auth.userId)
-        if (!group) return res.status(404).json({ error: 'no_active_group' })
+        const result = await getGroupAndSyncWindow(req.auth.userId)
+        if (!result) return res.status(404).json({ error: 'no_active_group' })
+        const { group } = result
 
         // BUG FIX: reject a non-numeric day param up front (was crashing mongoose with a NaN cast
         // when the frontend requested a day before it had actually loaded one)
@@ -271,8 +280,9 @@ export const submitReading = async (req, res) => {
 
 export const getProgress = async (req, res) => {
     try {
-        const group = await getGroupAndSyncWindow(req.auth.userId)
-        if (!group) return res.status(404).json({ error: 'no_active_group' })
+        const result = await getGroupAndSyncWindow(req.auth.userId)
+        if (!result) return res.status(404).json({ error: 'no_active_group' })
+        const { group, durationDays } = result
 
         const rows = await StudentProgress.find({ studentId: req.auth.userId, groupId: group._id }).sort({ day: 1 })
 
@@ -290,6 +300,7 @@ export const getProgress = async (req, res) => {
 
         res.json({
             streak,
+            durationDays,
             accuracy: { vocab: avg('vocabScore'), grammar: avg('grammarScore'), reading: avg('readingScore') },
             days: rows,
         })
@@ -327,8 +338,9 @@ export const getMe = async (req, res) => {
 
 export const getGroupRanking = async (req, res) => {
     try {
-        const group = await getGroupAndSyncWindow(req.auth.userId)
-        if (!group) return res.status(404).json({ error: 'no_active_group' })
+        const result = await getGroupAndSyncWindow(req.auth.userId)
+        if (!result) return res.status(404).json({ error: 'no_active_group' })
+        const { group } = result
 
         const rows = await StudentProgress.find({ groupId: group._id, status: 'done' })
 
@@ -359,8 +371,9 @@ export const getGroupRanking = async (req, res) => {
 // so the student app can show a real roster with daily progress bars, not just a done-only leaderboard
 export const getGroupProgress = async (req, res) => {
     try {
-        const group = await getGroupAndSyncWindow(req.auth.userId)
-        if (!group) return res.status(404).json({ error: 'no_active_group' })
+        const result = await getGroupAndSyncWindow(req.auth.userId)
+        if (!result) return res.status(404).json({ error: 'no_active_group' })
+        const { group, durationDays } = result
 
         await group.populate('languageId', 'name')
         await group.populate('levelId', 'name')
@@ -377,6 +390,7 @@ export const getGroupProgress = async (req, res) => {
 
         res.json({
             groupDayCounter: group.dayCounter,
+            durationDays,
             roster,
             group: {
                 language: group.languageId?.name,

@@ -14,7 +14,8 @@ import VocabExercise from "../models/VocabExercise.js"
 import GrammarExercise from "../models/GrammarExercise.js"
 import ReadingText from "../models/ReadingText.js"
 import ReadingExercise from "../models/ReadingExercise.js"
-import Language from "../models/Language.js"
+import Level from "../models/Level.js"
+import { findImageByName } from "./uploadController.js"
 
 const NATIVE_CODES = ['ru', 'uz', 'kaa']
 
@@ -87,6 +88,69 @@ export const getDayContent = async (req, res) => {
     }
 }
 
+// creates one day's vocab content from a list of {word, example, translations, image?} - shared by
+// saveVocab (one day, from the builder form/JSON paste) and fillVocabWordBank (many days at once,
+// from a bulk word-bank paste). Fully replaces whatever vocab content already exists for that day.
+// If a word has no `image` already resolved, this rechecks server/public/images/vocab by word name
+// itself - so a word-bank fill picks up photos the director drops into that folder with no extra
+// step, and a normal single-day save gets the same safety net if the frontend's own check missed it.
+const createVocabDay = async ({ languageId, levelId, day, words }) => {
+    const existing = await Curriculum.findOne({ languageId, levelId, day })
+    if (existing) {
+        const oldConceptIds = existing.conceptIds
+        await WordForm.deleteMany({ conceptId: { $in: oldConceptIds } })
+        await Translation.deleteMany({ conceptId: { $in: oldConceptIds } })
+        await Concept.deleteMany({ _id: { $in: oldConceptIds } })
+        await Curriculum.deleteOne({ _id: existing._id })
+    }
+    await VocabExercise.deleteMany({ languageId, levelId, day })
+
+    const concepts = []
+    for (const w of words) {
+        if (!w.word || !w.word.trim()) continue
+        const concept = await Concept.create({
+            image: w.image || findImageByName('vocab', w.word) || '',
+            category: `day-${day}`,
+        })
+        await WordForm.create({
+            conceptId: concept._id,
+            languageId,
+            word: w.word.trim(),
+            example: w.example || '',
+        })
+        for (const code of NATIVE_CODES) {
+            const text = w.translations?.[code]
+            if (text && text.trim()) {
+                await Translation.create({ conceptId: concept._id, nativeLanguageCode: code, text: text.trim() })
+            }
+        }
+        concepts.push(concept)
+    }
+
+    if (concepts.length === 0) return { conceptCount: 0, exerciseCount: 0 }
+
+    await Curriculum.create({ languageId, levelId, day, conceptIds: concepts.map(c => c._id) })
+
+    // auto-generate the vocab test: for each concept, one question of each of the 3 types, each
+    // with the concept as the correct answer and 3 distractors drawn from the same day
+    const exercises = []
+    for (const concept of concepts) {
+        const distractors = pickDistractors(concepts, concept, 3)
+        const options = shuffle([concept, ...distractors]).map(c => c._id)
+        for (const type of ['picture_match', 'translation_match', 'fill_gap']) {
+            exercises.push({
+                languageId, levelId, day, type,
+                conceptId: concept._id,
+                options,
+                correct: concept._id,
+            })
+        }
+    }
+    await VocabExercise.insertMany(exercises)
+
+    return { conceptCount: concepts.length, exerciseCount: exercises.length }
+}
+
 // ==== save the 10 vocab words for a day (+ auto-generate the 30 test questions) ====
 export const saveVocab = async (req, res) => {
     try {
@@ -95,64 +159,56 @@ export const saveVocab = async (req, res) => {
             return res.status(400).json({ error: 'missing_params' })
         }
 
-        // wipe this day's existing vocab content so a re-save is a clean replace, not a duplicate
-        const existing = await Curriculum.findOne({ languageId, levelId, day })
-        if (existing) {
-            const oldConceptIds = existing.conceptIds
-            await WordForm.deleteMany({ conceptId: { $in: oldConceptIds } })
-            await Translation.deleteMany({ conceptId: { $in: oldConceptIds } })
-            await Concept.deleteMany({ _id: { $in: oldConceptIds } })
-            await Curriculum.deleteOne({ _id: existing._id })
-        }
-        await VocabExercise.deleteMany({ languageId, levelId, day })
+        const { conceptCount, exerciseCount } = await createVocabDay({ languageId, levelId, day, words })
+        if (conceptCount === 0) return res.status(400).json({ error: 'no_words' })
 
-        // create the concepts + word forms + translations
-        const concepts = []
-        for (const w of words) {
-            if (!w.word || !w.word.trim()) continue
-            const concept = await Concept.create({
-                image: w.image || '',
-                category: `day-${day}`,
-            })
-            await WordForm.create({
-                conceptId: concept._id,
-                languageId,
-                word: w.word.trim(),
-                example: w.example || '',
-            })
-            for (const code of NATIVE_CODES) {
-                const text = w.translations?.[code]
-                if (text && text.trim()) {
-                    await Translation.create({ conceptId: concept._id, nativeLanguageCode: code, text: text.trim() })
-                }
-            }
-            concepts.push(concept)
+        res.json({ saved: true, wordCount: conceptCount, exerciseCount })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// ==== word bank: paste an unlimited list of words and auto-fill every EMPTY day in this level,
+// 10 words per day, in day order, until either the words or the empty days run out ====
+export const fillVocabWordBank = async (req, res) => {
+    try {
+        const { languageId, levelId, words } = req.body
+        if (!languageId || !levelId || !Array.isArray(words) || words.length === 0) {
+            return res.status(400).json({ error: 'missing_params' })
         }
 
-        if (concepts.length === 0) {
-            return res.status(400).json({ error: 'no_words' })
+        const level = await Level.findById(levelId).select('durationDays')
+        if (!level) return res.status(404).json({ error: 'level_not_found' })
+        const durationDays = level.durationDays || 30
+
+        const existing = await Curriculum.find({ languageId, levelId }).select('day')
+        const filledDays = new Set(existing.map(c => c.day))
+        const emptyDays = []
+        for (let d = 1; d <= durationDays; d++) {
+            if (!filledDays.has(d)) emptyDays.push(d)
         }
 
-        await Curriculum.create({ languageId, levelId, day, conceptIds: concepts.map(c => c._id) })
-
-        // auto-generate the vocab test: for each concept, one question of each of the 3 types,
-        // each with the concept as the correct answer and 3 distractors drawn from the same day
-        const exercises = []
-        for (const concept of concepts) {
-            const distractors = pickDistractors(concepts, concept, 3)
-            const options = shuffle([concept, ...distractors]).map(c => c._id)
-            for (const type of ['picture_match', 'translation_match', 'fill_gap']) {
-                exercises.push({
-                    languageId, levelId, day, type,
-                    conceptId: concept._id,
-                    options,
-                    correct: concept._id,
-                })
+        const validWords = words.filter(w => w.word && w.word.trim())
+        const filled = []
+        let cursor = 0
+        for (const day of emptyDays) {
+            if (cursor >= validWords.length) break
+            const batch = validWords.slice(cursor, cursor + 10)
+            const { conceptCount } = await createVocabDay({ languageId, levelId, day, words: batch })
+            if (conceptCount > 0) {
+                cursor += conceptCount
+                filled.push({ day, count: conceptCount })
             }
         }
-        await VocabExercise.insertMany(exercises)
 
-        res.json({ saved: true, wordCount: concepts.length, exerciseCount: exercises.length })
+        res.json({
+            filled,
+            daysFilled: filled.length,
+            wordsUsed: cursor,
+            wordsRemaining: validWords.length - cursor,
+            emptyDaysRemaining: Math.max(0, emptyDays.length - filled.length),
+        })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

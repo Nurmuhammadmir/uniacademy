@@ -23,7 +23,7 @@ const GroupProfileModal = ({ groupId, getGroupProfile, onViewStudent, onViewTeac
           <div className='grid grid-cols-3 gap-4'>
             <div className='bg-bg border border-hairline rounded-xl p-4'>
               <p className='text-muted text-xs mb-1'>Day</p>
-              <p className='font-mono text-ink'>{group.dayCounter}/30</p>
+              <p className='font-mono text-ink'>{group.dayCounter}/{group.levelId?.durationDays || 30}</p>
             </div>
             <div className='bg-bg border border-hairline rounded-xl p-4'>
               <p className='text-muted text-xs mb-1'>Students</p>
