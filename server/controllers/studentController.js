@@ -413,11 +413,30 @@ export const getGroupProgress = async (req, res) => {
     }
 }
 
+const shuffle = (arr) => {
+    const copy = [...arr]
+    for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1))
+        ;[copy[i], copy[j]] = [copy[j], copy[i]]
+    }
+    return copy
+}
+
+// draws `questionCount` random questions from the director's bank and NEVER sends `correct` to
+// the client - grading happens entirely server-side in submitExam below, against the exam
+// document's own stored answers, so a student can't read the answer key out of the network tab
 export const getExam = async (req, res) => {
     try {
         const exam = await Exam.findOne({ levelId: req.params.levelId })
-        if (!exam) return res.status(404).json({ error: 'not_found' })
-        res.json({ exam })
+        if (!exam || exam.questions.length === 0) return res.status(404).json({ error: 'not_found' })
+
+        const count = Math.min(exam.questionCount || 100, exam.questions.length)
+        const sampled = shuffle(exam.questions).slice(0, count)
+        const safeQuestions = sampled.map(q => ({
+            _id: q._id, section: q.section, type: q.type, passage: q.passage, question: q.question, image: q.image, options: q.options,
+        }))
+
+        res.json({ examId: exam._id, durationMinutes: exam.durationMinutes, questions: safeQuestions })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -426,7 +445,7 @@ export const getExam = async (req, res) => {
 
 export const submitExam = async (req, res) => {
     try {
-        const { score } = req.body
+        const { answers } = req.body // [{ questionId, answer }] - only the questions this attempt was actually shown
         const exam = await Exam.findById(req.params.id)
         if (!exam) return res.status(404).json({ error: 'not_found' })
 
@@ -437,11 +456,24 @@ export const submitExam = async (req, res) => {
             return res.status(403).json({ error: 'exam_already_attempted' })
         }
 
+        const questionById = new Map(exam.questions.map(q => [String(q._id), q]))
+        let correctCount = 0
+        for (const a of (Array.isArray(answers) ? answers : [])) {
+            const q = questionById.get(String(a.questionId))
+            if (!q) continue
+            const isStructured = typeof q.correct === 'object' && q.correct !== null
+            const isMatch = isStructured
+                ? JSON.stringify(q.correct) === JSON.stringify(a.answer)
+                : String(q.correct).trim().toLowerCase() === String(a.answer).trim().toLowerCase()
+            if (isMatch) correctCount++
+        }
+        const score = Math.round((correctCount / (answers?.length || 1)) * 100)
+
         const group = await Group.findOne({ studentIds: req.auth.userId, levelId: exam.levelId })
         const student = await User.findById(req.auth.userId)
 
         const result = await handleExamResult({ student, exam, group, score })
-        res.json(result)
+        res.json({ score, ...result })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

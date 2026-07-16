@@ -17,6 +17,7 @@ import {
     fillVocabWordBank, fillGrammarBank, fillReadingBank,
 } from "../controllers/contentController.js"
 import { uploadMiddleware, uploadImage, resolveImage } from "../controllers/uploadController.js"
+import { getExamConfig, saveExamConfig, addExamQuestions, clearExamQuestions } from "../controllers/examBuilderController.js"
 
 const directorRouter = express.Router()
 directorRouter.use(requireRole('director'))
@@ -32,6 +33,12 @@ directorRouter.put('/content/reading', saveReading)
 directorRouter.put('/content/reading/word-bank', fillReadingBank)
 directorRouter.post('/content/upload/:kind', uploadMiddleware, uploadImage)
 directorRouter.get('/content/resolve-image/:kind', resolveImage)
+
+// ==== exam builder (level-wide question bank, independent of the daily curriculum) ====
+directorRouter.get('/exam', getExamConfig)
+directorRouter.put('/exam', saveExamConfig)
+directorRouter.put('/exam/questions', addExamQuestions)
+directorRouter.delete('/exam/questions', clearExamQuestions)
 
 directorRouter.get('/branches', listBranches)
 directorRouter.get('/branches/:id', getBranchProfile)

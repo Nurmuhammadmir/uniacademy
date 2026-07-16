@@ -8,5 +8,6 @@ const grammarExerciseSchema = new mongoose.Schema({
     options: { type: [String], default: [] },
     correct: { type: String, required: true },
 }, { timestamps: true })
+grammarExerciseSchema.index({ languageId: 1, levelId: 1, day: 1 })
 const GrammarExercise = mongoose.models.GrammarExercise || mongoose.model('GrammarExercise', grammarExerciseSchema)
 export default GrammarExercise

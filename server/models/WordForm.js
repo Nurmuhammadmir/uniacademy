@@ -6,5 +6,6 @@ const wordFormSchema = new mongoose.Schema({
     // optional - a director pasting JSON in bulk won't always have an example sentence ready yet
     example: { type: String, default: '' },
 }, { timestamps: true })
+wordFormSchema.index({ conceptId: 1, languageId: 1 })
 const WordForm = mongoose.models.WordForm || mongoose.model('WordForm', wordFormSchema)
 export default WordForm

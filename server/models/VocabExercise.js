@@ -8,5 +8,6 @@ const vocabExerciseSchema = new mongoose.Schema({
     options: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Concept' }], required: true },
     correct: { type: mongoose.Schema.Types.ObjectId, ref: 'Concept', required: true },
 }, { timestamps: true })
+vocabExerciseSchema.index({ languageId: 1, levelId: 1, day: 1 })
 const VocabExercise = mongoose.models.VocabExercise || mongoose.model('VocabExercise', vocabExerciseSchema)
 export default VocabExercise

@@ -136,19 +136,22 @@ const StudentContextProvider = (props) => {
         }
     }
 
+    // returns { examId, durationMinutes, questions } - questions never include the correct answer,
+    // grading happens entirely server-side in submitExam below
     const getExam = async (levelId) => {
         try {
             const { data } = await axios.get(backendUrl + '/api/student/exam/' + levelId, authHeader)
-            return data.exam
+            return data
         } catch (error) {
             toast.error(error.response?.data?.error || 'no exam available yet')
             return null
         }
     }
 
-    const submitExam = async (examId, score) => {
+    // answers: [{ questionId, answer }]
+    const submitExam = async (examId, answers) => {
         try {
-            const { data } = await axios.post(backendUrl + '/api/student/exam/' + examId + '/submit', { score }, authHeader)
+            const { data } = await axios.post(backendUrl + '/api/student/exam/' + examId + '/submit', { answers }, authHeader)
             return data
         } catch (error) {
             if (error.response?.data?.error === 'exam_already_attempted') {

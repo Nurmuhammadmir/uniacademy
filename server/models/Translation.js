@@ -4,5 +4,6 @@ const translationSchema = new mongoose.Schema({
     nativeLanguageCode: { type: String, enum: ['ru', 'uz', 'kaa'], required: true },
     text: { type: String, required: true },
 }, { timestamps: true })
+translationSchema.index({ conceptId: 1, nativeLanguageCode: 1 })
 const Translation = mongoose.models.Translation || mongoose.model('Translation', translationSchema)
 export default Translation

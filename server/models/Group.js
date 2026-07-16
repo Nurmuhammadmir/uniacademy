@@ -12,5 +12,9 @@ const groupSchema = new mongoose.Schema({
     capacity: { type: Number, default: 20 },
     status: { type: String, enum: ['active', 'completed', 'archived'], default: 'active' },
 }, { timestamps: true })
+// finds "this student's active group" - hit on every homework/progress/ranking request
+groupSchema.index({ studentIds: 1, status: 1 })
+groupSchema.index({ teacherId: 1 })
+groupSchema.index({ branchId: 1 })
 const Group = mongoose.models.Group || mongoose.model('Group', groupSchema)
 export default Group

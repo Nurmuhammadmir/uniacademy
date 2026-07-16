@@ -10,5 +10,8 @@ const studentProgressSchema = new mongoose.Schema({
     status: { type: String, enum: ['locked', 'open', 'expired', 'done'], default: 'locked' },
     completedAt: { type: Date, default: null },
 }, { timestamps: true })
+// {studentId,groupId} prefix serves the per-student lookups; {groupId,status} serves ranking/roster reads
+studentProgressSchema.index({ studentId: 1, groupId: 1, day: 1 })
+studentProgressSchema.index({ groupId: 1, status: 1 })
 const StudentProgress = mongoose.models.StudentProgress || mongoose.model('StudentProgress', studentProgressSchema)
 export default StudentProgress

@@ -7,5 +7,6 @@ const examAttemptSchema = new mongoose.Schema({
     attemptNumber: { type: Number, required: true },
     date: { type: Date, default: Date.now },
 }, { timestamps: true })
+examAttemptSchema.index({ studentId: 1, examId: 1 })
 const ExamAttempt = mongoose.models.ExamAttempt || mongoose.model('ExamAttempt', examAttemptSchema)
 export default ExamAttempt

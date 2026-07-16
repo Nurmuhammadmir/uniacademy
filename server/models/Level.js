@@ -7,5 +7,6 @@ const levelSchema = new mongoose.Schema({
     // on the Courses page; the homework builder renders exactly this many days.
     durationDays: { type: Number, required: true, default: 30, min: 1, max: 300 },
 }, { timestamps: true })
+levelSchema.index({ languageId: 1, order: 1 })
 const Level = mongoose.models.Level || mongoose.model('Level', levelSchema)
 export default Level

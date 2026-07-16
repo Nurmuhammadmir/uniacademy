@@ -7,7 +7,14 @@
       "Bash(npx vite *)",
       "Bash(node --check controllers/uploadController.js)",
       "Bash(node --check controllers/studentController.js)",
-      "Bash(node --input-type=module -e \"import\\('./routes/studentRoute.js'\\).then\\(\\(\\)=>console.log\\('OK'\\)\\).catch\\(e=>{console.error\\('FAIL',e.message\\);process.exit\\(1\\)}\\)\")"
+      "Bash(node --input-type=module -e \"import\\('./routes/studentRoute.js'\\).then\\(\\(\\)=>console.log\\('OK'\\)\\).catch\\(e=>{console.error\\('FAIL',e.message\\);process.exit\\(1\\)}\\)\")",
+      "Bash(npm install *)",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(node --input-type=module -e \"import\\('c:/Users/PC Asusvivobook/Downloads/uniacademy \\(11\\)/server/server.js'\\)\")",
+      "Bash(kill %1)",
+      "Bash(timeout 6 node server.js)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\")"
     ]
   }
 }

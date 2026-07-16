@@ -7,5 +7,6 @@ const readingTextSchema = new mongoose.Schema({
     image: { type: String, default: '' },
     paragraphs: [{ id: { type: String, required: true }, text: { type: String, required: true } }],
 }, { timestamps: true })
+readingTextSchema.index({ languageId: 1, levelId: 1, day: 1 })
 const ReadingText = mongoose.models.ReadingText || mongoose.model('ReadingText', readingTextSchema)
 export default ReadingText

@@ -492,6 +492,53 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // ==== exam builder (level-wide, independent of the daily curriculum) ====
+    const getExamConfig = async (languageId, levelId) => {
+        try {
+            const { data } = await axios.get(backendUrl + `/api/director/exam?languageId=${languageId}&levelId=${levelId}`, authHeader)
+            return data.exam
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not load exam')
+            return null
+        }
+    }
+
+    const saveExamConfig = async (payload) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/exam', payload, authHeader)
+            toast.success('Exam settings saved')
+            return data.exam
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not save exam settings')
+            return null
+        }
+    }
+
+    // paste-and-add: grows the exam's question bank, skipping duplicates already in it
+    const addExamQuestions = async (languageId, levelId, questions) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/exam/questions', { languageId, levelId, questions }, authHeader)
+            const skipNote = data.skippedCount > 0 ? `, ${data.skippedCount} skipped as duplicates` : ''
+            toast.success(`Added ${data.addedCount} question${data.addedCount === 1 ? '' : 's'} (${data.totalInBank} total in bank${skipNote})`)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not add exam questions')
+            return null
+        }
+    }
+
+    const clearExamQuestions = async (languageId, levelId) => {
+        if (!(await confirm('Clear every question in this exam bank? This cannot be undone - exam settings (quantity, pass mark, time limit) are kept.'))) return false
+        try {
+            await axios.delete(backendUrl + `/api/director/exam/questions?languageId=${languageId}&levelId=${levelId}`, authHeader)
+            toast.success('Exam question bank cleared')
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not clear exam questions')
+            return false
+        }
+    }
+
     // uploads a photo, named after `name`, into /static/images/<kind>. Returns the served path.
     const uploadContentImage = async (kind, name, file) => {
         try {
@@ -566,6 +613,7 @@ const DirectorContextProvider = (props) => {
         backendUrl,
         getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage,
         fillVocabWordBank, fillGrammarBank, fillReadingBank,
+        getExamConfig, saveExamConfig, addExamQuestions, clearExamQuestions,
     }
 
     useEffect(() => {

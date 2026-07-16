@@ -7,12 +7,16 @@ import ReadingEditor from '../components/ReadingEditor.jsx'
 import WordBankModal from '../components/WordBankModal.jsx'
 import GrammarBankModal from '../components/GrammarBankModal.jsx'
 import ReadingBankModal from '../components/ReadingBankModal.jsx'
+import ExamBankModal from '../components/ExamBankModal.jsx'
 
 // The director builds the fixed daily programme students see: pick a course (language) -> a level ->
 // a day, then author the day's Vocab / Grammar / Reading. Content is stored per (language, level, day)
 // and shown in the student app exactly as built here.
 const Homework = () => {
-  const { languages, getLanguages, levels, getLevels, getContentSummary, getDayContent } = useContext(DirectorContext)
+  const {
+    languages, getLanguages, levels, getLevels, getContentSummary, getDayContent,
+    getExamConfig, saveExamConfig, clearExamQuestions,
+  } = useContext(DirectorContext)
 
   const [languageId, setLanguageId] = useState('')
   const [levelId, setLevelId] = useState('')
@@ -24,6 +28,10 @@ const Homework = () => {
   const [showWordBank, setShowWordBank] = useState(false)
   const [showGrammarBank, setShowGrammarBank] = useState(false)
   const [showReadingBank, setShowReadingBank] = useState(false)
+  const [showExamBank, setShowExamBank] = useState(false)
+  const [examConfig, setExamConfig] = useState(null)
+  const [examForm, setExamForm] = useState({ questionCount: 100, durationMinutes: 60, passScore: 70 })
+  const [savingExam, setSavingExam] = useState(false)
 
   useEffect(() => { if (!languages.length) getLanguages() }, [])
 
@@ -42,9 +50,29 @@ const Homework = () => {
     setSummary(s || {})
   }
 
+  const loadExamConfig = async (lang, lvl) => {
+    if (!lang || !lvl) return
+    const exam = await getExamConfig(lang, lvl)
+    setExamConfig(exam)
+    if (exam) setExamForm({ questionCount: exam.questionCount, durationMinutes: exam.durationMinutes, passScore: exam.passScore })
+  }
+
   const onSelectLevel = async (id) => {
     setLevelId(id); setDay(null); setDayContent(null)
-    await loadSummary(languageId, id)
+    await Promise.all([loadSummary(languageId, id), loadExamConfig(languageId, id)])
+  }
+
+  const submitExamForm = async (e) => {
+    e.preventDefault()
+    setSavingExam(true)
+    const exam = await saveExamConfig({ languageId, levelId, ...examForm })
+    setSavingExam(false)
+    if (exam) setExamConfig(prev => ({ ...prev, ...exam }))
+  }
+
+  const onClearExamBank = async () => {
+    const ok = await clearExamQuestions(languageId, levelId)
+    if (ok) await loadExamConfig(languageId, levelId)
   }
 
   const openDay = async (d) => {
@@ -94,6 +122,54 @@ const Homework = () => {
           </>
         )}
       </div>
+
+      {/* exam builder - level-wide, independent of the daily curriculum */}
+      {levelId && (
+        <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 mb-8'>
+          <div className='flex justify-between items-center mb-3'>
+            <p className='font-display text-lg text-ink'>Level exam</p>
+            <span className='text-xs px-2 py-0.5 rounded-full bg-accent-soft text-accent'>
+              {examConfig?.questions?.length || 0} question{(examConfig?.questions?.length || 0) === 1 ? '' : 's'} in bank
+            </span>
+          </div>
+          <form onSubmit={submitExamForm} className='flex flex-wrap items-end gap-3 mb-4'>
+            <div>
+              <label className='block text-xs text-muted mb-1'>Questions per attempt</label>
+              <input type='number' min='1' value={examForm.questionCount}
+                onChange={e => setExamForm({ ...examForm, questionCount: Number(e.target.value) })}
+                className='w-32 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+            </div>
+            <div>
+              <label className='block text-xs text-muted mb-1'>Pass mark %</label>
+              <input type='number' min='1' max='100' value={examForm.passScore}
+                onChange={e => setExamForm({ ...examForm, passScore: Number(e.target.value) })}
+                className='w-28 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+            </div>
+            <div>
+              <label className='block text-xs text-muted mb-1'>Time limit (minutes)</label>
+              <input type='number' min='1' value={examForm.durationMinutes}
+                onChange={e => setExamForm({ ...examForm, durationMinutes: Number(e.target.value) })}
+                className='w-32 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+            </div>
+            <button type='submit' disabled={savingExam} className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium disabled:opacity-50'>
+              {savingExam ? 'Saving…' : 'Save settings'}
+            </button>
+          </form>
+          <p className='text-xs text-muted mb-3'>
+            Each attempt draws {examForm.questionCount} random questions from the bank below - paste in far more than that so every student sees a different set.
+          </p>
+          <div className='flex gap-2'>
+            <button onClick={() => setShowExamBank(true)} className='px-4 py-2 rounded-lg border border-hairline text-sm text-accent font-medium'>
+              🎓 Add exam questions
+            </button>
+            {(examConfig?.questions?.length || 0) > 0 && (
+              <button onClick={onClearExamBank} className='px-4 py-2 rounded-lg border border-hairline text-sm text-red-500 font-medium'>
+                Clear bank
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* day grid */}
       {levelId && (
@@ -170,6 +246,13 @@ const Homework = () => {
         <Modal wide title='Reading bank' onClose={() => setShowReadingBank(false)}>
           <ReadingBankModal languageId={languageId} levelId={levelId} levelName={selectedLevel?.name || ''}
             onClose={() => setShowReadingBank(false)} onFilled={refreshAfterSave} />
+        </Modal>
+      )}
+
+      {showExamBank && (
+        <Modal wide title='Exam questions' onClose={() => setShowExamBank(false)}>
+          <ExamBankModal languageId={languageId} levelId={levelId} levelName={selectedLevel?.name || ''}
+            onClose={() => setShowExamBank(false)} onAdded={() => loadExamConfig(languageId, levelId)} />
         </Modal>
       )}
     </div>

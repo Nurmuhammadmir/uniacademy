@@ -17,9 +17,11 @@ export const getSettings = async (req, res) => {
     }
 }
 
+// this reference data is hit by every app, on every load, from every concurrent user - .lean()
+// skips building full Mongoose documents for data nobody here mutates or re-saves
 export const listLanguages = async (req, res) => {
     try {
-        const languages = await Language.find({})
+        const languages = await Language.find({}).lean()
         res.json({ languages })
     } catch (error) {
         console.log(error)
@@ -30,7 +32,7 @@ export const listLanguages = async (req, res) => {
 export const listLevels = async (req, res) => {
     try {
         const filter = req.query.languageId ? { languageId: req.query.languageId } : {}
-        const levels = await Level.find(filter).sort({ order: 1 })
+        const levels = await Level.find(filter).sort({ order: 1 }).lean()
         res.json({ levels })
     } catch (error) {
         console.log(error)
@@ -40,7 +42,7 @@ export const listLevels = async (req, res) => {
 
 export const listBranches = async (req, res) => {
     try {
-        const branches = await Branch.find({})
+        const branches = await Branch.find({}).lean()
         res.json({ branches })
     } catch (error) {
         console.log(error)

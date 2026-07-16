@@ -9,5 +9,7 @@ const paymentSchema = new mongoose.Schema({
     subscriptionEnd: { type: Date, default: null }, // resulting expiry after this payment was applied, filled in right after creation
 }, { timestamps: true })
 
+paymentSchema.index({ studentId: 1, languageId: 1 })
+
 const Payment = mongoose.models.Payment || mongoose.model('Payment', paymentSchema)
 export default Payment

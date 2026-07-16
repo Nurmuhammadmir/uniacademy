@@ -8,5 +8,6 @@ const readingExerciseSchema = new mongoose.Schema({
     options: { type: mongoose.Schema.Types.Mixed, default: [] },
     correct: { type: mongoose.Schema.Types.Mixed, required: true },
 }, { timestamps: true })
+readingExerciseSchema.index({ readingTextId: 1 })
 const ReadingExercise = mongoose.models.ReadingExercise || mongoose.model('ReadingExercise', readingExerciseSchema)
 export default ReadingExercise
