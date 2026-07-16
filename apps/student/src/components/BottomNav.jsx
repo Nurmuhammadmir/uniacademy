@@ -1,14 +1,16 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-
-const tabs = [
-  { to: '/', label: 'Today', icon: '📖' },
-  { to: '/progress', label: 'Progress', icon: '📊' },
-  { to: '/ranking', label: 'Ranking', icon: '🏆' },
-  { to: '/profile', label: 'Profile', icon: '👤' },
-]
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const BottomNav = () => {
+  const { t } = useLanguage()
+  const tabs = [
+    { to: '/', label: t('navToday'), icon: '📖' },
+    { to: '/progress', label: t('navProgress'), icon: '📊' },
+    { to: '/ranking', label: t('navRanking'), icon: '🏆' },
+    { to: '/profile', label: t('navProfile'), icon: '👤' },
+  ]
+
   return (
     <nav className='fixed bottom-0 left-0 right-0 bg-bg-elevated border-t border-hairline flex'>
       {tabs.map(tab => (

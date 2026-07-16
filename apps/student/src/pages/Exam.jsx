@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { StudentContext } from '../context/StudentContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import QuestionCard from '../components/QuestionCard.jsx'
 import { randomQuote } from '../lib/quotes.js'
 
@@ -13,6 +14,7 @@ const formatClock = (totalSeconds) => {
 const Exam = () => {
   const { levelId } = useParams()
   const { getExam, submitExam } = useContext(StudentContext)
+  const { t } = useLanguage()
   const [exam, setExam] = useState(false)
   const [answers, setAnswers] = useState({})
   const [secondsLeft, setSecondsLeft] = useState(null)
@@ -47,8 +49,8 @@ const Exam = () => {
     else submittedRef.current = false
   }
 
-  if (exam === false) return <div className='px-6 pt-16 text-muted'>Loading exam…</div>
-  if (!exam) return <div className='px-6 pt-16 text-center text-muted'>No exam available yet - check back once your director has published one.</div>
+  if (exam === false) return <div className='px-6 pt-16 text-muted'>{t('loadingExam')}</div>
+  if (!exam) return <div className='px-6 pt-16 text-center text-muted'>{t('noExamYet')}</div>
 
   if (result) {
     const passed = result.outcome === 'promoted' || result.outcome === 'course_completed'
@@ -56,10 +58,10 @@ const Exam = () => {
       <div className='min-h-screen flex flex-col items-center justify-center px-6 text-center'>
         <p className={`font-mono text-5xl mb-2 ${passed ? 'text-gold' : 'text-accent'}`}>{result.score}%</p>
         <p className='font-display text-xl text-ink mb-3'>
-          {result.outcome === 'promoted' ? 'Level passed! 🎉' :
-           result.outcome === 'course_completed' ? 'Course completed! 🎓' :
-           result.outcome === 'failed_awaiting_manual_retake' ? "Not quite - talk to your admin about your one retake" :
-           'Not quite this time'}
+          {result.outcome === 'promoted' ? t('levelPassed') :
+           result.outcome === 'course_completed' ? t('courseCompleted') :
+           result.outcome === 'failed_awaiting_manual_retake' ? t('notQuiteRetake') :
+           t('notQuiteThisTime')}
         </p>
         <p className='text-ink italic max-w-xs'>"{randomQuote()}"</p>
       </div>
@@ -72,7 +74,7 @@ const Exam = () => {
   return (
     <div className='px-5 pt-10 pb-10'>
       <div className='flex items-center justify-between mb-6'>
-        <p className='font-display text-2xl text-ink'>Level exam</p>
+        <p className='font-display text-2xl text-ink'>{t('levelExam')}</p>
         {secondsLeft !== null && (
           <span className={`font-mono text-lg px-3 py-1 rounded-full ${lowTime ? 'bg-red-100 text-red-500' : 'bg-accent-soft text-accent'}`}>
             {formatClock(Math.max(0, secondsLeft))}
@@ -98,7 +100,7 @@ const Exam = () => {
         </div>
       ))}
       <button onClick={submit} disabled={!allAnswered || submitting} className='w-full py-4 rounded-2xl bg-accent text-white font-medium mt-2 disabled:opacity-50'>
-        {submitting ? 'Submitting…' : 'Submit exam'}
+        {submitting ? t('submitting') : t('submitExam')}
       </button>
     </div>
   )

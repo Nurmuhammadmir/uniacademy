@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { StudentContext } from './context/StudentContext.jsx'
+import { LanguageProvider } from './i18n/LanguageContext.jsx'
 import BottomNav from './components/BottomNav.jsx'
 import ConfirmHost from './components/ConfirmHost.jsx'
 import Login from './pages/Login.jsx'
@@ -14,10 +15,10 @@ import Profile from './pages/Profile.jsx'
 import GoogleTranslateWidget from './components/GoogleTranslateWidget.jsx'
 
 const App = () => {
-  const { token } = useContext(StudentContext)
+  const { token, settings } = useContext(StudentContext)
 
   return (
-    <>
+    <LanguageProvider enabledLanguages={settings?.enabledStudentLanguages}>
       <ToastContainer position='top-center' autoClose={2500} />
       <ConfirmHost />
       {!token ? (
@@ -38,7 +39,7 @@ const App = () => {
           <BottomNav />
         </div>
       )}
-    </>
+    </LanguageProvider>
   )
 }
 

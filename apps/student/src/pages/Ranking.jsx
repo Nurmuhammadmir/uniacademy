@@ -1,5 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { StudentContext } from '../context/StudentContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const dayScore = (row) => {
   const scores = [row?.vocabScore, row?.grammarScore, row?.readingScore].filter(s => s !== null && s !== undefined)
@@ -9,6 +10,7 @@ const dayScore = (row) => {
 
 const Ranking = () => {
   const { getGroupRanking, getGroupProgress } = useContext(StudentContext)
+  const { t } = useLanguage()
   const [ranking, setRanking] = useState(false)
   const [groupProgress, setGroupProgress] = useState(false)
 
@@ -17,7 +19,7 @@ const Ranking = () => {
     getGroupProgress().then(setGroupProgress)
   }, [])
 
-  if (!ranking || !groupProgress) return <div className='px-6 pt-16 text-muted'>Loading ranking…</div>
+  if (!ranking || !groupProgress) return <div className='px-6 pt-16 text-muted'>{t('loading')}</div>
 
   const scoreByStudent = Object.fromEntries(ranking.ranking.map(r => [r.studentId, r.averageScore]))
   const sortedRoster = [...groupProgress.roster].sort((a, b) => (scoreByStudent[b.studentId] ?? -1) - (scoreByStudent[a.studentId] ?? -1))
@@ -25,12 +27,12 @@ const Ranking = () => {
 
   return (
     <div className='px-5 pt-10'>
-      <p className='font-display text-2xl text-ink mb-1'>Level ranking</p>
+      <p className='font-display text-2xl text-ink mb-1'>{t('levelRanking')}</p>
       <p className='text-ink text-sm font-medium mb-1'>
         {groupProgress.group?.language} · {groupProgress.group?.level} · {groupProgress.group?.teacher} · {groupProgress.group?.schedulePattern?.replaceAll('_', '/')} {groupProgress.group?.time}
       </p>
-      <p className='text-muted mb-1'>you're #{ranking.myRank || '—'} in your group</p>
-      <p className='text-muted text-xs mb-6'>overall average across this whole level so far, not just today</p>
+      <p className='text-muted mb-1'>{t('yourRank', { rank: ranking.myRank || '—' })}</p>
+      <p className='text-muted text-xs mb-6'>{t('overallAverageNote')}</p>
 
       <div className='flex flex-col gap-2 mb-8'>
         {sortedRoster.map((student, i) => {
@@ -44,25 +46,25 @@ const Ranking = () => {
                 ) : (
                   <span className='font-mono text-muted text-sm w-5'>{i + 1}</span>
                 )}
-                <span className='text-ink font-medium'>{isMe ? 'You' : student.name}</span>
+                <span className='text-ink font-medium'>{isMe ? t('you') : student.name}</span>
               </span>
               <span className={`font-mono text-sm ${isFirst ? 'text-gold' : 'text-accent'}`}>{scoreByStudent[student.studentId] ?? '—'}%</span>
             </div>
           )
         })}
-        {sortedRoster.length === 0 && <p className='text-muted text-sm'>No students in your group yet.</p>}
+        {sortedRoster.length === 0 && <p className='text-muted text-sm'>{t('noStudentsYet')}</p>}
       </div>
 
-      <p className='text-ink font-medium mb-3'>Day-by-day, everyone</p>
+      <p className='text-ink font-medium mb-3'>{t('dayByDayEveryone')}</p>
       <div className='bg-bg-card border border-hairline rounded-2xl p-4 overflow-x-auto'>
         <table className='text-sm border-separate' style={{ borderSpacing: '4px 6px' }}>
           <thead>
             <tr>
-              <th className='sticky left-0 bg-bg-card text-left text-muted font-medium pr-3'>Student</th>
+              <th className='sticky left-0 bg-bg-card text-left text-muted font-medium pr-3'>{t('student')}</th>
               {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => (
                 <th key={d} className='text-muted font-mono font-medium text-xs w-8'>{d}</th>
               ))}
-              <th className='text-muted font-medium pl-3'>Avg</th>
+              <th className='text-muted font-medium pl-3'>{t('avg')}</th>
             </tr>
           </thead>
           <tbody>
@@ -71,7 +73,7 @@ const Ranking = () => {
               return (
                 <tr key={student.studentId}>
                   <td className={`sticky left-0 bg-bg-card pr-3 whitespace-nowrap ${isMe ? 'text-accent font-medium' : 'text-ink'}`}>
-                    {isMe ? 'You' : student.name}
+                    {isMe ? t('you') : student.name}
                   </td>
                   {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
                     const row = student.days.find(r => r.day === d)

@@ -11,6 +11,7 @@ const StudentContextProvider = (props) => {
     const [me, setMe] = useState(false)
     const [week, setWeek] = useState(false)
     const [progress, setProgress] = useState(false)
+    const [settings, setSettings] = useState(false)
 
     const authHeader = { headers: { Authorization: `Bearer ${token}` } }
 
@@ -106,6 +107,16 @@ const StudentContextProvider = (props) => {
         }
     }
 
+    // enabledStudentLanguages here controls which UI languages the app's language switcher offers
+    const getSettings = async () => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/student/settings', authHeader)
+            setSettings(data.settings)
+        } catch (error) {
+            // quiet - this only gates the language switcher, not worth alarming the student over
+        }
+    }
+
     const getProgress = async () => {
         try {
             const { data } = await axios.get(backendUrl + '/api/student/progress', authHeader)
@@ -184,6 +195,7 @@ const StudentContextProvider = (props) => {
         submitVocab, submitGrammar, submitReading,
         progress, getProgress, getGroupRanking, getGroupProgress, getExam, submitExam,
         scanAttendance,
+        settings, getSettings,
     }
 
     useEffect(() => {
@@ -191,6 +203,7 @@ const StudentContextProvider = (props) => {
             getHomeworkWeek()
             getProgress()
             getMe()
+            getSettings()
         }
     }, [token])
 

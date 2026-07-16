@@ -1,24 +1,26 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StudentContext } from '../context/StudentContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import DayRow from '../components/DayRow.jsx'
 import ExerciseModal from '../components/ExerciseModal.jsx'
 import AttendanceScanner from '../components/AttendanceScanner.jsx'
 
-const SECTION_META = {
-  vocab: { label: 'Vocabulary', icon: '🔤' },
-  grammar: { label: 'Grammar', icon: '✏️' },
-  reading: { label: 'Reading', icon: '📖' },
-}
-
 const Today = () => {
   const { week, getHomeworkWeek, getHomeworkForDay, submitVocab, submitGrammar, submitReading, progress } = useContext(StudentContext)
+  const { t } = useLanguage()
   const [selectedDay, setSelectedDay] = useState(null)
   const [dayData, setDayData] = useState(false)
   const [openSection, setOpenSection] = useState(null)
   const [showExamInfo, setShowExamInfo] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const navigate = useNavigate()
+
+  const SECTION_META = {
+    vocab: { label: t('vocabulary'), icon: '🔤' },
+    grammar: { label: t('grammar'), icon: '✏️' },
+    reading: { label: t('reading'), icon: '📖' },
+  }
 
   useEffect(() => {
     if (week && week.days && selectedDay === null && Number.isInteger(week.groupDayCounter)) {
@@ -53,22 +55,22 @@ const Today = () => {
   if (!week) {
     return (
       <div className='px-6 pt-16 text-center'>
-        <p className='text-muted'>No active group yet, or your subscription needs attention.</p>
-        <p className='text-muted text-sm mt-2'>Ask your branch admin to enroll you in a group.</p>
+        <p className='text-muted'>{t('noActiveGroup')}</p>
+        <p className='text-muted text-sm mt-2'>{t('askAdminEnroll')}</p>
       </div>
     )
   }
 
   const selectedDayMeta = week.days.find(d => d.day === selectedDay)
 
-  const examButtonLabel = week.examAttempted ? '🎓 Exam already taken - ask your admin about a retake'
-    : week.examAvailable ? '🎓 Level exam is open - tap to start'
-    : `🎓 Level exam (opens on day ${week.durationDays})`
+  const examButtonLabel = week.examAttempted ? t('examAlreadyTaken')
+    : week.examAvailable ? t('examOpenTapStart')
+    : t('examOpensOnDay', { day: week.durationDays })
 
   return (
     <div className='px-5 pt-10'>
-      <p className='font-display text-2xl text-ink mb-1'>Today</p>
-      <p className='text-muted text-sm mb-5'>day {week.groupDayCounter} of {week.durationDays}</p>
+      <p className='font-display text-2xl text-ink mb-1'>{t('today')}</p>
+      <p className='text-muted text-sm mb-5'>{t('dayOf', { current: week.groupDayCounter, total: week.durationDays })}</p>
 
       <DayRow days={week.days} selectedDay={selectedDay} onSelect={setSelectedDay} groupDayCounter={week.groupDayCounter} />
 
@@ -76,7 +78,7 @@ const Today = () => {
         onClick={() => setShowScanner(true)}
         className='w-full mb-3 py-3 rounded-2xl border border-hairline text-ink font-medium flex items-center justify-center gap-2'
       >
-        📷 Scan attendance QR
+        {t('scanAttendance')}
       </button>
 
       <button
@@ -87,11 +89,11 @@ const Today = () => {
       </button>
 
       {!dayData ? (
-        <p className='text-muted'>Loading…</p>
+        <p className='text-muted'>{t('loading')}</p>
       ) : dayData.restDay ? (
         <div className='bg-bg-card border border-hairline rounded-2xl p-8 text-center'>
-          <p className='font-display text-lg text-ink mb-1'>Rest day</p>
-          <p className='text-muted text-sm'>No homework today - see you back tomorrow.</p>
+          <p className='font-display text-lg text-ink mb-1'>{t('restDay')}</p>
+          <p className='text-muted text-sm'>{t('restDaySubtitle')}</p>
         </div>
       ) : (
         <>
@@ -102,7 +104,7 @@ const Today = () => {
             return (
               <div className='bg-bg-card border border-hairline rounded-2xl p-4 mb-4'>
                 <div className='flex justify-between text-sm mb-1'>
-                  <span className='text-ink font-medium'>Day {selectedDay} progress</span>
+                  <span className='text-ink font-medium'>{t('dayProgress', { day: selectedDay })}</span>
                   <span className='font-mono text-accent'>{partsDone}/3 · {dayPercent}%</span>
                 </div>
                 <div className='h-2 rounded-full bg-hairline overflow-hidden'>
@@ -130,7 +132,7 @@ const Today = () => {
                       <span className='text-ink font-medium'>{meta.label}</span>
                     </span>
                     <span className={`text-xs font-medium px-3 py-1 rounded-full ${done ? 'bg-accent-soft text-accent' : locked ? 'bg-hairline text-muted' : 'bg-accent text-white'}`}>
-                      {done ? `${score}%` : locked ? 'Missed' : 'Start'}
+                      {done ? `${score}%` : locked ? t('missed') : t('start')}
                     </span>
                   </div>
                   {done && (
@@ -148,20 +150,20 @@ const Today = () => {
       {progress && (
         <div className='bg-bg-card border border-hairline rounded-2xl p-4 mt-4'>
           <div className='flex justify-between items-center mb-3'>
-            <p className='text-ink font-medium text-sm'>Your overall accuracy</p>
-            <span className='font-mono text-xs text-gold'>{progress.streak} day streak</span>
+            <p className='text-ink font-medium text-sm'>{t('yourAccuracy')}</p>
+            <span className='font-mono text-xs text-gold'>{progress.streak} {t('dayStreak')}</span>
           </div>
           <div className='grid grid-cols-3 gap-3 text-center'>
             <div>
-              <p className='text-muted text-xs mb-1'>Vocab</p>
+              <p className='text-muted text-xs mb-1'>{t('vocabulary')}</p>
               <p className='font-mono text-accent'>{progress.accuracy.vocab ?? '—'}{progress.accuracy.vocab !== null ? '%' : ''}</p>
             </div>
             <div>
-              <p className='text-muted text-xs mb-1'>Grammar</p>
+              <p className='text-muted text-xs mb-1'>{t('grammar')}</p>
               <p className='font-mono text-accent'>{progress.accuracy.grammar ?? '—'}{progress.accuracy.grammar !== null ? '%' : ''}</p>
             </div>
             <div>
-              <p className='text-muted text-xs mb-1'>Reading</p>
+              <p className='text-muted text-xs mb-1'>{t('reading')}</p>
               <p className='font-mono text-accent'>{progress.accuracy.reading ?? '—'}{progress.accuracy.reading !== null ? '%' : ''}</p>
             </div>
           </div>
@@ -186,12 +188,12 @@ const Today = () => {
           <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 max-w-xs text-center' onClick={e => e.stopPropagation()}>
             <span className='text-4xl mb-3 block'>🎓</span>
             <p className='font-display text-lg text-ink mb-2'>
-              {week.examAttempted ? "You've already taken this level's exam" : `Exam opens on day ${week.durationDays}`}
+              {week.examAttempted ? t('examAlreadyTakenTitle') : t('examOpensOnDayTitle', { day: week.durationDays })}
             </p>
             <p className='text-muted text-sm mb-4'>
-              {week.examAttempted ? 'A retake can only be arranged by your branch admin.' : `You're currently on day ${week.groupDayCounter} of ${week.durationDays} - keep going!`}
+              {week.examAttempted ? t('examRetakeAdmin') : t('examCurrentlyOnDay', { day: week.groupDayCounter, total: week.durationDays })}
             </p>
-            <button onClick={() => setShowExamInfo(false)} className='w-full py-3 rounded-xl bg-accent text-white font-medium'>Got it</button>
+            <button onClick={() => setShowExamInfo(false)} className='w-full py-3 rounded-xl bg-accent text-white font-medium'>{t('gotIt')}</button>
           </div>
         </div>
       )}

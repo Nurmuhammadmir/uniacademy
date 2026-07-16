@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 import { StudentContext } from '../context/StudentContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const SCANNER_ELEMENT_ID = 'attendance-qr-reader'
 
@@ -12,6 +13,7 @@ const SCANNER_ELEMENT_ID = 'attendance-qr-reader'
 // .stop() when it's genuinely safe to.
 const AttendanceScanner = ({ onClose }) => {
   const { scanAttendance } = useContext(StudentContext)
+  const { t } = useLanguage()
   const scannerRef = useRef(null)
   const runningRef = useRef(false)
   const processingRef = useRef(false)
@@ -59,8 +61,8 @@ const AttendanceScanner = ({ onClose }) => {
   return (
     <div className='fixed inset-0 bg-black z-50 flex flex-col'>
       <div className='flex items-center justify-between px-5 pt-6 pb-4'>
-        <button onClick={onClose} className='text-white text-sm'>Close</button>
-        <p className='font-display text-white'>Scan attendance</p>
+        <button onClick={onClose} className='text-white text-sm'>{t('close')}</button>
+        <p className='font-display text-white'>{t('scanAttendanceTitle')}</p>
         <span className='w-10' />
       </div>
 
@@ -68,34 +70,34 @@ const AttendanceScanner = ({ onClose }) => {
         {status === 'scanning' && (
           <div className='w-full max-w-xs'>
             <div id={SCANNER_ELEMENT_ID} className='rounded-2xl overflow-hidden' />
-            {cameraError && <p className='text-white text-sm text-center mt-4'>Couldn't access the camera - check your browser's camera permission.</p>}
-            {!cameraError && <p className='text-white/70 text-sm text-center mt-4'>Point your camera at your teacher's QR code</p>}
+            {cameraError && <p className='text-white text-sm text-center mt-4'>{t('cameraError')}</p>}
+            {!cameraError && <p className='text-white/70 text-sm text-center mt-4'>{t('pointCamera')}</p>}
           </div>
         )}
 
-        {status === 'checking' && <p className='text-white'>Checking in…</p>}
+        {status === 'checking' && <p className='text-white'>{t('checkingIn')}</p>}
 
         {status === 'success' && (
           <div className='text-center'>
             <span className='text-6xl block mb-3'>✅</span>
-            <p className='text-white font-display text-xl mb-6'>You're checked in!</p>
-            <button onClick={onClose} className='px-6 py-3 rounded-2xl bg-accent text-white font-medium'>Done</button>
+            <p className='text-white font-display text-xl mb-6'>{t('checkedIn')}</p>
+            <button onClick={onClose} className='px-6 py-3 rounded-2xl bg-accent text-white font-medium'>{t('gotIt')}</button>
           </div>
         )}
 
         {status === 'already' && (
           <div className='text-center'>
             <span className='text-6xl block mb-3'>👍</span>
-            <p className='text-white font-display text-xl mb-6'>Already checked in today</p>
-            <button onClick={onClose} className='px-6 py-3 rounded-2xl bg-accent text-white font-medium'>Done</button>
+            <p className='text-white font-display text-xl mb-6'>{t('alreadyCheckedIn')}</p>
+            <button onClick={onClose} className='px-6 py-3 rounded-2xl bg-accent text-white font-medium'>{t('gotIt')}</button>
           </div>
         )}
 
         {status === 'error' && (
           <div className='text-center'>
             <span className='text-6xl block mb-3'>⚠️</span>
-            <p className='text-white font-display text-xl mb-6'>Couldn't check you in</p>
-            <button onClick={onClose} className='px-6 py-3 rounded-2xl bg-accent text-white font-medium'>Close</button>
+            <p className='text-white font-display text-xl mb-6'>{t('couldNotCheckIn')}</p>
+            <button onClick={onClose} className='px-6 py-3 rounded-2xl bg-accent text-white font-medium'>{t('close')}</button>
           </div>
         )}
       </div>

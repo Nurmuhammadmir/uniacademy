@@ -586,14 +586,17 @@ export const deleteLevel = async (req, res) => {
 
 // ==== Settings ====
 
-// api to update global settings (currently just whether passport info is required at student
-// registration) - upserts the single settings document
+// api to update global settings (passport requirement, which languages students may switch the
+// student app into) - upserts the single settings document
 export const updateSettings = async (req, res) => {
     try {
-        const { passportRequired } = req.body
+        const { passportRequired, enabledStudentLanguages } = req.body
+        const update = {}
+        if (passportRequired !== undefined) update.passportRequired = passportRequired
+        if (enabledStudentLanguages !== undefined) update.enabledStudentLanguages = enabledStudentLanguages
         const settings = await Settings.findOneAndUpdate(
             {},
-            { passportRequired },
+            update,
             { new: true, upsert: true, runValidators: true }
         )
         res.json({ settings })

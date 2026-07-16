@@ -1,4 +1,5 @@
 import React from 'react'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const statusStyles = {
   done: 'bg-gold text-white',
@@ -11,15 +12,16 @@ const statusStyles = {
 // array index as a tiebreaker so React never warns about duplicate keys even if the backend ever
 // returns an edge-case window with a repeated day number.
 const DayRow = ({ days, selectedDay, onSelect, groupDayCounter }) => {
+  const { t } = useLanguage()
   return (
     <div className='flex gap-2 mb-6 overflow-x-auto pb-1'>
       {days.map((d, i) => {
         const isSelected = d.day === selectedDay
-        const label = d.status === 'rest' ? 'rest'
-          : d.status === 'done' ? 'done'
-          : d.status === 'expired' ? 'missed'
-          : d.day === groupDayCounter ? 'today'
-          : 'open'
+        const label = d.status === 'rest' ? t('dayRest')
+          : d.status === 'done' ? t('dayDone')
+          : d.status === 'expired' ? t('dayMissed')
+          : d.day === groupDayCounter ? t('dayToday')
+          : t('dayOpen')
         return (
           <button
             key={`${d.day}-${i}`}

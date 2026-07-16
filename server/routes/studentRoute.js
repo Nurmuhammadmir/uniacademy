@@ -1,6 +1,7 @@
 import express from "express"
 import requireRole from "../middleware/auth.js"
 import { requireActiveSubscription } from "../services/subscription.service.js"
+import { getSettings } from "../controllers/catalogController.js"
 import {
     getHomeworkWeek, getHomeworkForDay, submitVocab, submitGrammar, submitReading,
     getProgress, getGroupRanking, getGroupProgress, getExam, submitExam, getMe, scanAttendance,
@@ -10,6 +11,7 @@ const studentRouter = express.Router()
 studentRouter.use(requireRole('student'))
 
 studentRouter.get('/me', getMe)
+studentRouter.get('/settings', getSettings)
 studentRouter.post('/attendance/scan', scanAttendance)
 
 studentRouter.get('/homework/week', requireActiveSubscription, getHomeworkWeek)

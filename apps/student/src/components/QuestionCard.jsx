@@ -1,12 +1,14 @@
 import React, { useContext } from 'react'
 import { resolveImageUrl } from '../lib/format.js'
 import { StudentContext } from '../context/StudentContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 // `image` is the question's own prompt picture (e.g. a vocab picture_match concept) - never a
 // per-option picture. Options are always rendered as plain word/text choices, so every prompt
 // image renders at the same square size regardless of the source photo's aspect ratio.
 const QuestionCard = ({ index, question, image, options, value, onChange, type }) => {
   const { backendUrl } = useContext(StudentContext)
+  const { t } = useLanguage()
   const hasOptions = Array.isArray(options) && options.length > 0
   // true_false questions never carry an options array (they're a fixed binary choice), so they'd
   // otherwise fall through to the free-text input below - which mismatches the boolean `correct`
@@ -16,7 +18,7 @@ const QuestionCard = ({ index, question, image, options, value, onChange, type }
 
   return (
     <div className='bg-bg-card border border-hairline rounded-2xl p-4 mb-3'>
-      <p className='text-xs font-mono text-muted mb-2'>Q{index + 1}</p>
+      <p className='text-xs font-mono text-muted mb-2'>{t('question', { n: index + 1 })}</p>
       {image && (
         <img src={resolveImageUrl(image, backendUrl)} alt='' className='w-full aspect-square object-cover rounded-xl mb-3' />
       )}
@@ -58,7 +60,7 @@ const QuestionCard = ({ index, question, image, options, value, onChange, type }
           type='text'
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
-          placeholder='Type your answer'
+          placeholder={t('typeAnswer')}
           className='w-full px-4 py-3 rounded-xl border border-hairline bg-bg-elevated text-ink'
         />
       )}

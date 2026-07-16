@@ -3,8 +3,8 @@ import QuestionCard from './QuestionCard.jsx'
 import { randomQuote } from '../lib/quotes.js'
 import { resolveImageUrl } from '../lib/format.js'
 import { StudentContext } from '../context/StudentContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
-const TITLES = { vocab: 'Vocabulary', grammar: 'Grammar', reading: 'Reading' }
 const ICONS = { vocab: '🔤', grammar: '✏️', reading: '📖' }
 
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -14,23 +14,21 @@ const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 // translation_match shows all 3 native translations at once (not just Russian - the student body
 // isn't only Russian speakers), fill_gap shows its example sentence with the word blanked out. The
 // 4 options are always the same - words - only what's being asked differs.
-const buildVocabPrompt = (ex) => {
+const buildVocabPrompt = (ex, t) => {
   const c = ex.conceptId || {}
   if (ex.type === 'picture_match') {
-    return c.image
-      ? { image: c.image, question: 'Which word matches this picture?' }
-      : { image: null, question: c.word ? `Which word matches: "${c.word}"?` : 'Which word matches this picture?' }
+    return { image: c.image || null, question: t('whichWordMatches') }
   }
   if (ex.type === 'translation_match') {
     const parts = [c.translations?.ru, c.translations?.uz, c.translations?.kaa].filter(Boolean)
-    return { image: null, question: parts.length ? `Translate: ${parts.join(' / ')}` : 'Translate the word' }
+    return { image: null, question: parts.length ? `${t('translateWord')}: ${parts.join(' / ')}` : t('translateWord') }
   }
   // fill_gap
   if (c.example && c.word) {
     const blanked = c.example.replace(new RegExp(`\\b${escapeRegExp(c.word)}\\b`, 'i'), '____')
     return { image: null, question: blanked }
   }
-  return { image: null, question: c.example || 'Fill in the blank' }
+  return { image: null, question: c.example || t('fillInBlank') }
 }
 
 // 4-stage flow for vocab (intro -> flashcards -> questions -> result), 3-stage for grammar/reading
@@ -38,6 +36,8 @@ const buildVocabPrompt = (ex) => {
 // especially prompt photos - blows up to fill a wide desktop browser window.
 const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) => {
   const { backendUrl } = useContext(StudentContext)
+  const { t } = useLanguage()
+  const TITLES = { vocab: t('vocabulary'), grammar: t('grammar'), reading: t('reading') }
   const [stage, setStage] = useState('intro')
   const [cardIndex, setCardIndex] = useState(0)
   const [answers, setAnswers] = useState({})
@@ -73,8 +73,8 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
     <div className='fixed inset-0 bg-bg z-50 flex justify-center'>
       <div className='w-full max-w-md flex flex-col h-full'>
         <div className='flex items-center justify-between px-5 pt-6 pb-4 border-b border-hairline'>
-          <button onClick={() => onClose(stage === 'result')} className='text-muted text-sm'>Close</button>
-          <p className='font-display text-ink'>{TITLES[section]} · Day {day}</p>
+          <button onClick={() => onClose(stage === 'result')} className='text-muted text-sm'>{t('close')}</button>
+          <p className='font-display text-ink'>{TITLES[section]} · {t('dayN', { day })}</p>
           <span className='w-10' />
         </div>
 
@@ -82,13 +82,13 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
           <div className='flex-1 flex flex-col items-center justify-center px-8 text-center'>
             <span className='text-5xl mb-4'>{ICONS[section]}</span>
             <p className='font-display text-2xl text-ink mb-2'>{TITLES[section]}</p>
-            <p className='text-muted mb-6'>{exercises.length} question{exercises.length === 1 ? '' : 's'} · about {estimatedMinutes} min</p>
+            <p className='text-muted mb-6'>{t('estimatedTime', { count: exercises.length, plural: exercises.length === 1 ? '' : 's', minutes: estimatedMinutes })}</p>
             <button
               onClick={() => { setCardIndex(0); setStage(concepts.length > 0 ? 'cards' : 'questions') }}
               disabled={exercises.length === 0}
               className='w-full max-w-xs py-4 rounded-2xl bg-accent text-white font-medium disabled:opacity-50'
             >
-              {exercises.length === 0 ? 'Nothing here yet' : (concepts.length > 0 ? 'Review the words' : 'Start')}
+              {exercises.length === 0 ? t('nothingHereYet') : (concepts.length > 0 ? t('reviewTheWords') : t('start'))}
             </button>
           </div>
         )}
@@ -107,17 +107,17 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
                   {card?.translations?.kaa && <p className='text-muted text-sm'>kaa: {card.translations.kaa}</p>}
                 </div>
               </div>
-              <p className='text-muted text-xs mt-3'>Card {cardIndex + 1} of {concepts.length}</p>
+              <p className='text-muted text-xs mt-3'>{t('card', { current: cardIndex + 1, total: concepts.length })}</p>
             </div>
             <div className='flex gap-2 px-5 py-4 border-t border-hairline'>
               <button onClick={() => setCardIndex(i => Math.max(0, i - 1))} disabled={cardIndex === 0}
                 className='flex-1 py-4 rounded-2xl border border-hairline text-ink font-medium disabled:opacity-40'>
-                Previous
+                {t('previous')}
               </button>
               <button
                 onClick={() => cardIndex === concepts.length - 1 ? setStage('questions') : setCardIndex(i => i + 1)}
                 className='flex-1 py-4 rounded-2xl bg-accent text-white font-medium'>
-                {cardIndex === concepts.length - 1 ? 'Start test' : 'Next'}
+                {cardIndex === concepts.length - 1 ? t('startTest') : t('next')}
               </button>
             </div>
           </>
@@ -138,12 +138,12 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
                 </div>
               )}
               {exercises.map((ex, i) => {
-                const vocabPrompt = section === 'vocab' ? buildVocabPrompt(ex) : null
+                const vocabPrompt = section === 'vocab' ? buildVocabPrompt(ex, t) : null
                 return (
                   <QuestionCard
                     key={ex._id}
                     index={i}
-                    question={vocabPrompt ? vocabPrompt.question : (ex.question || 'Match the correct word')}
+                    question={vocabPrompt ? vocabPrompt.question : (ex.question || t('matchCorrectWord'))}
                     image={vocabPrompt?.image}
                     options={ex.options}
                     value={answers[ex._id]}
@@ -155,7 +155,7 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
             </div>
             <div className='px-5 py-4 border-t border-hairline'>
               <button onClick={submit} disabled={!allAnswered || submitting} className='w-full py-4 rounded-2xl bg-accent text-white font-medium disabled:opacity-50'>
-                {submitting ? 'Submitting…' : 'Finish & submit'}
+                {submitting ? t('submitting') : t('finishSubmit')}
               </button>
             </div>
           </>
@@ -166,7 +166,7 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
             <p className='font-mono text-6xl text-accent mb-3'>{result.score}%</p>
             <p className='text-ink italic mb-8 max-w-xs'>"{randomQuote()}"</p>
             <button onClick={() => onClose(true)} className='w-full max-w-xs py-4 rounded-2xl bg-accent text-white font-medium'>
-              Back to today
+              {t('backToToday')}
             </button>
           </div>
         )}

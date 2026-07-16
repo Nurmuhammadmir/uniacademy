@@ -5,6 +5,9 @@ import mongoose from "mongoose"
 
 const settingsSchema = new mongoose.Schema({
     passportRequired: { type: Boolean, default: true },
+    // which UI languages students are allowed to switch the student app into - the director can
+    // narrow this (e.g. drop Karakalpak) without touching any translation content itself
+    enabledStudentLanguages: { type: [String], default: ['en', 'ru', 'uz', 'kaa'] },
 }, { timestamps: true })
 
 const Settings = mongoose.models.Settings || mongoose.model('Settings', settingsSchema)
