@@ -438,12 +438,18 @@ const pickOnePerRandomDay = (byDay, count) => {
     return picked
 }
 
-// The exam is no longer a director-curated bank - it's assembled fresh per attempt straight from
+// The exam is no longer a director-curated bank - it's assembled once per attempt straight from
 // content the student has already been taught: 25 vocab + 25 grammar exercises (one random
 // exercise from one random already-learned day, drawn 25 times each) plus 3 whole reading texts
 // (each kept intact with all 10 of its own exercises) from already-learned days. `correct` is
 // never sent to the client - grading happens entirely server-side in submitExam, by looking the
 // same exercise ids back up in their source collections.
+//
+// The drawn set is persisted in ExamSession the FIRST time a student opens the exam, and every
+// later call just replays that same snapshot - closing the tab and reopening (or refreshing right
+// before a bad answer) can never re-roll a fresh, easier set. `startedAt` anchors the countdown
+// server-side too, so the remaining time keeps counting down in the background regardless of how
+// many times the page is reloaded.
 export const getExam = async (req, res) => {
     try {
         const group = await Group.findOne({ studentIds: req.auth.userId, levelId: req.params.levelId })
@@ -456,6 +462,20 @@ export const getExam = async (req, res) => {
         let exam = await Exam.findOne({ levelId: req.params.levelId })
         if (!exam) {
             exam = await Exam.create({ languageId: group.languageId, levelId: req.params.levelId, durationMinutes: 90, passScore: 70 })
+        }
+
+        const alreadyAttempted = await ExamAttempt.exists({ studentId: req.auth.userId, examId: exam._id })
+        if (alreadyAttempted) return res.status(403).json({ error: 'exam_already_attempted' })
+
+        const existingSession = await ExamSession.findOne({ studentId: req.auth.userId, examId: exam._id })
+        if (existingSession) {
+            return res.json({
+                examId: exam._id,
+                durationMinutes: exam.durationMinutes,
+                startedAt: existingSession.startedAt,
+                questions: existingSession.questions,
+                readingTexts: existingSession.readingTexts,
+            })
         }
 
         const level = await Level.findById(req.params.levelId).select('durationDays')
@@ -533,10 +553,14 @@ export const getExam = async (req, res) => {
             return res.status(404).json({ error: 'not_enough_content' })
         }
 
+        const questions = shuffle([...vocabQuestions, ...grammarQuestions])
+        const session = await ExamSession.create({ studentId: req.auth.userId, examId: exam._id, questions, readingTexts })
+
         res.json({
             examId: exam._id,
             durationMinutes: exam.durationMinutes,
-            questions: shuffle([...vocabQuestions, ...grammarQuestions]),
+            startedAt: session.startedAt,
+            questions,
             readingTexts,
         })
     } catch (error) {

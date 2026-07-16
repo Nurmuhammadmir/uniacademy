@@ -19,7 +19,10 @@
       "Bash(node --check controllers/directorController.js)",
       "Bash(node --check routes/studentRoute.js)",
       "Bash(node --check src/i18n/translations.js)",
-      "Bash(node -e \"require\\('./src/i18n/translations.js'\\)\")"
+      "Bash(node -e \"require\\('./src/i18n/translations.js'\\)\")",
+      "Bash(node --check controllers/examBuilderController.js)",
+      "Bash(node --check models/Exam.js)",
+      "Bash(node _diagnose_exam_404_tmp.mjs)"
     ]
   }
 }
