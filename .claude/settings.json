@@ -27,7 +27,12 @@
       "Bash(node --check services/examPromotion.service.js)",
       "Bash(node --check models/ExamSession.js)",
       "Bash(node --check controllers/adminController.js)",
-      "Bash(node -e \"console.log\\(new Date\\(\\).toString\\(\\)\\); console.log\\(new Date\\(\\).getTimezoneOffset\\(\\)\\); console.log\\(process.env.TZ\\)\")"
+      "Bash(node -e \"console.log\\(new Date\\(\\).toString\\(\\)\\); console.log\\(new Date\\(\\).getTimezoneOffset\\(\\)\\); console.log\\(process.env.TZ\\)\")",
+      "Bash(node --check controllers/teacherController.js)",
+      "Bash(node --check services/dayCounter.service.js)",
+      "Bash(node --check services/enrollMidCycle.service.js)",
+      "Bash(node --check models/ExamAttempt.js)",
+      "Bash(node _check_index_conflicts_tmp.mjs)"
     ]
   }
 }

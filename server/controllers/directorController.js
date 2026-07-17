@@ -391,12 +391,17 @@ export const deletePricing = async (req, res) => {
 // or any past date means exactly what it says regardless of where each group's cycle currently is.
 export const getAttendanceOverview = async (req, res) => {
     try {
+        // UTC throughout, matching teacherController.scanOwnAttendance's write side exactly - a
+        // "YYYY-MM-DD" query string is always UTC-parsed by `new Date(...)`, so zeroing locally
+        // here (on a server not running in UTC) used to produce a different instant than the write
+        // side and silently miss real check-ins. Range match, not exact equality, for the same
+        // reason the student Attendance queries below already use $gte/$lt.
         const requestedDate = req.query.date ? new Date(req.query.date) : new Date()
-        const startOfDay = new Date(requestedDate); startOfDay.setHours(0, 0, 0, 0)
-        const endOfDay = new Date(startOfDay); endOfDay.setDate(endOfDay.getDate() + 1)
+        const startOfDay = new Date(requestedDate); startOfDay.setUTCHours(0, 0, 0, 0)
+        const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
         const teachers = await User.find({ role: 'teacher' }).select('name branchId').populate('branchId', 'name')
-        const teacherCheckIns = await TeacherAttendance.find({ date: startOfDay })
+        const teacherCheckIns = await TeacherAttendance.find({ date: { $gte: startOfDay, $lt: endOfDay } })
         const checkInByTeacher = Object.fromEntries(teacherCheckIns.map(t => [String(t.teacherId), t.scannedAt]))
 
         const teacherRows = teachers.map(t => ({

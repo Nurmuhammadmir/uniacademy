@@ -9,6 +9,7 @@ const courseSchema = new mongoose.Schema({
     isActive: { type: Boolean, default: false },          // false until balance covers this course's price (rule #1)
     balance: { type: Number, default: 0 },                // unspent payment credit for THIS course/language
     subscriptionExpiresAt: { type: Date, default: null }, // this course's own paid-through date
+    courseCompleted: { type: Boolean, default: false },   // set once a group graduates past this language's final level (groupPromotion.service.js) - distinguishes "finished everything" from "never enrolled"/"no active group yet" everywhere the student app reads courses
 }, { timestamps: true })
 
 const userSchema = new mongoose.Schema({

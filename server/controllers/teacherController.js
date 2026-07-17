@@ -13,7 +13,10 @@ import { computeDayCounter } from "../services/dayCounter.service.js"
 
 export const getMyGroups = async (req, res) => {
     try {
-        const groups = await Group.find({ teacherId: req.auth.userId })
+        // active only - a completed/archived group still exists for historical reporting (its
+        // roster is deliberately kept, see groupPromotion.service.js), but a teacher's own "my
+        // groups" list is for classes they're actually running today, not a history browser
+        const groups = await Group.find({ teacherId: req.auth.userId, status: 'active' })
             .populate('languageId', 'name code')
             .populate('levelId', 'name order durationDays')
 
@@ -86,7 +89,10 @@ export const getStudentDayDetail = async (req, res) => {
 // issues a new one; the old one silently stops working.
 export const createAttendanceSession = async (req, res) => {
     try {
-        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId })
+        // status:'active' matters now that a completed group's studentIds are kept (not cleared)
+        // for historical reporting - without this filter a teacher could still open a live
+        // attendance QR for a group that finished and already promoted its students onward
+        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId, status: 'active' })
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         const level = await Level.findById(group.levelId).select('durationDays')
@@ -159,7 +165,11 @@ export const scanOwnAttendance = async (req, res) => {
             return res.status(400).json({ error: 'invalid_qr' })
         }
 
-        const today = new Date(); today.setHours(0, 0, 0, 0)
+        // UTC, not local server time - directorController.getAttendanceOverview parses "today" from
+        // a plain YYYY-MM-DD string, which JS always treats as UTC midnight; zeroing locally here
+        // would silently disagree with that read-side calculation on any non-UTC server timezone,
+        // making a real check-in invisible to the director's attendance overview
+        const today = new Date(); today.setUTCHours(0, 0, 0, 0)
         const existing = await TeacherAttendance.findOne({ teacherId: req.auth.userId, date: today })
         if (existing) return res.json({ alreadyMarked: true })
 
@@ -184,7 +194,8 @@ export const markStudentAttendance = async (req, res) => {
         const { id: groupId, studentId, day } = req.params
         const { present } = req.body
 
-        const group = await Group.findOne({ _id: groupId, teacherId: req.auth.userId })
+        // status:'active' - see createAttendanceSession's comment above
+        const group = await Group.findOne({ _id: groupId, teacherId: req.auth.userId, status: 'active' })
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         if (present) {

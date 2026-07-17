@@ -58,6 +58,7 @@ const Teachers = () => {
             <tr className='text-left text-muted border-b border-hairline'>
               <th className='px-5 py-3 font-medium'>{t('nameCol')}</th>
               <th className='px-5 py-3 font-medium'>{t('phoneCol')}</th>
+              <th className='px-5 py-3 font-medium'>{t('checkedInTodayCol')}</th>
             </tr>
           </thead>
           <tbody>
@@ -65,10 +66,19 @@ const Teachers = () => {
               <tr key={t2._id} className='border-b border-hairline last:border-0'>
                 <td className='px-5 py-3 text-ink'>{t2.name}</td>
                 <td className='px-5 py-3 text-muted font-mono'>{t2.phone}</td>
+                <td className='px-5 py-3'>
+                  {t2.checkedInToday ? (
+                    <span className='inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent'>
+                      {t('checkedIn')} · {new Date(t2.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  ) : (
+                    <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t('notCheckedIn')}</span>
+                  )}
+                </td>
               </tr>
             ))}
             {teachers.length === 0 && (
-              <tr><td colSpan={2} className='px-5 py-8 text-center text-muted'>{t('noTeachersYet')}</td></tr>
+              <tr><td colSpan={3} className='px-5 py-8 text-center text-muted'>{t('noTeachersYet')}</td></tr>
             )}
           </tbody>
         </table>

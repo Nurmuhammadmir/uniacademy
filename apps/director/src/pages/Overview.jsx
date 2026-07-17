@@ -22,10 +22,6 @@ const Overview = () => {
     <div>
       <div className='flex justify-between items-center mb-6'>
         <p className='font-display text-2xl text-ink'>{t('navOverview')}</p>
-        <div className='bg-accent-soft rounded-xl px-4 py-2 text-right'>
-          <p className='text-xs text-muted'>{t('revenueThisMonth')}</p>
-          <p className='font-mono text-lg text-accent'>{formatMoney(stats.monthlyRevenue || 0)}</p>
-        </div>
       </div>
 
       <p className='text-ink font-medium mb-3'>{t('revenueByBranch')}</p>

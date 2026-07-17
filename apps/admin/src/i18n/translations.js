@@ -21,6 +21,7 @@ export const TRANSLATIONS = {
     // Students
     studentsTitle: 'Students', addStudent: '+ Add student', searchByNameOrPhone: 'Search by name or phone…',
     nameCol: 'Name', phoneCol: 'Phone', coursesCol: 'Courses', statusCol: 'Status',
+    checkedInTodayCol: 'Checked in today', checkedIn: 'Checked in', notCheckedIn: 'Not checked in',
     recordPayment: 'Record payment', noStudentsYet: 'No students in this branch yet.', noStudentsMatchSearch: 'No students match that search.',
     addStudentModalTitle: 'Add student', fullName: 'Full name', phoneNumber: 'Phone number',
     passportIdInfo: 'Passport / ID info', passportIdInfoOptional: 'Passport / ID info (optional)',
@@ -32,7 +33,8 @@ export const TRANSLATIONS = {
     confirmPaymentBtn: 'Confirm payment', recordingPayment: 'Recording…',
 
     // Groups
-    groupsTitle: 'Groups', newGroup: '+ New group', activeTab: 'active', archivedTab: 'archived', allLanguages: 'All languages',
+    groupsTitle: 'Groups', newGroup: '+ New group', activeTab: 'active', completedTab: 'completed', archivedTab: 'archived', allLanguages: 'All languages',
+    completedGroupNote: 'Finished this level - students moved on to the next one automatically.',
     anyTeacher: 'Any teacher', anyLevel: 'Any level', anyTimeHint: 'Any time', clearFilters: 'Clear filters',
     dayOf: 'day {day}/{total}', studentsOfCapacity: '{count}/{capacity} students', addStudentBtn: '+ Add student',
     archiveBtn: 'Archive', reactivateBtn: 'Reactivate', noGroupsMatchFilters: 'No groups match these filters.',
@@ -121,6 +123,7 @@ export const TRANSLATIONS = {
 
     studentsTitle: 'Студенты', addStudent: '+ Добавить студента', searchByNameOrPhone: 'Поиск по имени или телефону…',
     nameCol: 'Имя', phoneCol: 'Телефон', coursesCol: 'Курсы', statusCol: 'Статус',
+    checkedInTodayCol: 'Отметился сегодня', checkedIn: 'Отметился', notCheckedIn: 'Не отметился',
     recordPayment: 'Записать платёж', noStudentsYet: 'В этом филиале пока нет студентов.', noStudentsMatchSearch: 'Нет студентов по этому запросу.',
     addStudentModalTitle: 'Добавить студента', fullName: 'Полное имя', phoneNumber: 'Номер телефона',
     passportIdInfo: 'Паспорт / ID данные', passportIdInfoOptional: 'Паспорт / ID данные (необязательно)',
@@ -131,7 +134,8 @@ export const TRANSLATIONS = {
     amountLabel: 'Сумма', paymentCreditNote: 'Зачисляется на баланс этого курса. Курс становится активным только когда баланс покрывает полный месяц по его цене - вам сообщат точную сумму, если её не хватает.',
     confirmPaymentBtn: 'Подтвердить платёж', recordingPayment: 'Запись…',
 
-    groupsTitle: 'Группы', newGroup: '+ Новая группа', activeTab: 'активные', archivedTab: 'архив', allLanguages: 'Все языки',
+    groupsTitle: 'Группы', newGroup: '+ Новая группа', activeTab: 'активные', completedTab: 'завершённые', archivedTab: 'архив', allLanguages: 'Все языки',
+    completedGroupNote: 'Уровень завершён - студенты автоматически перешли на следующий.',
     anyTeacher: 'Любой учитель', anyLevel: 'Любой уровень', anyTimeHint: 'Любое время', clearFilters: 'Сбросить фильтры',
     dayOf: 'день {day}/{total}', studentsOfCapacity: '{count}/{capacity} студентов', addStudentBtn: '+ Добавить студента',
     archiveBtn: 'В архив', reactivateBtn: 'Восстановить', noGroupsMatchFilters: 'Нет групп по этим фильтрам.',
@@ -214,6 +218,7 @@ export const TRANSLATIONS = {
 
     studentsTitle: 'Talabalar', addStudent: "+ Talaba qo'shish", searchByNameOrPhone: 'Ism yoki telefon bo\'yicha qidirish…',
     nameCol: 'Ism', phoneCol: 'Telefon', coursesCol: 'Kurslar', statusCol: 'Holat',
+    checkedInTodayCol: 'Bugun kelgan', checkedIn: 'Keldi', notCheckedIn: 'Kelmadi',
     recordPayment: "To'lovni qayd etish", noStudentsYet: "Bu filialda hozircha talabalar yo'q.", noStudentsMatchSearch: "Bu qidiruvga mos talaba yo'q.",
     addStudentModalTitle: "Talaba qo'shish", fullName: "To'liq ism", phoneNumber: 'Telefon raqami',
     passportIdInfo: 'Pasport / ID ma\'lumotlari', passportIdInfoOptional: "Pasport / ID ma'lumotlari (ixtiyoriy)",
@@ -224,7 +229,8 @@ export const TRANSLATIONS = {
     amountLabel: 'Miqdor', paymentCreditNote: "Bu kursning balansiga qo'shiladi. Kurs faqat balans narxi bo'yicha to'liq oyni qoplaganda faollashadi - agar yetarli bo'lmasa, aniq qancha yetishmasligi aytiladi.",
     confirmPaymentBtn: "To'lovni tasdiqlash", recordingPayment: "Yozilmoqda…",
 
-    groupsTitle: 'Guruhlar', newGroup: '+ Yangi guruh', activeTab: 'faol', archivedTab: 'arxiv', allLanguages: 'Barcha tillar',
+    groupsTitle: 'Guruhlar', newGroup: '+ Yangi guruh', activeTab: 'faol', completedTab: 'tugallangan', archivedTab: 'arxiv', allLanguages: 'Barcha tillar',
+    completedGroupNote: "Bu daraja tugallandi - talabalar avtomatik ravishda keyingisiga o'tdi.",
     anyTeacher: "Har qanday o'qituvchi", anyLevel: 'Har qanday daraja', anyTimeHint: 'Har qanday vaqt', clearFilters: 'Filtrlarni tozalash',
     dayOf: '{day}/{total} kun', studentsOfCapacity: '{count}/{capacity} talaba', addStudentBtn: "+ Talaba qo'shish",
     archiveBtn: 'Arxivlash', reactivateBtn: 'Qayta faollashtirish', noGroupsMatchFilters: "Bu filtrlarga mos guruh yo'q.",
@@ -307,6 +313,7 @@ export const TRANSLATIONS = {
 
     studentsTitle: 'Studentler', addStudent: "+ Student qosıw", searchByNameOrPhone: 'At yamasa telefon boyınsha izlew…',
     nameCol: 'Atı', phoneCol: 'Telefon', coursesCol: 'Kurslar', statusCol: 'Halı',
+    checkedInTodayCol: 'Búgin kelgen', checkedIn: 'Keldi', notCheckedIn: 'Kelmedi',
     recordPayment: "Tólemdi jazıp qoyıw", noStudentsYet: "Bul filialda ele studentler joq.", noStudentsMatchSearch: "Bul izlewge sáykes student joq.",
     addStudentModalTitle: "Student qosıw", fullName: "Tolıq atı", phoneNumber: 'Telefon nomeri',
     passportIdInfo: 'Pasport / ID maǵlıwmatları', passportIdInfoOptional: "Pasport / ID maǵlıwmatları (mindetli emes)",
@@ -317,7 +324,8 @@ export const TRANSLATIONS = {
     amountLabel: 'Muǵdarı', paymentCreditNote: "Bul kurstıń balansına qosıladı. Kurs tek balansı bahası boyınsha tolıq aydı qaplaǵanda ǵana aktiv boladı - жеткиликсиз болса, dál qansha jetispeytuǵını aytıladı.",
     confirmPaymentBtn: "Tólemdi tastıyıqlaw", recordingPayment: "Jazılmoqta…",
 
-    groupsTitle: 'Gruppalar', newGroup: '+ Jańa gruppa', activeTab: 'aktiv', archivedTab: 'arxiv', allLanguages: 'Barlıq tiller',
+    groupsTitle: 'Gruppalar', newGroup: '+ Jańa gruppa', activeTab: 'aktiv', completedTab: 'tamamlanǵan', archivedTab: 'arxiv', allLanguages: 'Barlıq tiller',
+    completedGroupNote: "Bul dáreje tamamlandı - studentler avtomatik túrde keyingisine ótti.",
     anyTeacher: "Kez-kelgen oqıtıwshı", anyLevel: 'Kez-kelgen dáreje', anyTimeHint: 'Kez-kelgen waqıt', clearFilters: 'Filtrlerdi tazalaw',
     dayOf: '{day}/{total} kún', studentsOfCapacity: '{count}/{capacity} student', addStudentBtn: "+ Student qosıw",
     archiveBtn: 'Arxivlew', reactivateBtn: 'Qayta aktivlestiriw', noGroupsMatchFilters: "Bul filtrlerge sáykes gruppa joq.",

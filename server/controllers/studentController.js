@@ -1,4 +1,8 @@
-// every route in this file sits behind requireRole('student') AND requireActiveSubscription (rule #2)
+// every route in this file sits behind requireRole('student'); only the homework read/submit
+// routes additionally require requireActiveSubscription (see studentRoute.js) - exam, progress,
+// ranking and attendance routes are deliberately left ungated so an unpaid student still moves
+// on with their cohort at the end of a level (see groupPromotion.service.js) instead of being
+// blocked from ever finding out their group has advanced
 import Group from "../models/Group.js"
 import Level from "../models/Level.js"
 import User from "../models/User.js"
@@ -200,7 +204,17 @@ export const getHomeworkForDay = async (req, res) => {
 
 const assertDayIsOpen = async (studentId, groupId, day) => {
     let row = await StudentProgress.findOne({ studentId, groupId, day })
-    if (!row) row = await StudentProgress.create({ studentId, groupId, day, status: 'open' })
+    if (!row) {
+        try {
+            row = await StudentProgress.create({ studentId, groupId, day, status: 'open' })
+        } catch (error) {
+            // two sections (vocab/grammar/reading) for the same day share one StudentProgress row
+            // and can race to create it on their first-ever submit - the unique {studentId,groupId,
+            // day} index rejects the loser, which just means the winner's row already exists
+            if (error.code === 11000) row = await StudentProgress.findOne({ studentId, groupId, day })
+            else throw error
+        }
+    }
     if (row.status === 'done') { const err = new Error('day_already_completed'); err.status = 403; err.code = 'day_already_completed'; throw err }
     if (row.status === 'expired') { const err = new Error('day_expired'); err.status = 403; err.code = 'day_expired'; throw err }
     if (row.status === 'locked') { const err = new Error('day_locked'); err.status = 403; err.code = 'day_locked'; throw err }
@@ -595,6 +609,11 @@ export const submitExam = async (req, res) => {
             return res.status(403).json({ error: 'exam_already_attempted' })
         }
 
+        // must have actually opened this exam via getExam first (which creates the session) -
+        // closes off submitting a guessed/discovered examId for a level never taken
+        const session = await ExamSession.findOne({ studentId: req.auth.userId, examId: exam._id })
+        if (!session) return res.status(404).json({ error: 'no_exam_session' })
+
         const list = Array.isArray(answers) ? answers : []
         const ids = list.map(a => a.questionId)
         // exam questions are just VocabExercise/GrammarExercise/ReadingExercise docs drawn at
@@ -636,6 +655,12 @@ export const submitExam = async (req, res) => {
         await ExamSession.deleteOne({ studentId: req.auth.userId, examId: exam._id })
         res.json({ score, ...result })
     } catch (error) {
+        // the exists-then-create check above has a race window - a double-click/double-submit can
+        // slip both requests past it before either commits. ExamAttempt's partial unique index
+        // (source:'self') is the real backstop; a duplicate-key error here just means the OTHER
+        // concurrent request won, so report it the same as the normal "already attempted" case
+        // instead of a confusing 500.
+        if (error.code === 11000) return res.status(403).json({ error: 'exam_already_attempted' })
         console.log(error)
         res.status(500).json({ error: 'server_error' })
     }
@@ -652,7 +677,10 @@ export const scanAttendance = async (req, res) => {
             return res.status(400).json({ error: 'qr_expired' })
         }
 
-        const group = await Group.findOne({ _id: session.groupId, studentIds: req.auth.userId })
+        // status:'active' - a completed group's roster is kept for historical reporting (see
+        // groupPromotion.service.js), so matching on studentIds alone could otherwise let a stale
+        // QR scan register attendance against a group the student has already moved on from
+        const group = await Group.findOne({ _id: session.groupId, studentIds: req.auth.userId, status: 'active' })
         if (!group) {
             return res.status(403).json({ error: 'not_in_this_group' })
         }

@@ -10,8 +10,10 @@ const studentProgressSchema = new mongoose.Schema({
     status: { type: String, enum: ['locked', 'open', 'expired', 'done'], default: 'locked' },
     completedAt: { type: Date, default: null },
 }, { timestamps: true })
-// {studentId,groupId} prefix serves the per-student lookups; {groupId,status} serves ranking/roster reads
-studentProgressSchema.index({ studentId: 1, groupId: 1, day: 1 })
+// {studentId,groupId} prefix serves the per-student lookups; {groupId,status} serves ranking/roster
+// reads. Unique so a student can never end up with two rows for the same day in the same group -
+// a DB-level backstop against any concurrent enroll/promote race creating duplicates.
+studentProgressSchema.index({ studentId: 1, groupId: 1, day: 1 }, { unique: true })
 studentProgressSchema.index({ groupId: 1, status: 1 })
 const StudentProgress = mongoose.models.StudentProgress || mongoose.model('StudentProgress', studentProgressSchema)
 export default StudentProgress

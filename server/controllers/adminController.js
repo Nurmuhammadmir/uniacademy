@@ -10,6 +10,7 @@ import Exam from "../models/Exam.js"
 import ExamAttempt from "../models/ExamAttempt.js"
 import Level from "../models/Level.js"
 import TeacherAttendanceQR from "../models/TeacherAttendanceQR.js"
+import TeacherAttendance from "../models/TeacherAttendance.js"
 import Settings from "../models/Settings.js"
 import { assertStudentHasPaid } from "../services/paymentGate.service.js"
 import { assertNoTeacherConflict } from "../services/scheduleConflict.service.js"
@@ -89,10 +90,28 @@ export const getTeacherProfile = async (req, res) => {
     }
 }
 
+// same "who checked in today" visibility a teacher already has over their students' attendance,
+// just for admin looking at their own branch's teachers - UTC day boundary, matching exactly how
+// teacherController.scanOwnAttendance writes the check-in (see that file's comment for why UTC)
 export const listBranchTeachers = async (req, res) => {
     try {
         const teachers = await User.find({ role: 'teacher', branchId: req.auth.branchId }).select('name phone')
-        res.json({ teachers })
+
+        const startOfDay = new Date(); startOfDay.setUTCHours(0, 0, 0, 0)
+        const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
+        const checkIns = await TeacherAttendance.find({
+            teacherId: { $in: teachers.map(t => t._id) },
+            date: { $gte: startOfDay, $lt: endOfDay },
+        })
+        const checkInByTeacher = Object.fromEntries(checkIns.map(c => [String(c.teacherId), c.scannedAt]))
+
+        const teachersWithAttendance = teachers.map(t => ({
+            ...t.toObject(),
+            checkedInToday: !!checkInByTeacher[String(t._id)],
+            checkedInAt: checkInByTeacher[String(t._id)] || null,
+        }))
+
+        res.json({ teachers: teachersWithAttendance })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -436,6 +455,11 @@ export const removeStudentFromGroup = async (req, res) => {
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         group.studentIds = group.studentIds.filter(id => String(id) !== req.params.studentId)
+        // an empty active group serves no purpose and would otherwise sit at status:'active'
+        // forever - nothing can ever trigger groupPromotion.service's lazy student-driven
+        // promotion check for a group with nobody left in it, and while active it permanently
+        // blocks its teacher+schedule+time slot from being reused (scheduleConflict.service.js)
+        if (group.studentIds.length === 0) group.status = 'completed'
         await group.save()
         res.json({ group })
     } catch (error) {
@@ -482,7 +506,8 @@ export const addStudentToGroup = async (req, res) => {
 
         group.studentIds.push(studentId)
         await group.save()
-        await enrollStudentMidCycle(studentId, group)
+        const level = await Level.findById(group.levelId).select('durationDays')
+        await enrollStudentMidCycle(studentId, group, level?.durationDays || 30)
 
         res.json({ group })
     } catch (error) {
@@ -492,10 +517,13 @@ export const addStudentToGroup = async (req, res) => {
     }
 }
 
-// api for the ONE manual admin-entered retake, for a student an automatic exam already removed
-// from their group. Passing updates their course level (admin then manually re-adds them to a
-// group at the new level via the normal Add student flow); failing again ends their retake
-// opportunity - level stays put and payment is never touched either way.
+// api for a manual admin-entered retake or level correction. This is the ONLY place a student's
+// course level changes based on an exam score - the automatic self-service exam (studentController
+// .submitExam) only ever records a score and never touches group/level, since the whole group
+// advances together at the end of the level regardless of individual results (see
+// groupPromotion.service.js). An admin uses this after reviewing a student's ExamAttempt history
+// to move them to a different level than their cohort - passing updates their course level;
+// payment is never touched either way.
 export const retakeExam = async (req, res) => {
     try {
         const { id: examId, studentId } = req.params
@@ -509,14 +537,16 @@ export const retakeExam = async (req, res) => {
 
         const attemptCount = await ExamAttempt.countDocuments({ studentId, examId })
         const passed = score >= exam.passScore
-        const attempt = await ExamAttempt.create({ studentId, examId, score, passed, attemptNumber: attemptCount + 1 })
+        const attempt = await ExamAttempt.create({ studentId, examId, score, passed, attemptNumber: attemptCount + 1, source: 'admin_retake' })
 
         const courseEntry = student.courses.find(c => String(c.languageId) === String(exam.languageId))
         let outcome = passed ? 'course_completed' : 'failed_final'
 
         if (passed) {
             const currentLevel = await Level.findById(exam.levelId)
-            const nextLevel = await Level.findOne({ languageId: exam.languageId, order: { $gt: currentLevel.order } }).sort({ order: 1 })
+            const nextLevel = currentLevel
+                ? await Level.findOne({ languageId: exam.languageId, order: { $gt: currentLevel.order } }).sort({ order: 1 })
+                : null
             if (nextLevel && courseEntry) {
                 courseEntry.levelId = nextLevel._id
                 await student.save()

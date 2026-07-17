@@ -92,7 +92,7 @@ const Groups = () => {
 
       {/* status tabs */}
       <div className='flex gap-2 mb-4'>
-        {[{ key: 'active', label: t('activeTab') }, { key: 'archived', label: t('archivedTab') }].map(s => (
+        {[{ key: 'active', label: t('activeTab') }, { key: 'completed', label: t('completedTab') }, { key: 'archived', label: t('archivedTab') }].map(s => (
           <button key={s.key} onClick={() => setStatusTab(s.key)} className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize ${statusTab === s.key ? 'bg-accent text-white' : 'bg-bg-elevated border border-hairline text-muted'}`}>{s.label}</button>
         ))}
       </div>
@@ -150,8 +150,10 @@ const Groups = () => {
                   <button onClick={() => openEdit(g)} className='text-accent text-sm font-medium'>{t('edit')}</button>
                   <button onClick={() => deleteGroup(g._id)} className='text-muted text-sm font-medium'>{t('archiveBtn')}</button>
                 </>
-              ) : (
+              ) : statusTab === 'archived' ? (
                 <button onClick={() => unarchiveGroup(g._id)} className='text-accent text-sm font-medium'>{t('reactivateBtn')}</button>
+              ) : (
+                <span className='text-muted text-xs'>{t('completedGroupNote')}</span>
               )}
             </div>
           </div>
