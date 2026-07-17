@@ -76,6 +76,7 @@ export const TRANSLATIONS = {
 
     // toasts / confirms
     accountNotAdmin: 'this account is not an admin account', loginFailed: 'login failed',
+    sessionExpired: 'your session has expired - please log in again',
     confirmSignOut: 'Sign out of UniAcademy?',
     couldNotLoadStudents: 'could not load students', studentCreated: 'student created',
     passportRequiredError: 'passport/ID info is required for new students', couldNotCreateStudent: 'could not create student',
@@ -171,6 +172,7 @@ export const TRANSLATIONS = {
     searchAddress: 'Поиск адреса', searchOrTapHint: 'Найдите адрес или коснитесь карты, чтобы указать местоположение студента.',
 
     accountNotAdmin: 'этот аккаунт не является аккаунтом администратора', loginFailed: 'ошибка входа',
+    sessionExpired: 'ваша сессия истекла - пожалуйста, войдите снова',
     confirmSignOut: 'Выйти из UniAcademy?',
     couldNotLoadStudents: 'не удалось загрузить студентов', studentCreated: 'студент создан',
     passportRequiredError: 'для новых студентов требуются паспортные/ID данные', couldNotCreateStudent: 'не удалось создать студента',
@@ -266,6 +268,7 @@ export const TRANSLATIONS = {
     searchAddress: 'Manzilni qidirish', searchOrTapHint: "Talabaning joylashuvini belgilash uchun qidiring yoki xaritaga bosing.",
 
     accountNotAdmin: 'bu hisob admin hisobi emas', loginFailed: 'kirishda xatolik',
+    sessionExpired: 'sessiyangiz tugadi - iltimos, qaytadan kiring',
     confirmSignOut: "UniAcademy dan chiqasizmi?",
     couldNotLoadStudents: "talabalarni yuklab bo'lmadi", studentCreated: 'talaba yaratildi',
     passportRequiredError: "yangi talabalar uchun pasport/ID ma'lumotlari talab qilinadi", couldNotCreateStudent: "talabani yaratib bo'lmadi",
@@ -361,6 +364,7 @@ export const TRANSLATIONS = {
     searchAddress: 'Mánzildi izlew', searchOrTapHint: "Studenttiń orınlasıwın belgilew ushın izlең yamasa xaritaǵa basıń.",
 
     accountNotAdmin: 'bul akkaunt admin akkauntı emes', loginFailed: 'kiriwde qátelik',
+    sessionExpired: 'seansıńız tamamlandı - qayta kiriń',
     confirmSignOut: "UniAcademy den shıǵasızba?",
     couldNotLoadStudents: "studentlerdi júklep bolmadı", studentCreated: 'student jaratıldı',
     passportRequiredError: "jańa studentler ushın pasport/ID maǵlıwmatları talap etiledi", couldNotCreateStudent: "studentti jaratıp bolmadı",

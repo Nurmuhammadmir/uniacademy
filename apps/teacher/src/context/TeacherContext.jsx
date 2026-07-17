@@ -13,6 +13,26 @@ const TeacherContextProvider = (props) => {
 
     const authHeader = { headers: { Authorization: `Bearer ${token}` } }
 
+    // a stale/invalid token (expired JWT, or a password changed elsewhere) makes every
+    // authenticated request 401 forever with no way back to the login screen short of manually
+    // clearing localStorage - catch it globally once and drop the user back to login instead
+    useEffect(() => {
+        const interceptorId = axios.interceptors.response.use(
+            (response) => response,
+            (error) => {
+                const isLoginRequest = error.config?.url?.includes('/api/auth/login')
+                if (error.response?.status === 401 && !isLoginRequest && localStorage.getItem('token')) {
+                    localStorage.removeItem('token')
+                    setToken(false)
+                    setGroups([])
+                    toast.error('your session has expired - please log in again')
+                }
+                return Promise.reject(error)
+            }
+        )
+        return () => axios.interceptors.response.eject(interceptorId)
+    }, [])
+
     const login = async (phone, password) => {
         try {
             const { data } = await axios.post(backendUrl + '/api/auth/login', { phone, password })

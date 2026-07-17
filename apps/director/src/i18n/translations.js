@@ -99,6 +99,7 @@ export const TRANSLATIONS = {
 
     // toasts / confirms
     accountNotDirector: 'this account is not a director account', loginFailed: 'login failed',
+    sessionExpired: 'your session has expired - please log in again',
     confirmSignOut: 'Sign out of UniAcademy?',
     couldNotLoadStats: 'could not load stats', couldNotLoadMapData: 'could not load map data',
     couldNotLoadStudents: 'could not load students', couldNotLoadStudentProfile: 'could not load student profile',
@@ -300,6 +301,7 @@ export const TRANSLATIONS = {
     questionsInBankPlural: '{count} вопрос{plural} в банке',
 
     accountNotDirector: 'этот аккаунт не является аккаунтом директора', loginFailed: 'ошибка входа',
+    sessionExpired: 'ваша сессия истекла - пожалуйста, войдите снова',
     confirmSignOut: 'Выйти из UniAcademy?',
     couldNotLoadStats: 'не удалось загрузить статистику', couldNotLoadMapData: 'не удалось загрузить данные карты',
     couldNotLoadStudents: 'не удалось загрузить студентов', couldNotLoadStudentProfile: 'не удалось загрузить профиль студента',
@@ -501,6 +503,7 @@ export const TRANSLATIONS = {
     questionsInBankPlural: '{count} ta savol bankda',
 
     accountNotDirector: 'bu hisob direktor hisobi emas', loginFailed: 'kirish muvaffaqiyatsiz',
+    sessionExpired: 'sessiyangiz tugadi - iltimos, qaytadan kiring',
     confirmSignOut: "UniAcademy'dan chiqasizmi?",
     couldNotLoadStats: 'statistikani yuklab bo\'lmadi', couldNotLoadMapData: 'xarita ma\'lumotini yuklab bo\'lmadi',
     couldNotLoadStudents: "talabalarni yuklab bo'lmadi", couldNotLoadStudentProfile: "talaba profilini yuklab bo'lmadi",
