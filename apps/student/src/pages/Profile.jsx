@@ -19,7 +19,7 @@ const CourseCard = ({ course, t }) => {
       <div className='grid grid-cols-2 gap-2 text-sm'>
         <div><p className='text-muted text-xs'>{t('monthlyPrice')}</p><p className='font-mono text-ink'>{course.price !== null ? formatMoney(course.price) : '—'}</p></div>
         <div><p className='text-muted text-xs'>{t('totalPaid')}</p><p className='font-mono text-ink'>{formatMoney(course.totalPaid)}</p></div>
-        <div><p className='text-muted text-xs'>{t('balance')}</p><p className='font-mono text-ink'>{formatMoney(course.balance)}</p></div>
+        <div><p className='text-muted text-xs'>{t('balance')}</p><p className={`font-mono ${course.balance > 0 ? 'text-green-600' : 'text-ink'}`}>{formatMoney(course.balance)}</p></div>
         <div><p className='text-muted text-xs'>{t('nextDue')}</p><p className='font-mono text-ink'>{course.subscriptionExpiresAt ? new Date(course.subscriptionExpiresAt).toLocaleDateString() : '—'}</p></div>
       </div>
       {!course.isActive && remaining !== null && remaining > 0 && (

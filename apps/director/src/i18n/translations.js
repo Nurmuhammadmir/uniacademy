@@ -37,7 +37,7 @@ export const TRANSLATIONS = {
     editX: 'Edit {name}', noStudentLocationsYet: 'No student locations recorded yet.',
 
     // Students
-    studentsTitle: 'Students', allStudentsTitle: 'All students', searchStudents: 'Search by name or phone…', anyBranch: 'Any branch', anyCourse: 'Any course',
+    studentsTitle: 'Students', allStudentsTitle: 'All students', searchStudents: 'Search by name or phone…', anyBranch: 'Any branch', anyCourse: 'Any course', exportBtn: 'Export to Excel',
     noStudentsFound: 'No students found.', anyLanguage: 'Any language', anyLevel: 'Any level', clear: 'Clear', unpaid: 'unpaid',
     nameCol: 'Name', phoneCol: 'Phone', coursesCol: 'Courses', noStudentsYetPlain: 'No students yet.', noStudentsMatchFilters: 'No students match these filters.',
 
@@ -70,7 +70,7 @@ export const TRANSLATIONS = {
 
     // Attendance
     attendanceTitle: 'Attendance', teacherCheckIns: 'Teacher check-ins, by branch', studentAttendanceByBranch: 'Student check-ins, by branch',
-    checkedIn: 'Checked in', notCheckedIn: 'not checked in', loadingAttendance: 'Loading attendance…',
+    checkedIn: 'Checked in', notCheckedIn: 'not checked in', loadingAttendance: 'Loading attendance…', lateBadge: 'Late',
     noTeachersFound: 'No teachers found.', percentAttended: '{percent}% attended', byGroup: 'By group', groupCol: 'Group',
     presentCol: 'Present', noCheckInsForDate: 'No student check-ins recorded for this date.',
 
@@ -161,7 +161,7 @@ export const TRANSLATIONS = {
     activeGroups: 'Active groups', totalRevenue: 'Total revenue', noAdminsYetPlain: 'No admins yet.',
     noTeachersYetPlain: 'No teachers yet.', noActiveGroupsPlain: 'No active groups.',
     registeredOn: 'Registered {date} · {branch}', passportIdInfo: 'Passport / ID info', courses: 'Courses',
-    noCoursesYetPlain: 'No courses yet.', priceBalanceLine: 'price {price} · balance {balance}', nextDue: 'next due {date}',
+    noCoursesYetPlain: 'No courses yet.', priceBalanceLine: 'price {price}', courseBalanceLine: 'balance {balance}', nextDue: 'next due {date}',
     address: 'Address', paymentHistory: 'Payment history', noPaymentsYetPlain: 'No payments yet.',
     paymentLine: '{date} · {language} · by {admin}', examResults: 'Exam results', noExamsYetPlain: 'No exams taken yet.',
     paymentMethodCash: 'Cash', paymentMethodBankTransfer: 'Bank transfer', paymentMethodCard: 'Card', paymentMethodClick: 'Click', paymentMethodUnrecorded: 'Not recorded',
@@ -245,6 +245,9 @@ export const TRANSLATIONS = {
     teacherCalcMethodCol: 'Calculation method', removeBtn: 'Remove',
     groupsCountCol: 'Groups', studentsCountCol: 'Students', calcMethodUsedCol: 'Calculation method', totalSalaryCol: 'Total salary',
     paidStatusCol: 'Paid', payBtn: 'Pay', payingBtn: 'Paying…', paidBadge: 'Paid', noSalaryResultsYet: 'Set rates and click Calculate.',
+    prepayBtn: 'Prepayment', prepaidHint: 'Already prepaid {amount}', prepaymentWarningTitle: 'A prepayment was already made to this teacher for this period:',
+    prepaymentRecorded: 'prepayment recorded', couldNotPrepaySalary: 'could not record prepayment',
+    salaryAlreadyPaidError: 'salary for this period has already been paid - no prepayment possible',
     expenseMethodLabel: 'Payment method',
     expenseMethod_cash: 'Cash', expenseMethod_card: 'Card', expenseMethod_click: 'Click',
     expenseMethod_bank_transfer: 'Bank transfer', expenseMethod_payme: 'Payme', expenseMethod_apelsin: 'Apelsin',
@@ -295,7 +298,7 @@ export const TRANSLATIONS = {
     noBranchesYet: 'Пока нет филиалов.', loadingMapData: 'Загрузка данных карты…', branchesMapSubtitle: 'каждый студент с геометкой, по цвету филиала',
     editX: 'Изменить {name}', noStudentLocationsYet: 'Пока нет записанных мест студентов.',
 
-    studentsTitle: 'Студенты', allStudentsTitle: 'Все студенты', searchStudents: 'Поиск по имени или телефону…', anyBranch: 'Любой филиал', anyCourse: 'Любой курс',
+    studentsTitle: 'Студенты', allStudentsTitle: 'Все студенты', searchStudents: 'Поиск по имени или телефону…', anyBranch: 'Любой филиал', anyCourse: 'Любой курс', exportBtn: 'Экспорт в Excel',
     noStudentsFound: 'Студенты не найдены.', anyLanguage: 'Любой язык', anyLevel: 'Любой уровень', clear: 'Очистить', unpaid: 'не оплачен',
     nameCol: 'Имя', phoneCol: 'Телефон', coursesCol: 'Курсы', noStudentsYetPlain: 'Пока нет студентов.', noStudentsMatchFilters: 'Нет студентов по этим фильтрам.',
 
@@ -323,7 +326,7 @@ export const TRANSLATIONS = {
     durationInDays: 'Длительность в днях',
 
     attendanceTitle: 'Посещаемость', teacherCheckIns: 'Отметки учителей, по филиалам', studentAttendanceByBranch: 'Отметки студентов, по филиалам',
-    checkedIn: 'Отмечен', notCheckedIn: 'не отмечен', loadingAttendance: 'Загрузка посещаемости…',
+    checkedIn: 'Отмечен', notCheckedIn: 'не отмечен', loadingAttendance: 'Загрузка посещаемости…', lateBadge: 'Опоздал',
     noTeachersFound: 'Учителя не найдены.', percentAttended: '{percent}% посетили', byGroup: 'По группам', groupCol: 'Группа',
     presentCol: 'Присутствовало', noCheckInsForDate: 'Нет отметок студентов за эту дату.',
 
@@ -410,7 +413,7 @@ export const TRANSLATIONS = {
     activeGroups: 'Активные группы', totalRevenue: 'Общий доход', noAdminsYetPlain: 'Пока нет админов.',
     noTeachersYetPlain: 'Пока нет учителей.', noActiveGroupsPlain: 'Нет активных групп.',
     registeredOn: 'Зарегистрирован {date} · {branch}', passportIdInfo: 'Паспорт / ID данные', courses: 'Курсы',
-    noCoursesYetPlain: 'Пока нет курсов.', priceBalanceLine: 'цена {price} · баланс {balance}', nextDue: 'следующий платёж {date}',
+    noCoursesYetPlain: 'Пока нет курсов.', priceBalanceLine: 'цена {price}', courseBalanceLine: 'баланс {balance}', nextDue: 'следующий платёж {date}',
     address: 'Адрес', paymentHistory: 'История платежей', noPaymentsYetPlain: 'Пока нет платежей.',
     paymentLine: '{date} · {language} · от {admin}', examResults: 'Результаты экзаменов', noExamsYetPlain: 'Экзамены ещё не сдавались.',
     paymentMethodCash: 'Наличные', paymentMethodBankTransfer: 'Банковский перевод', paymentMethodCard: 'Карта', paymentMethodClick: 'Click', paymentMethodUnrecorded: 'Не указан',
@@ -494,6 +497,9 @@ export const TRANSLATIONS = {
     teacherCalcMethodCol: 'Способ расчёта', removeBtn: 'Удалить',
     groupsCountCol: 'Группы', studentsCountCol: 'Студенты', calcMethodUsedCol: 'Способ расчёта', totalSalaryCol: 'Итого зарплата',
     paidStatusCol: 'Выплачено', payBtn: 'Оплатить', payingBtn: 'Оплата…', paidBadge: 'Выплачено', noSalaryResultsYet: 'Установите ставки и нажмите Рассчитать.',
+    prepayBtn: 'Аванс', prepaidHint: 'Уже выплачен аванс {amount}', prepaymentWarningTitle: 'Этому учителю уже был выплачен аванс за этот период:',
+    prepaymentRecorded: 'аванс записан', couldNotPrepaySalary: 'не удалось записать аванс',
+    salaryAlreadyPaidError: 'зарплата за этот период уже выплачена - аванс невозможен',
     expenseMethodLabel: 'Способ оплаты',
     expenseMethod_cash: 'Наличные', expenseMethod_card: 'Карта', expenseMethod_click: 'Click',
     expenseMethod_bank_transfer: 'Банковский перевод', expenseMethod_payme: 'Payme', expenseMethod_apelsin: 'Apelsin',
@@ -544,7 +550,7 @@ export const TRANSLATIONS = {
     noBranchesYet: "Hozircha filiallar yo'q.", loadingMapData: 'Xarita ma\'lumotlari yuklanmoqda…', branchesMapSubtitle: 'har bir geobelgili talaba, filial rangi bo\'yicha',
     editX: '{name}ni o\'zgartirish', noStudentLocationsYet: "Hozircha talaba joylashuvlari qayd etilmagan.",
 
-    studentsTitle: 'Talabalar', allStudentsTitle: 'Barcha talabalar', searchStudents: 'Ism yoki telefon bo\'yicha qidirish…', anyCourse: 'Har qanday kurs', anyBranch: 'Har qanday filial',
+    studentsTitle: 'Talabalar', allStudentsTitle: 'Barcha talabalar', searchStudents: 'Ism yoki telefon bo\'yicha qidirish…', anyCourse: 'Har qanday kurs', anyBranch: 'Har qanday filial', exportBtn: "Excelga eksport",
     noStudentsFound: 'Talabalar topilmadi.', anyLanguage: 'Har qanday til', anyLevel: 'Har qanday daraja', clear: 'Tozalash', unpaid: "to'lanmagan",
     nameCol: 'Ism', phoneCol: 'Telefon', coursesCol: 'Kurslar', noStudentsYetPlain: "Hozircha talabalar yo'q.", noStudentsMatchFilters: "Bu filtrlarga mos talaba yo'q.",
 
@@ -572,7 +578,7 @@ export const TRANSLATIONS = {
     durationInDays: 'Kunlarda davomiylik',
 
     attendanceTitle: 'Davomat', teacherCheckIns: "O'qituvchilar belgilashi, filiallar bo'yicha", studentAttendanceByBranch: "Talabalar belgilashi, filiallar bo'yicha",
-    checkedIn: 'Belgilangan', notCheckedIn: 'belgilanmagan', loadingAttendance: 'Davomat yuklanmoqda…',
+    checkedIn: 'Belgilangan', notCheckedIn: 'belgilanmagan', loadingAttendance: 'Davomat yuklanmoqda…', lateBadge: 'Kechikdi',
     noTeachersFound: "O'qituvchilar topilmadi.", percentAttended: '{percent}% qatnashdi', byGroup: "Guruhlar bo'yicha", groupCol: 'Guruh',
     presentCol: 'Qatnashdi', noCheckInsForDate: 'Bu sana uchun talaba belgilari qayd etilmagan.',
 
@@ -659,7 +665,7 @@ export const TRANSLATIONS = {
     activeGroups: 'Faol guruhlar', totalRevenue: 'Umumiy daromad', noAdminsYetPlain: "Hozircha adminlar yo'q.",
     noTeachersYetPlain: "Hozircha o'qituvchilar yo'q.", noActiveGroupsPlain: "Faol guruhlar yo'q.",
     registeredOn: "Ro'yxatdan o'tgan {date} · {branch}", passportIdInfo: 'Pasport / ID ma\'lumotlari', courses: 'Kurslar',
-    noCoursesYetPlain: "Hozircha kurslar yo'q.", priceBalanceLine: 'narx {price} · balans {balance}', nextDue: 'keyingi to\'lov {date}',
+    noCoursesYetPlain: "Hozircha kurslar yo'q.", priceBalanceLine: 'narx {price}', courseBalanceLine: 'balans {balance}', nextDue: 'keyingi to\'lov {date}',
     address: 'Manzil', paymentHistory: "To'lovlar tarixi", noPaymentsYetPlain: "Hozircha to'lovlar yo'q.",
     paymentLine: '{date} · {language} · {admin} tomonidan', examResults: 'Imtihon natijalari', noExamsYetPlain: "Hali imtihon topshirilmagan.",
     paymentMethodCash: 'Naqd', paymentMethodBankTransfer: "Bank o'tkazmasi", paymentMethodCard: 'Karta', paymentMethodClick: 'Click', paymentMethodUnrecorded: 'Kiritilmagan',
@@ -743,6 +749,9 @@ export const TRANSLATIONS = {
     teacherCalcMethodCol: 'Hisoblash usuli', removeBtn: "O'chirish",
     groupsCountCol: 'Guruhlar soni', studentsCountCol: "O'quvchilar soni", calcMethodUsedCol: 'Hisoblash usuli', totalSalaryCol: 'Jami ish haqi',
     paidStatusCol: "To'landimi", payBtn: "To'lash", payingBtn: "To'lanmoqda…", paidBadge: "To'landi", noSalaryResultsYet: "Stavkalarni belgilang va Hisoblang tugmasini bosing.",
+    prepayBtn: 'Avans', prepaidHint: 'Allaqachon {amount} avans berilgan', prepaymentWarningTitle: "Bu o'qituvchiga shu davr uchun avans allaqachon berilgan:",
+    prepaymentRecorded: 'avans qayd etildi', couldNotPrepaySalary: "avansni qayd etib bo'lmadi",
+    salaryAlreadyPaidError: "bu davr uchun ish haqi allaqachon to'langan - avans berish mumkin emas",
     expenseMethodLabel: "To'lov usuli",
     expenseMethod_cash: 'Naqd pul', expenseMethod_card: 'Karta', expenseMethod_click: 'Click',
     expenseMethod_bank_transfer: "Bank o'tkazmasi", expenseMethod_payme: 'Payme', expenseMethod_apelsin: 'Apelsin',

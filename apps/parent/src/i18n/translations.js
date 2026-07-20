@@ -19,6 +19,8 @@ export const TRANSLATIONS = {
     lessonHistoryLabel: 'Lesson history', extraLessonsLabel: 'Extra lessons',
     presentStatus: 'Present', absentStatus: 'Absent', lateStatus: 'Late', excusedStatus: 'Excused', unmarkedStatus: 'Not marked',
     noExtraLessonsYet: 'No extra lessons scheduled.', notesLabel: 'Notes',
+    notificationsLabel: 'Notifications', notificationsHint: 'Get notified about attendance and payments, even when the app is closed.',
+    turnOnBtn: 'Turn on', turnOffBtn: 'Turn off',
   },
   ru: {
     signIn: 'Войти', signingIn: 'Вход…', phone: 'Номер телефона', password: 'Пароль',
@@ -38,6 +40,8 @@ export const TRANSLATIONS = {
     lessonHistoryLabel: 'История занятий', extraLessonsLabel: 'Дополнительные занятия',
     presentStatus: 'Присутствовал', absentStatus: 'Отсутствовал', lateStatus: 'Опоздал', excusedStatus: 'Уважительная причина', unmarkedStatus: 'Не отмечено',
     noExtraLessonsYet: 'Дополнительных занятий пока нет.', notesLabel: 'Заметки',
+    notificationsLabel: 'Уведомления', notificationsHint: 'Получайте уведомления о посещаемости и оплате, даже когда приложение закрыто.',
+    turnOnBtn: 'Включить', turnOffBtn: 'Выключить',
   },
   uz: {
     signIn: 'Kirish', signingIn: 'Kirilmoqda…', phone: 'Telefon raqami', password: 'Parol',
@@ -57,6 +61,8 @@ export const TRANSLATIONS = {
     lessonHistoryLabel: 'Darslar tarixi', extraLessonsLabel: "Qo'shimcha darslar",
     presentStatus: 'Keldi', absentStatus: 'Kelmadi', lateStatus: 'Kechikdi', excusedStatus: 'Sababli', unmarkedStatus: 'Belgilanmagan',
     noExtraLessonsYet: "Hozircha qo'shimcha darslar yo'q.", notesLabel: 'Izohlar',
+    notificationsLabel: 'Bildirishnomalar', notificationsHint: "Ilova yopiq bo'lsa ham davomat va to'lovlar haqida xabar oling.",
+    turnOnBtn: 'Yoqish', turnOffBtn: "O'chirish",
   },
   kaa: {
     signIn: 'Kiriw', signingIn: 'Kirilmekte…', phone: 'Telefon nomeri', password: 'Parol',
@@ -76,5 +82,7 @@ export const TRANSLATIONS = {
     lessonHistoryLabel: 'Sabaqlar tarıyxı', extraLessonsLabel: "Qosımsha sabaqlar",
     presentStatus: 'Keldi', absentStatus: 'Kelmedi', lateStatus: 'Keship keldi', excusedStatus: 'Sebepli', unmarkedStatus: 'Belgilenbegen',
     noExtraLessonsYet: "Ele qosımsha sabaqlar joq.", notesLabel: 'Eskertpeler',
+    notificationsLabel: 'Bildirmeler', notificationsHint: "Qollanba jabıq bolsa da qatnasıw hám tólemler haqqında xabar alıń.",
+    turnOnBtn: 'Qosıw', turnOffBtn: "Óshiriw",
   },
 }

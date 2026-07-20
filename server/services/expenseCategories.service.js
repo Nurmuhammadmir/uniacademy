@@ -7,6 +7,7 @@ import ExpenseCategory from "../models/ExpenseCategory.js"
 // page has already been opened once).
 export const DEFAULT_CATEGORIES = [
     { name: 'Salary', color: '#3E7CB1' },
+    { name: 'Prepayment', color: '#E67E22' },
     { name: 'Refund', color: '#C0392B' },
     { name: 'Rent', color: '#8E44AD' },
     { name: 'Utilities', color: '#16A085' },
@@ -25,4 +26,16 @@ export const ensureDefaultCategories = async (branchId) => {
         // call lost just means the categories already exist, which is exactly the goal
         if (error.code !== 11000 && !error.writeErrors) throw error
     }
+}
+
+// guarantees ONE specific category exists with a real name/color, regardless of whether this
+// branch already has other categories set up - ensureDefaultCategories above only seeds anything
+// for a branch with ZERO categories, so a category introduced after a branch is already active
+// (like 'Prepayment') would otherwise never get created for it
+export const ensureCategoryExists = async (branchId, name, color) => {
+    await ExpenseCategory.findOneAndUpdate(
+        { branchId, name },
+        { $setOnInsert: { branchId, name, color } },
+        { upsert: true }
+    )
 }

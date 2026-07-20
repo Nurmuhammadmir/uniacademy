@@ -10,7 +10,7 @@ import {
     createLevel, updateLevel, deleteLevel,
     updateSettings,
     listAllGroups, updateGroupLimits, getTodayTimetable,
-    getFinanceOverview, getPaymentDetail, listPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, getBusinessLedger,
+    getFinanceOverview, getPaymentDetail, listPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, prepaySalary, getBusinessLedger,
 } from "../controllers/directorController.js"
 import { listLanguages, listLevels, listBranches, getSettings } from "../controllers/catalogController.js"
 import {
@@ -74,6 +74,7 @@ directorRouter.delete('/pay-rates/:id', deletePayRate)
 directorRouter.get('/salary/calculate', calculateSalary)
 directorRouter.get('/salary/detail/:teacherId', getSalaryDetail)
 directorRouter.post('/salary/pay', paySalary)
+directorRouter.post('/salary/prepay', prepaySalary)
 
 directorRouter.get('/stats', getStats)
 directorRouter.get('/map-data', getMapData)

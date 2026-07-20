@@ -135,7 +135,7 @@ const StudentProfile = () => {
           </div>
           <div className='bg-bg-elevated border border-hairline rounded-xl px-4 py-3 text-right'>
             <p className='text-muted text-xs'>{t('totalBalance')}</p>
-            <p className='font-mono text-xl text-ink'>{formatMoney(totalBalance)}</p>
+            <p className={`font-mono text-xl ${totalBalance > 0 ? 'text-green-600' : 'text-ink'}`}>{formatMoney(totalBalance)}</p>
           </div>
         </div>
 
@@ -160,7 +160,10 @@ const StudentProfile = () => {
                     <p className='text-ink text-sm font-medium'>{c.languageId?.name} · {c.levelId?.name}</p>
                     <span className={`text-xs px-2.5 py-1 rounded-full ${c.isActive ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>{c.isActive ? t('active') : t('unpaid')}</span>
                   </div>
-                  <p className='text-muted text-xs'>{t('priceBalanceLine', { price: c.price !== null ? formatMoney(c.price) : '—', balance: formatMoney(c.balance) })}</p>
+                  <p className='text-muted text-xs'>
+                    {t('priceBalanceLine', { price: c.price !== null ? formatMoney(c.price) : '—' })} ·{' '}
+                    <span className={c.balance > 0 ? 'text-green-600 font-medium' : ''}>{t('courseBalanceLine', { balance: formatMoney(c.balance) })}</span>
+                  </p>
                   <p className='text-muted text-xs mb-2'>{t('nextDue', { date: c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).toLocaleDateString() : '—' })}</p>
                   {courseStatement?.owed > 0 && (
                     <p className='text-red-600 text-xs font-medium mb-2'>{t('statusOwes', { amount: formatMoney(courseStatement.owed) })}</p>

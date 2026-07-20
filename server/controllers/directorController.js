@@ -18,11 +18,12 @@ import TeacherPayRate, { PAY_RATE_TYPES } from "../models/TeacherPayRate.js"
 import Expense, { EXPENSE_METHODS } from "../models/Expense.js"
 import { assertNoScheduleConflict } from "../services/scheduleConflict.service.js"
 import { computeDayCounter } from "../services/dayCounter.service.js"
+import { earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
 import { deleteLevelContent } from "../services/contentCascade.service.js"
 import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
 import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
-import { ensureDefaultCategories } from "../services/expenseCategories.service.js"
+import { ensureDefaultCategories, ensureCategoryExists } from "../services/expenseCategories.service.js"
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
 
 const startOfThisMonth = () => {
@@ -419,15 +420,21 @@ export const getAttendanceOverview = async (req, res) => {
         const teachers = await User.find({ role: 'teacher' }).select('name branchId').populate('branchId', 'name')
         const teacherCheckIns = await TeacherAttendance.find({ date: { $gte: startOfDay, $lt: endOfDay } })
         const checkInByTeacher = Object.fromEntries(teacherCheckIns.map(t => [String(t.teacherId), t.scannedAt]))
+        const allGroups = await Group.find({ teacherId: { $in: teachers.map(t => t._id) } })
 
-        const teacherRows = teachers.map(t => ({
-            teacherId: t._id,
-            name: t.name,
-            branchId: t.branchId?._id,
-            branchName: t.branchId?.name,
-            checkedIn: !!checkInByTeacher[String(t._id)],
-            scannedAt: checkInByTeacher[String(t._id)] || null,
-        }))
+        const teacherRows = teachers.map(t => {
+            const scannedAt = checkInByTeacher[String(t._id)] || null
+            const firstLessonTime = earliestLessonTimeOnDate(allGroups.filter(g => String(g.teacherId) === String(t._id)), startOfDay)
+            return {
+                teacherId: t._id,
+                name: t.name,
+                branchId: t.branchId?._id,
+                branchName: t.branchId?.name,
+                checkedIn: !!scannedAt,
+                scannedAt,
+                firstLessonTime, late: isLateCheckIn(scannedAt, firstLessonTime),
+            }
+        })
 
         const studentAttendanceByBranch = await Attendance.aggregate([
             { $match: { scannedAt: { $gte: startOfDay, $lt: endOfDay } } },
@@ -877,6 +884,40 @@ export const paySalary = async (req, res) => {
             recipient: teacher?.name || '', method,
             date: new Date(),
             note: dateFrom && dateTo ? `Salary for ${dateFrom} — ${dateTo}` : 'Salary payout',
+            createdBy: req.auth.userId,
+        })
+        res.status(201).json({ expense })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// director's counterpart of adminController.prepaySalary - same advance/prepayment concept,
+// scoped to whichever branchId the director's Finance switcher has selected
+export const prepaySalary = async (req, res) => {
+    try {
+        const { branchId, teacherId, amount, dateFrom, dateTo, method } = req.body
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        if (!teacherId || !amount) return res.status(400).json({ error: 'missing_fields' })
+        if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
+
+        if (dateFrom && dateTo) {
+            const alreadyPaid = await Expense.exists({
+                branchId, category: 'Salary', teacherId,
+                date: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
+            })
+            if (alreadyPaid) return res.status(409).json({ error: 'salary_already_paid' })
+        }
+
+        const teacher = await User.findById(teacherId).select('name')
+        await ensureCategoryExists(branchId, 'Prepayment', '#E67E22')
+        const expense = await Expense.create({
+            branchId, category: 'Prepayment', amount, teacherId,
+            name: dateFrom && dateTo ? `Prepayment for ${dateFrom} — ${dateTo}` : 'Salary prepayment',
+            recipient: teacher?.name || '', method,
+            date: new Date(),
+            note: dateFrom && dateTo ? `Prepayment for ${dateFrom} — ${dateTo}` : 'Salary prepayment',
             createdBy: req.auth.userId,
         })
         res.status(201).json({ expense })

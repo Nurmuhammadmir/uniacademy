@@ -4,6 +4,7 @@ import cors from 'cors'
 import compression from 'compression'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import cron from 'node-cron'
 import 'dotenv/config'
 import connectDB from './config/mongodb.js'
 import authRouter from './routes/authRoute.js'
@@ -13,6 +14,7 @@ import teacherRouter from './routes/teacherRoute.js'
 import studentRouter from './routes/studentRoute.js'
 import parentRouter from './routes/parentRoute.js'
 import publicRouter from './routes/publicRoute.js'
+import { sendDailyParentDigest } from './services/parentNotifications.service.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -70,5 +72,13 @@ app.use('/api/parent', parentRouter)
 app.use('/api/public', publicRouter)
 
 app.get('/', (req, res) => res.send('uniacademy api working'))
+
+// once a day, at a sensible local morning hour - "your child didn't attend yesterday" plus any
+// still-unpaid course reminders (see parentNotifications.service.js for exactly what this checks).
+// Fixed to Asia/Tashkent regardless of whatever timezone the host server itself runs in, so this
+// always fires at 8am for the branch's actual users, not 8am UTC.
+cron.schedule('0 8 * * *', () => {
+    sendDailyParentDigest().catch(error => console.log('sendDailyParentDigest failed', error))
+}, { timezone: 'Asia/Tashkent' })
 
 app.listen(port, () => console.log('server started on port', port))

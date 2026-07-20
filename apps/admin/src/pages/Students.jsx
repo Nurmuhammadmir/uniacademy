@@ -88,6 +88,25 @@ const Students = () => {
 
   const courseSummary = (student) => student.courses.length === 0 ? '—' : student.courses.map(c => `${c.languageId?.name} · ${c.levelId?.name}`).join(', ')
   const anyActive = (student) => student.courses.some(c => c.isActive)
+  const totalBalance = (student) => student.courses.reduce((sum, c) => sum + (c.balance || 0), 0)
+
+  // one row per student, every detail in its own column - reuses the same CSV-building pattern
+  // already used for a group's roster export (GroupDetails.jsx), just with more columns. Exports
+  // exactly whatever's currently visible (respects the active/archived tab + search filter).
+  const exportStudentsCSV = () => {
+    const header = ['#', 'Name', 'Phone', 'Status', 'Courses', 'Total balance', 'Passport info', 'Registered on']
+    const rows = filteredStudents.map((s, i) => [
+      i + 1, s.name, s.phone, anyActive(s) ? t('active') : t('unpaid'),
+      courseSummary(s), totalBalance(s), s.passportInfo || '', new Date(s.createdAt).toLocaleDateString(),
+    ])
+    const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `students-${statusTab}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const toggleDiscountMode = () => {
     setDiscountMode(m => !m)
@@ -125,6 +144,7 @@ const Students = () => {
           <p className='font-display text-2xl text-ink'>{t('studentsTitle')}</p>
           <div className='flex gap-2'>
             <button onClick={toggleDiscountMode} className={`px-4 py-2 rounded-xl text-sm font-medium ${discountMode ? 'bg-accent text-white' : 'bg-bg-elevated border border-hairline text-muted'}`}>🏷️ {t('discountBtn')}</button>
+            <button onClick={exportStudentsCSV} className='px-4 py-2 rounded-xl bg-bg-elevated border border-hairline text-muted text-sm font-medium'>⬇️ {t('exportBtn')}</button>
             <button onClick={() => setShowCreate(true)} className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium'>{t('addStudent')}</button>
           </div>
         </div>

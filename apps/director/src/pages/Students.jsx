@@ -15,6 +15,23 @@ const Students = () => {
   const isExpired = (c) => !c.subscriptionExpiresAt || new Date(c.subscriptionExpiresAt) < new Date()
   const courseSummary = (student) => student.courses.length === 0 ? '—' : student.courses.map(c => `${c.languageId?.name} · ${c.levelId?.name}`).join(', ')
   const anyActive = (student) => student.courses.some(c => c.isActive)
+  const totalBalance = (student) => student.courses.reduce((sum, c) => sum + (c.balance || 0), 0)
+
+  // one row per student, every detail in its own column - exports exactly whatever's currently
+  // visible (respects the search/branch/language/level filters)
+  const exportStudentsCSV = () => {
+    const header = ['#', 'Name', 'Phone', 'Branch', 'Status', 'Courses', 'Total balance']
+    const rows = visibleStudents.map((s, i) => [
+      i + 1, s.name, s.phone, s.branchId?.name || '', anyActive(s) ? t('active') : t('unpaid'), courseSummary(s), totalBalance(s),
+    ])
+    const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `students-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const visibleStudents = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -29,7 +46,10 @@ const Students = () => {
 
   return (
     <div>
-      <p className='font-display text-2xl text-ink mb-4'>{t('allStudentsTitle')}</p>
+      <div className='flex justify-between items-center mb-4'>
+        <p className='font-display text-2xl text-ink'>{t('allStudentsTitle')}</p>
+        <button onClick={exportStudentsCSV} className='px-4 py-2 rounded-xl bg-bg-elevated border border-hairline text-muted text-sm font-medium'>⬇️ {t('exportBtn')}</button>
+      </div>
 
       <div className='flex flex-wrap gap-3 mb-4'>
         <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('searchStudents')}

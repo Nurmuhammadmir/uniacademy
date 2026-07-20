@@ -67,8 +67,8 @@ const TeachersList = () => {
                 <td className='px-5 py-4 text-muted font-mono'>{t2.phone}</td>
                 <td className='px-5 py-4'>
                   {t2.checkedInToday ? (
-                    <span className='inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent'>
-                      {t('checkedIn')} · {new Date(t2.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full ${t2.late ? 'bg-red-100 text-red-500' : 'bg-accent-soft text-accent'}`}>
+                      {t('checkedIn')} · {new Date(t2.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{t2.late ? ` · ${t('lateBadge')}` : ''}
                     </span>
                   ) : (
                     <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t('notCheckedIn')}</span>

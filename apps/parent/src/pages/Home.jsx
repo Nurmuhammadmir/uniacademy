@@ -127,7 +127,7 @@ const Home = () => {
             </div>
             <div className='grid grid-cols-2 gap-2 text-sm'>
               <div><p className='text-muted text-xs'>{t('monthlyPriceLabel')}</p><p className='font-mono text-ink'>{c.price !== null ? formatMoney(c.price) : '—'}</p></div>
-              <div><p className='text-muted text-xs'>{t('balanceLabel')}</p><p className='font-mono text-ink'>{formatMoney(c.balance)}</p></div>
+              <div><p className='text-muted text-xs'>{t('balanceLabel')}</p><p className={`font-mono ${c.balance > 0 ? 'text-green-600' : 'text-ink'}`}>{formatMoney(c.balance)}</p></div>
               <div><p className='text-muted text-xs'>{t('nextDueLabel')}</p><p className='font-mono text-ink'>{c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).toLocaleDateString() : '—'}</p></div>
             </div>
           </div>

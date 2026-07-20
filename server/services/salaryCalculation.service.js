@@ -132,6 +132,20 @@ export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
     })
     const paidTeacherIds = new Set(existingPayouts.map(e => String(e.teacherId)))
 
+    // any advance already given for this same period - shown as a warning before a real salary
+    // payout, and blocks a second prepayment once the real payout has happened (see paySalary's
+    // own comment for why the payout itself is always dated "today", same approximation this reuses)
+    const existingPrepayments = await Expense.find({
+        branchId, category: 'Prepayment', teacherId: { $in: teachers.map(t => t._id) },
+        date: { $gte: dateFrom, $lte: dateTo },
+    })
+    const prepaymentsByTeacher = {}
+    for (const e of existingPrepayments) {
+        const key = String(e.teacherId)
+        if (!prepaymentsByTeacher[key]) prepaymentsByTeacher[key] = []
+        prepaymentsByTeacher[key].push({ amount: e.amount, date: e.date, method: e.method })
+    }
+
     const results = []
     for (const teacher of teachers) {
         const rate = resolveRate(teacher._id, rates)
@@ -144,6 +158,7 @@ export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
             teacherId: teacher._id, name: teacher.name, groupCount: teacherGroups.length, studentCount,
             rateType: rate.rateType, rateValue: rate.rateValue, total,
             paid: paidTeacherIds.has(String(teacher._id)),
+            prepayments: prepaymentsByTeacher[String(teacher._id)] || [],
         })
     }
 

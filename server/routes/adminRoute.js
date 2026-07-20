@@ -6,14 +6,14 @@ import {
     createGroup, listGroups, getGroupProfile, updateGroup, deleteGroup, unarchiveGroup, suggestGroup, addStudentToGroup, removeStudentFromGroup,
     retakeExam, listBranchTeachers, getTeacherProfile, getTeacherAttendanceGrid, getStudentAttendanceGrid, getLessonDetail, setLessonTeacherStatus,
     getMe, createTeacherAttendanceQR, listTeacherAttendanceQRs, getAttendanceOverview,
-    listPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, getSalaryDetail,
+    listPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, prepaySalary, getSalaryDetail,
     getStudentStatement, getReconciliation, getBusinessLedger, setStudentDiscount,
     listMyNotes, createMyNote, deleteMyNote,
 } from "../controllers/adminController.js"
 import { listLanguages, listLevels, getSettings } from "../controllers/catalogController.js"
 import {
     listRooms, createRoom, updateRoom, deleteRoom,
-    getGroupDetails, updateGroupDiscount, getGroupAttendanceGrid, setLessonAttendance,
+    getGroupDetails, updateGroupDiscount, getGroupAttendanceGrid,
     listGroupMaterials, addGroupMaterial, deleteGroupMaterial,
     listGroupComments, addGroupComment, deleteGroupComment,
     listExtraLessons, createExtraLesson, deleteExtraLesson,
@@ -92,6 +92,7 @@ adminRouter.delete('/pay-rates/:id', deletePayRate)
 adminRouter.get('/salary/calculate', calculateSalary)
 adminRouter.get('/salary/detail/:teacherId', getSalaryDetail)
 adminRouter.post('/salary/pay', paySalary)
+adminRouter.post('/salary/prepay', prepaySalary)
 
 adminRouter.get('/rooms', listRooms)
 adminRouter.post('/rooms', createRoom)
@@ -102,7 +103,6 @@ adminRouter.get('/timetable', getTodayTimetable)
 adminRouter.get('/groups/:id/details', getGroupDetails)
 adminRouter.put('/groups/:id/discount', updateGroupDiscount)
 adminRouter.get('/groups/:id/attendance-grid', getGroupAttendanceGrid)
-adminRouter.put('/lesson-attendance', setLessonAttendance)
 adminRouter.get('/groups/:id/materials', listGroupMaterials)
 adminRouter.post('/groups/:id/materials', addGroupMaterial)
 adminRouter.delete('/groups/:id/materials/:materialId', deleteGroupMaterial)

@@ -43,8 +43,8 @@ const Attendance = () => {
               {list.map(tc => (
                 <div key={tc.teacherId} className='flex justify-between text-sm'>
                   <span className={tc.checkedIn ? 'text-ink' : 'text-muted'}>{tc.name}</span>
-                  <span className={tc.checkedIn ? 'text-accent font-mono text-xs' : 'text-muted text-xs'}>
-                    {tc.checkedIn ? new Date(tc.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('notCheckedIn')}
+                  <span className={`font-mono text-xs ${tc.checkedIn ? (tc.late ? 'text-red-500' : 'text-accent') : 'text-muted'}`}>
+                    {tc.checkedIn ? `${new Date(tc.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${tc.late ? ` · ${t('lateBadge')}` : ''}` : t('notCheckedIn')}
                   </span>
                 </div>
               ))}

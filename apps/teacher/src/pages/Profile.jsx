@@ -42,6 +42,18 @@ const Profile = () => {
 
           <p className='text-muted text-sm mb-6'>Working here since {new Date(me.employedSince).toLocaleDateString()}</p>
 
+          {me.todayAttendance?.checkedIn && (
+            <div className={`rounded-2xl p-4 mb-4 ${me.todayAttendance.late ? 'bg-red-50 border border-red-200' : 'bg-accent-soft'}`}>
+              <p className={`text-sm font-medium ${me.todayAttendance.late ? 'text-red-500' : 'text-accent'}`}>
+                {me.todayAttendance.late ? '⚠️ Checked in late today' : '✓ Checked in on time today'}
+              </p>
+              <p className='text-muted text-xs mt-1'>
+                {new Date(me.todayAttendance.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {me.todayAttendance.firstLessonTime && ` · first lesson at ${me.todayAttendance.firstLessonTime}`}
+              </p>
+            </div>
+          )}
+
           <button onClick={() => setShowScanner(true)} className='w-full py-4 rounded-2xl bg-accent text-white font-medium mb-3'>
             📷 Check in for today
           </button>

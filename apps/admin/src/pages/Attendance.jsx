@@ -37,20 +37,38 @@ const LessonDetailModal = ({ lessonId, onClose, onStatusChanged, t }) => {
   const [data, setData] = useState(null)
   const [note, setNote] = useState('')
   const [substituteId, setSubstituteId] = useState('')
+  const [showSubstituteForm, setShowSubstituteForm] = useState(false)
 
   useEffect(() => {
     getLessonDetail(lessonId).then(d => {
-      if (d) { setData(d); setNote(d.lesson.teacherNote || '') }
+      if (d) { setData(d); setNote(d.lesson.teacherNote || ''); setShowSubstituteForm(false) }
     })
   }, [lessonId])
 
-  const setStatus = async (status) => {
-    const payload = { teacherStatus: status, teacherNote: note }
-    if (status === 'substituted') payload.substituteTeacherId = substituteId || null
-    const lesson = await setLessonTeacherStatus(lessonId, payload)
+  // whether a lesson was conducted is now always computed from real attendance - never something
+  // an admin asserts - so this only ever writes 'substituted' (a genuine human judgment call) or
+  // 'unmarked' to clear that flag back to letting the status be computed again
+  const saveNote = async () => {
+    const lesson = await setLessonTeacherStatus(lessonId, { teacherStatus: data.lesson.isSubstituted ? 'substituted' : 'unmarked', teacherNote: note })
+    if (lesson) setData(d => ({ ...d, lesson: { ...d.lesson, teacherNote: lesson.teacherNote } }))
+  }
+
+  const markSubstituted = async () => {
+    const lesson = await setLessonTeacherStatus(lessonId, { teacherStatus: 'substituted', substituteTeacherId: substituteId || null, teacherNote: note })
     if (lesson) {
-      setData(d => ({ ...d, lesson: { ...d.lesson, teacherStatus: lesson.teacherStatus, teacherNote: lesson.teacherNote } }))
-      onStatusChanged(lessonId, lesson.teacherStatus)
+      const substituteName = teachers.find(tc => tc._id === substituteId)?.name || null
+      setData(d => ({ ...d, lesson: { ...d.lesson, teacherStatus: 'substituted', isSubstituted: true, substituteTeacherName: substituteName } }))
+      onStatusChanged(lessonId, 'substituted')
+      setShowSubstituteForm(false)
+    }
+  }
+
+  const clearSubstitution = async () => {
+    await setLessonTeacherStatus(lessonId, { teacherStatus: 'unmarked', teacherNote: note })
+    const refreshed = await getLessonDetail(lessonId)
+    if (refreshed) {
+      setData(refreshed)
+      onStatusChanged(lessonId, refreshed.lesson.teacherStatus)
     }
   }
 
@@ -63,23 +81,31 @@ const LessonDetailModal = ({ lessonId, onClose, onStatusChanged, t }) => {
             <p className='text-muted text-sm mb-4'>{data.lesson.date} · {data.lesson.startTime}–{data.lesson.endTime}{data.group.roomName ? ` · ${data.group.roomName}` : ''}</p>
 
             <p className='text-ink text-sm font-medium mb-2'>{t('teacherStatusLabel')}</p>
-            <div className='flex gap-2 mb-3 flex-wrap'>
-              {['conducted', 'not_conducted', 'substituted', 'unmarked'].map(s => (
-                <button key={s} onClick={() => setStatus(s)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium ${data.lesson.teacherStatus === s ? TEACHER_STATUS_STYLE[s] : 'bg-bg border border-hairline text-muted'}`}>
-                  {t('teacherStatus_' + s)}
-                </button>
-              ))}
+            <div className='flex items-center gap-2 mb-1'>
+              <span className={`px-3 py-1.5 rounded-lg text-xs font-medium ${TEACHER_STATUS_STYLE[data.lesson.teacherStatus]}`}>
+                {t('teacherStatus_' + data.lesson.teacherStatus)}
+              </span>
+              <span className='text-muted text-xs'>{t('teacherStatusComputedHint')}</span>
             </div>
 
-            {data.lesson.teacherStatus === 'substituted' && (
-              <select value={substituteId} onChange={e => setSubstituteId(e.target.value)} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm mb-3'>
-                <option value=''>{t('selectSubstituteLabel')}</option>
-                {teachers.map(tc => <option key={tc._id} value={tc._id}>{tc.name}</option>)}
-              </select>
+            {data.lesson.isSubstituted ? (
+              <div className='flex items-center justify-between bg-bg border border-hairline rounded-lg px-3 py-2 text-sm mb-3'>
+                <span className='text-ink'>{data.lesson.substituteTeacherName || '—'}</span>
+                <button onClick={clearSubstitution} className='text-muted text-xs font-medium'>{t('clearSubstitutionBtn')}</button>
+              </div>
+            ) : showSubstituteForm ? (
+              <div className='flex gap-2 mb-3'>
+                <select value={substituteId} onChange={e => setSubstituteId(e.target.value)} className='flex-1 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm'>
+                  <option value=''>{t('selectSubstituteLabel')}</option>
+                  {teachers.map(tc => <option key={tc._id} value={tc._id}>{tc.name}</option>)}
+                </select>
+                <button onClick={markSubstituted} disabled={!substituteId} className='px-3 py-2 rounded-lg bg-accent text-white text-sm font-medium disabled:opacity-50'>{t('save')}</button>
+              </div>
+            ) : (
+              <button onClick={() => setShowSubstituteForm(true)} className='text-accent text-xs font-medium mb-3'>{t('markSubstitutedBtn')}</button>
             )}
 
-            <textarea value={note} onChange={e => setNote(e.target.value)} onBlur={() => setStatus(data.lesson.teacherStatus)}
+            <textarea value={note} onChange={e => setNote(e.target.value)} onBlur={saveNote}
               placeholder={t('teacherNotePlaceholder')} rows={2} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm mb-4' />
 
             <p className='text-ink text-sm font-medium mb-2'>{t('studentsLabel')}</p>
@@ -202,8 +228,8 @@ const Attendance = () => {
             {data.teachers.map(tc => (
               <div key={tc.teacherId} className='flex justify-between text-sm'>
                 <span className={tc.checkedIn ? 'text-ink' : 'text-muted'}>{tc.name}</span>
-                <span className={tc.checkedIn ? 'text-accent font-mono text-xs' : 'text-muted text-xs'}>
-                  {tc.checkedIn ? new Date(tc.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('notCheckedIn')}
+                <span className={`font-mono text-xs ${tc.checkedIn ? (tc.late ? 'text-red-500' : 'text-accent') : 'text-muted'}`}>
+                  {tc.checkedIn ? `${new Date(tc.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${tc.late ? ` · ${t('lateBadge')}` : ''}` : t('notCheckedIn')}
                 </span>
               </div>
             ))}

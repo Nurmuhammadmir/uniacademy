@@ -9,6 +9,7 @@ import LessonAttendance from "../models/LessonAttendance.js"
 import ExtraLesson from "../models/ExtraLesson.js"
 import Payment from "../models/Payment.js"
 import Pricing from "../models/Pricing.js"
+import PushSubscription from "../models/PushSubscription.js"
 import { computeDayCounter } from "../services/dayCounter.service.js"
 import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
 
@@ -136,6 +137,40 @@ export const getChildPayments = async (req, res) => {
         const payments = await Payment.find({ studentId: student._id, refunded: { $ne: true } }).sort({ date: -1 }).populate('languageId', 'name')
 
         res.json({ courses, payments })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// registers (or re-registers, if the browser already had a stale one) this device's push
+// subscription against the logged-in parent - upserted by endpoint since that's the real
+// per-device identity, so re-subscribing on the same browser just updates the same row
+export const subscribeToPush = async (req, res) => {
+    try {
+        const { endpoint, keys } = req.body
+        if (!endpoint || !keys?.p256dh || !keys?.auth) return res.status(400).json({ error: 'invalid_subscription' })
+
+        await PushSubscription.findOneAndUpdate(
+            { endpoint },
+            { parentId: req.auth.userId, endpoint, keys },
+            { upsert: true, new: true, runValidators: true }
+        )
+        res.status(201).json({ subscribed: true })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// called when the parent turns notifications back off in-app - only removes THIS device's
+// subscription, other devices they enabled it on keep receiving pushes
+export const unsubscribeFromPush = async (req, res) => {
+    try {
+        const { endpoint } = req.body
+        if (!endpoint) return res.status(400).json({ error: 'missing_endpoint' })
+        await PushSubscription.findOneAndDelete({ endpoint, parentId: req.auth.userId })
+        res.json({ unsubscribed: true })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

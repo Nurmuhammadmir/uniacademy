@@ -29,8 +29,10 @@ import { computeDayCounter } from "../services/dayCounter.service.js"
 import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
 import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
-import { ensureDefaultCategories } from "../services/expenseCategories.service.js"
+import { ensureDefaultCategories, ensureCategoryExists } from "../services/expenseCategories.service.js"
 import { computeStudentStatements, computeReconciliation, computeGroupRevenue } from "../services/studentLedger.service.js"
+import { earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
+import { computeEffectiveLessonStatuses, computeEffectiveLessonStatus } from "../services/lessonStatus.service.js"
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
 import { applyDiscount } from "../services/discount.service.js"
 import Discount from "../models/Discount.js"
@@ -197,13 +199,15 @@ export const getTeacherAttendanceGrid = async (req, res) => {
         const groups = []
         for (const group of groupDocs) {
             const lessons = await ensureLessonsGenerated(group, rangeStart, rangeEnd)
+            const statusByLessonId = await computeEffectiveLessonStatuses(lessons)
             const lessonRows = lessons.map(l => {
                 total++
-                if (l.teacherStatus === 'conducted' || l.teacherStatus === 'substituted') conducted++
+                const teacherStatus = statusByLessonId[String(l._id)]
+                if (teacherStatus === 'conducted' || teacherStatus === 'substituted') conducted++
                 return {
                     lessonId: l._id, date: l.date.toISOString().slice(0, 10),
                     dayOfWeek: l.date.getUTCDay(), startTime: l.startTime, endTime: l.endTime,
-                    teacherStatus: l.teacherStatus, teacherNote: l.teacherNote,
+                    teacherStatus, teacherNote: l.teacherNote,
                 }
             })
             groups.push({
@@ -284,11 +288,16 @@ export const getLessonDetail = async (req, res) => {
         const students = group.studentIds.map(s => ({ studentId: s._id, name: s.name, phone: s.phone, status: statusByStudent[String(s._id)] || 'unmarked' }))
 
         const substitute = lesson.substituteTeacherId ? await User.findById(lesson.substituteTeacherId).select('name') : null
+        const teacherStatus = await computeEffectiveLessonStatus(lesson)
 
         res.json({
             lesson: {
                 lessonId: lesson._id, date: lesson.date.toISOString().slice(0, 10), startTime: lesson.startTime, endTime: lesson.endTime,
-                teacherStatus: lesson.teacherStatus, teacherNote: lesson.teacherNote, substituteTeacherName: substitute?.name || null,
+                // teacherStatus is the COMPUTED, display-only value (conducted/not_conducted are
+                // derived from real attendance, never stored) - isSubstituted reflects the actual
+                // stored flag, which is the only part of this an admin can still set/clear
+                teacherStatus, isSubstituted: lesson.teacherStatus === 'substituted',
+                teacherNote: lesson.teacherNote, substituteTeacherName: substitute?.name || null,
             },
             group: { groupId: group._id, languageName: group.languageId?.name, levelName: group.levelId?.name, roomName: group.roomId?.name || null },
             students,
@@ -299,12 +308,16 @@ export const getLessonDetail = async (req, res) => {
     }
 }
 
-// marks/changes ONE lesson's teacherStatus (conducted/not_conducted/substituted/unmarked) - what
-// the Teacher Profile's attendance grid calls when an admin clicks a date cell
+// admin can no longer assert whether a lesson was conducted or not - that's now always computed
+// from real student attendance (see lessonStatus.service.js), so it can't be biased. The ONE thing
+// still genuinely a human call is flagging that a substitute taught the class that day (nothing in
+// the attendance data could ever tell you that), so this endpoint now only accepts 'substituted'
+// (to set it, with substituteTeacherId) or 'unmarked' (to clear a substitution and let the status
+// go back to being computed). A note can still be left either way.
 export const setLessonTeacherStatus = async (req, res) => {
     try {
         const { teacherStatus, substituteTeacherId, teacherNote } = req.body
-        if (!['unmarked', 'conducted', 'not_conducted', 'substituted'].includes(teacherStatus)) {
+        if (!['unmarked', 'substituted'].includes(teacherStatus)) {
             return res.status(400).json({ error: 'invalid_status' })
         }
         const lesson = await Lesson.findById(req.params.id)
@@ -342,11 +355,20 @@ export const listBranchTeachers = async (req, res) => {
         })
         const checkInByTeacher = Object.fromEntries(checkIns.map(c => [String(c.teacherId), c.scannedAt]))
 
-        const teachersWithAttendance = teachers.map(t => ({
-            ...t.toObject(),
-            checkedInToday: !!checkInByTeacher[String(t._id)],
-            checkedInAt: checkInByTeacher[String(t._id)] || null,
-        }))
+        // "on time" is judged against each teacher's own EARLIEST group lesson today, so a teacher
+        // with no lesson scheduled today is never flagged late
+        const allGroups = await Group.find({ teacherId: { $in: teachers.map(t => t._id) } })
+        const teachersWithAttendance = teachers.map(t => {
+            const scannedAt = checkInByTeacher[String(t._id)] || null
+            const firstLessonTime = earliestLessonTimeOnDate(allGroups.filter(g => String(g.teacherId) === String(t._id)), startOfDay)
+            return {
+                ...t.toObject(),
+                checkedInToday: !!scannedAt,
+                checkedInAt: scannedAt,
+                firstLessonTime,
+                late: isLateCheckIn(scannedAt, firstLessonTime),
+            }
+        })
 
         res.json({ teachers: teachersWithAttendance })
     } catch (error) {
@@ -373,15 +395,21 @@ export const getAttendanceOverview = async (req, res) => {
             date: { $gte: startOfDay, $lt: endOfDay },
         })
         const checkInByTeacher = Object.fromEntries(teacherCheckIns.map(t => [String(t.teacherId), t.scannedAt]))
-        const teacherRows = teachers.map(t => ({
-            teacherId: t._id, name: t.name, phone: t.phone,
-            checkedIn: !!checkInByTeacher[String(t._id)], scannedAt: checkInByTeacher[String(t._id)] || null,
-        }))
 
         // pre-fetch this branch's own groups and match by real ObjectId rather than trying to
         // $match a populated field inside the aggregate below
         const branchGroups = await Group.find({ branchId: req.auth.branchId })
             .populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name')
+
+        const teacherRows = teachers.map(t => {
+            const scannedAt = checkInByTeacher[String(t._id)] || null
+            const firstLessonTime = earliestLessonTimeOnDate(branchGroups.filter(g => String(g.teacherId?._id || g.teacherId) === String(t._id)), startOfDay)
+            return {
+                teacherId: t._id, name: t.name, phone: t.phone,
+                checkedIn: !!scannedAt, scannedAt,
+                firstLessonTime, late: isLateCheckIn(scannedAt, firstLessonTime),
+            }
+        })
         const groupAttendanceRaw = await Attendance.aggregate([
             { $match: { groupId: { $in: branchGroups.map(g => g._id) }, scannedAt: { $gte: startOfDay, $lt: endOfDay } } },
             { $group: { _id: '$groupId', count: { $sum: 1 } } },
@@ -1403,6 +1431,43 @@ export const paySalary = async (req, res) => {
             recipient: teacher?.name || '', method,
             date: new Date(),
             note: dateFrom && dateTo ? `Salary for ${dateFrom} — ${dateTo}` : 'Salary payout',
+            createdBy: req.auth.userId,
+        })
+        res.status(201).json({ expense })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// records an advance/prepayment (category 'Prepayment', not 'Salary') for a teacher - for when
+// they need money urgently before the period's real payout is due. Blocked once the real salary
+// for this exact period has already been paid, since there's nothing left to advance against at
+// that point. The reverse isn't blocked here: paySalary itself just shows a warning (built from
+// calculateSalaries' `prepayments` field) so the admin can see what was already advanced before
+// deciding how much more to actually pay out.
+export const prepaySalary = async (req, res) => {
+    try {
+        const { teacherId, amount, dateFrom, dateTo, method } = req.body
+        if (!teacherId || !amount) return res.status(400).json({ error: 'missing_fields' })
+        if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
+
+        if (dateFrom && dateTo) {
+            const alreadyPaid = await Expense.exists({
+                branchId: req.auth.branchId, category: 'Salary', teacherId,
+                date: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
+            })
+            if (alreadyPaid) return res.status(409).json({ error: 'salary_already_paid' })
+        }
+
+        const teacher = await User.findById(teacherId).select('name')
+        await ensureCategoryExists(req.auth.branchId, 'Prepayment', '#E67E22')
+        const expense = await Expense.create({
+            branchId: req.auth.branchId, category: 'Prepayment', amount, teacherId,
+            name: dateFrom && dateTo ? `Prepayment for ${dateFrom} — ${dateTo}` : 'Salary prepayment',
+            recipient: teacher?.name || '', method,
+            date: new Date(),
+            note: dateFrom && dateTo ? `Prepayment for ${dateFrom} — ${dateTo}` : 'Salary prepayment',
             createdBy: req.auth.userId,
         })
         res.status(201).json({ expense })

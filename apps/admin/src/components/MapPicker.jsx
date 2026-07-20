@@ -21,6 +21,21 @@ const MapPicker = ({ address, lat, lng, onChange }) => {
   const [query, setQuery] = useState(address || '')
   const [suggestions, setSuggestions] = useState([])
 
+  // the map's click listener and the marker's dragend listener are both native Mapbox event
+  // listeners attached exactly ONCE (see the mount effect below, and the `if (!markerRef.current)`
+  // guard in placeMarker) - they are never re-attached as the component re-renders. onChange,
+  // though, is a fresh inline closure every time the PARENT form re-renders (Students.jsx passes
+  // `({lat,lng,address}) => setForm({...form, ...})`, capturing whatever `form` existed at that
+  // render). Without this ref, clicking the map or dragging the pin would call the onChange that
+  // was current at MOUNT time - silently reverting name/phone/etc back to their mount-time values,
+  // which is exactly the "typing then clicking the map wipes the form" bug this fixes. Routing
+  // every onChange call through a ref means it always fires the LATEST closure, however stale the
+  // listener that triggered it is.
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
+  const queryRef = useRef(query)
+  useEffect(() => { queryRef.current = query }, [query])
+
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return
     mapRef.current = new mapboxgl.Map({
@@ -61,13 +76,13 @@ const MapPicker = ({ address, lat, lng, onChange }) => {
       markerRef.current = new mapboxgl.Marker({ draggable: true, color: '#2F6FED' }).setLngLat([nextLng, nextLat]).addTo(mapRef.current)
       markerRef.current.on('dragend', () => {
         const pos = markerRef.current.getLngLat()
-        onChange({ lat: pos.lat, lng: pos.lng, address: query })
+        onChangeRef.current({ lat: pos.lat, lng: pos.lng, address: queryRef.current })
       })
     } else {
       markerRef.current.setLngLat([nextLng, nextLat])
     }
     if (shouldFly) mapRef.current.flyTo({ center: [nextLng, nextLat], zoom: 15 })
-    onChange({ lat: nextLat, lng: nextLng, address: query })
+    onChangeRef.current({ lat: nextLat, lng: nextLng, address: queryRef.current })
   }
 
   const search = async (text) => {
@@ -91,7 +106,7 @@ const MapPicker = ({ address, lat, lng, onChange }) => {
     setQuery(feature.place_name)
     setSuggestions([])
     placeMarker(featureLat, featureLng, true)
-    onChange({ lat: featureLat, lng: featureLng, address: feature.place_name })
+    onChangeRef.current({ lat: featureLat, lng: featureLng, address: feature.place_name })
   }
 
   return (

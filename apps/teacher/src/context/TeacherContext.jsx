@@ -72,10 +72,22 @@ const TeacherContextProvider = (props) => {
     const getGroupStudents = async (groupId) => {
         try {
             const { data } = await axios.get(backendUrl + `/api/teacher/my-groups/${groupId}/students`, authHeader)
-            return data.students
+            return data
         } catch (error) {
             toast.error(error.response?.data?.error || 'could not load roster')
-            return []
+            return { students: [], today: null }
+        }
+    }
+
+    // the real vocab/grammar/reading content behind today's homework for this group - lets the
+    // teacher see (and try) exactly what her students see, purely read-only, nothing graded/saved
+    const getTodayHomework = async (groupId) => {
+        try {
+            const { data } = await axios.get(backendUrl + `/api/teacher/my-groups/${groupId}/today-homework`, authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not load homework')
+            return null
         }
     }
 
@@ -166,7 +178,7 @@ const TeacherContextProvider = (props) => {
         }
     }
 
-    const value = { token, login, logout, groups, nextLesson, getMyGroups, getGroupStudents, getStudentDayDetail, createAttendanceSession, getAttendanceForDay, me, getMe, scanOwnAttendance, markStudentAttendance, getMyTimetable, getMyAttendanceGrid }
+    const value = { token, login, logout, groups, nextLesson, getMyGroups, getGroupStudents, getTodayHomework, getStudentDayDetail, createAttendanceSession, getAttendanceForDay, me, getMe, scanOwnAttendance, markStudentAttendance, getMyTimetable, getMyAttendanceGrid, backendUrl }
 
     useEffect(() => { if (token) { getMyGroups(); getMe() } }, [token])
 

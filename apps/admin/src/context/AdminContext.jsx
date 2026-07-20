@@ -384,6 +384,21 @@ const AdminContextProvider = (props) => {
         }
     }
 
+    // an advance against a teacher's salary, booked as its own 'Prepayment' expense category -
+    // blocked server-side once the real salary for this exact period has already been paid
+    const prepaySalary = async (teacherId, amount, dateFrom, dateTo, method) => {
+        try {
+            await axios.post(backendUrl + '/api/admin/salary/prepay', { teacherId, amount, dateFrom, dateTo, method }, authHeader)
+            toast.success(t('prepaymentRecorded'))
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            if (code === 'salary_already_paid') toast.error(t('salaryAlreadyPaidError'))
+            else toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError') : (code || t('couldNotPrepaySalary')))
+            return false
+        }
+    }
+
     // amount is optional - omitting it refunds whatever remains (a full refund); passing a specific
     // amount does a partial refund instead. Confirmation happens in the refund modal itself (it
     // needs a number input, not just OK/Cancel), so this doesn't use the generic confirm() dialog.
@@ -698,16 +713,6 @@ const AdminContextProvider = (props) => {
         } catch (error) {
             toast.error(error.response?.data?.error || t('couldNotLoadAttendanceGrid'))
             return null
-        }
-    }
-
-    const setLessonAttendance = async (lessonId, studentId, status) => {
-        try {
-            await axios.put(backendUrl + '/api/admin/lesson-attendance', { lessonId, studentId, status }, authHeader)
-            return true
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotSaveAttendance'))
-            return false
         }
     }
 
@@ -1222,7 +1227,7 @@ const AdminContextProvider = (props) => {
         applyDiscountToStudents,
         payments, getPayments, createPayment, refundPayment, updatePayment, getFinanceOverview, getPaymentPreview, getPaymentDetail,
         getStudentStatement, getReconciliation, deletePayment, getBusinessLedger,
-        payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, getSalaryDetail,
+        payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, prepaySalary, getSalaryDetail,
         groups, getGroups, createGroup, getGroupProfile, updateGroup, deleteGroup, unarchiveGroup, suggestGroup, addStudentToGroup, removeStudentFromGroup, retakeExam,
         teachers, getTeachers,
         languages, getLanguages,
@@ -1232,7 +1237,7 @@ const AdminContextProvider = (props) => {
         createTeacherAttendanceQR, getTeacherProfile,
         getAttendanceOverview,
         rooms, getRooms, createRoom, updateRoom, deleteRoom,
-        getGroupDetails, updateGroupDiscount, getGroupAttendanceGrid, setLessonAttendance,
+        getGroupDetails, updateGroupDiscount, getGroupAttendanceGrid,
         getGroupMaterials, addGroupMaterial, deleteGroupMaterial,
         getGroupComments, addGroupComment, deleteGroupComment,
         getExtraLessons, createExtraLesson, deleteExtraLesson,

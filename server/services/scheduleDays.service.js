@@ -65,3 +65,36 @@ export const getNextLessonDate = (group, from = new Date()) => {
     }
     return null
 }
+
+// the earliest group time this teacher is actually scheduled to teach on `date` - used to judge
+// whether their check-in was "on time" or "late". Only counts groups whose active window
+// (startDate..endDate) actually covers `date` and whose schedule includes that weekday; a group
+// with no lesson today just doesn't factor in. Returns null if the teacher has no lesson that day
+// at all (nothing to be "late" for).
+export const earliestLessonTimeOnDate = (groups, date) => {
+    const dow = date.getUTCDay()
+    const dateOnly = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+    let earliest = null
+    for (const g of groups) {
+        if (g.status !== 'active' || !g.time) continue
+        if (!getScheduleDays(g).includes(dow)) continue
+        const start = new Date(g.startDate)
+        const startUTC = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()))
+        if (dateOnly < startUTC) continue
+        if (g.endDate) {
+            const end = new Date(g.endDate)
+            const endUTC = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()))
+            if (dateOnly > endUTC) continue
+        }
+        if (earliest === null || timeToMinutes(g.time) < timeToMinutes(earliest)) earliest = g.time
+    }
+    return earliest
+}
+
+// true only if the teacher actually had a lesson that day AND checked in after it started -
+// no lesson scheduled that day means "late" isn't a meaningful judgment, so this returns false
+export const isLateCheckIn = (scannedAt, firstLessonTime) => {
+    if (!scannedAt || !firstLessonTime) return false
+    const scannedMinutes = scannedAt.getUTCHours() * 60 + scannedAt.getUTCMinutes()
+    return scannedMinutes > timeToMinutes(firstLessonTime)
+}

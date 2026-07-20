@@ -368,6 +368,19 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    const prepaySalary = async (branchId, teacherId, amount, dateFrom, dateTo, method) => {
+        try {
+            await axios.post(backendUrl + '/api/director/salary/prepay', { branchId, teacherId, amount, dateFrom, dateTo, method }, authHeader)
+            toast.success(t('prepaymentRecorded'))
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            if (code === 'salary_already_paid') toast.error(t('salaryAlreadyPaidError'))
+            else toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError') : (code || t('couldNotPrepaySalary')))
+            return false
+        }
+    }
+
     const getLanguages = async () => {
         try {
             const { data } = await axios.get(backendUrl + '/api/director/languages', authHeader)
@@ -741,7 +754,7 @@ const DirectorContextProvider = (props) => {
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,
         getFinanceOverview, getPaymentDetail, getBusinessLedger,
-        payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary,
+        payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, prepaySalary,
         backendUrl,
         getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage,
         fillVocabWordBank, fillGrammarBank, fillReadingBank,

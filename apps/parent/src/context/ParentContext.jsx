@@ -2,6 +2,7 @@ import { createContext, useEffect, useState } from "react"
 import axios from 'axios'
 import { toast } from 'react-toastify'
 import { confirm } from '../lib/confirm.js'
+import { pushSupported, subscribeToPush, getExistingPushSubscription } from '../lib/push.js'
 
 export const ParentContext = createContext()
 
@@ -116,14 +117,49 @@ const ParentContextProvider = (props) => {
         }
     }
 
+    // registers this device's Web Push subscription against the parent's own account - the
+    // browser-side subscribe/unsubscribe mechanics live in lib/push.js, this just tells the backend
+    // about whatever subscription (or removal) already happened locally
+    const registerPushSubscription = async (subscription) => {
+        try {
+            await axios.post(backendUrl + '/api/parent/push/subscribe', subscription, authHeader)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not enable notifications')
+            return false
+        }
+    }
+
+    const unregisterPushSubscription = async (endpoint) => {
+        try {
+            await axios.post(backendUrl + '/api/parent/push/unsubscribe', { endpoint }, authHeader)
+            return true
+        } catch (error) {
+            return false
+        }
+    }
+
+    // notifications default to ON - the moment a parent logs in, silently try to subscribe this
+    // device to push (no button to find/tap first). Still just a browser permission prompt under
+    // the hood - if they dismiss/deny it, nothing breaks, they just don't get pushes on this
+    // device (Profile still has the manual toggle for exactly that case, or a different browser).
+    const autoEnablePush = async () => {
+        if (!pushSupported()) return
+        const already = await getExistingPushSubscription()
+        if (already) { registerPushSubscription(already); return }
+        const subscription = await subscribeToPush()
+        if (subscription) registerPushSubscription(subscription)
+    }
+
     const value = {
         token, login, logout,
         me, children, getMe, selectedChildId, setSelectedChildId,
         getChildAttendance, getChildProgress, getChildPayments, getChildExtraLessons,
+        registerPushSubscription, unregisterPushSubscription,
     }
 
     useEffect(() => {
-        if (token) getMe()
+        if (token) { getMe(); autoEnablePush() }
     }, [token])
 
     return (

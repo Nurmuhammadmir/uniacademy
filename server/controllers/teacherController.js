@@ -11,9 +11,18 @@ import TeacherAttendance from "../models/TeacherAttendance.js"
 import TeacherAttendanceQR from "../models/TeacherAttendanceQR.js"
 import Lesson from "../models/Lesson.js"
 import LessonAttendance from "../models/LessonAttendance.js"
+import VocabExercise from "../models/VocabExercise.js"
+import GrammarExercise from "../models/GrammarExercise.js"
+import ReadingText from "../models/ReadingText.js"
+import ReadingExercise from "../models/ReadingExercise.js"
+import Curriculum from "../models/Curriculum.js"
+import Concept from "../models/Concept.js" // required so mongoose can resolve populate('conceptId'/'options'/'correct') refs below
+import WordForm from "../models/WordForm.js"
+import Translation from "../models/Translation.js"
 import { computeDayCounter } from "../services/dayCounter.service.js"
 import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
-import { getNextLessonDate, timeToMinutes } from "../services/scheduleDays.service.js"
+import { getNextLessonDate, timeToMinutes, earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
+import { computeEffectiveLessonStatuses } from "../services/lessonStatus.service.js"
 
 export const getMyGroups = async (req, res) => {
     try {
@@ -110,7 +119,91 @@ export const getGroupStudents = async (req, res) => {
             }
         })
 
-        res.json({ students })
+        // "what will my students actually be asked to do today" - the group's current day (e.g.
+        // 4/30) plus whether each of the 3 sections actually has content assigned for that day in
+        // the curriculum (a day can legitimately be missing one, e.g. no reading text yet), so the
+        // teacher sees the same shape of homework her students see on their own Today page, without
+        // having to go check a student's phone
+        const level = await Level.findById(group.levelId).select('durationDays')
+        const durationDays = level?.durationDays || 30
+        const dayCounter = computeDayCounter(group.startDate, durationDays)
+        const [vocabCount, grammarCount, readingText] = await Promise.all([
+            VocabExercise.countDocuments({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }),
+            GrammarExercise.countDocuments({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }),
+            ReadingText.exists({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }),
+        ])
+
+        res.json({
+            students,
+            today: {
+                dayCounter, durationDays,
+                vocab: vocabCount > 0, grammar: grammarCount > 0, reading: !!readingText,
+            },
+        })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// the actual real content behind today's homework for this group - not just "is there content"
+// (getGroupStudents' `today` flags already cover that), the real vocab/grammar/reading questions
+// themselves, so a teacher can see and try exactly what her students will see, before class. Purely
+// read-only: no StudentProgress row is ever touched here, nothing about this is graded or saved -
+// this mirrors studentController.getHomeworkForDay's content-loading half, just without any of the
+// day-locked/expired gating or progress-row bookkeeping a real student submission needs.
+export const getTodayHomework = async (req, res) => {
+    try {
+        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId, status: 'active' })
+        if (!group) return res.status(404).json({ error: 'not_found' })
+
+        const level = await Level.findById(group.levelId).select('durationDays')
+        const durationDays = level?.durationDays || 30
+        const dayCounter = computeDayCounter(group.startDate, durationDays)
+
+        const curriculum = await Curriculum.findOne({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }).populate('conceptIds')
+        const vocab = await VocabExercise.find({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
+            .populate('conceptId').populate('options').populate('correct')
+        const grammar = await GrammarExercise.find({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
+        const readingText = await ReadingText.findOne({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
+        const readingExercises = readingText ? await ReadingExercise.find({ readingTextId: readingText._id }) : []
+
+        // same word/translation enrichment studentController.getHomeworkForDay does, so a vocab
+        // prompt here renders identically to what the student actually sees on their own phone
+        const conceptIds = new Set()
+        ;(curriculum?.conceptIds || []).forEach(c => conceptIds.add(String(c._id)))
+        vocab.forEach(v => {
+            if (v.conceptId) conceptIds.add(String(v.conceptId._id))
+            ;(v.options || []).forEach(o => conceptIds.add(String(o._id)))
+            if (v.correct) conceptIds.add(String(v.correct._id))
+        })
+        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: group.languageId })
+        const wordFormByConceptId = Object.fromEntries(wordForms.map(w => [String(w.conceptId), w]))
+        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } })
+        const translationsByConceptId = {}
+        translations.forEach(t => {
+            const key = String(t.conceptId)
+            if (!translationsByConceptId[key]) translationsByConceptId[key] = {}
+            translationsByConceptId[key][t.nativeLanguageCode] = t.text
+        })
+        const withWord = (concept) => {
+            if (!concept) return concept
+            const obj = concept.toObject ? concept.toObject() : concept
+            const wf = wordFormByConceptId[String(obj._id)]
+            const tr = translationsByConceptId[String(obj._id)] || {}
+            return { ...obj, word: wf?.word || '', example: wf?.example || '', translations: { ru: tr.ru || '', uz: tr.uz || '', kaa: tr.kaa || '' } }
+        }
+        const enrichedVocab = vocab.map(v => ({
+            ...v.toObject(),
+            conceptId: withWord(v.conceptId),
+            options: (v.options || []).map(withWord),
+            correct: withWord(v.correct),
+        }))
+
+        res.json({
+            dayCounter, durationDays,
+            vocab: enrichedVocab, grammar, readingText, readingExercises,
+        })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -228,11 +321,24 @@ export const getMe = async (req, res) => {
         const uniqueStudentIds = new Set()
         activeGroups.forEach(g => g.studentIds.forEach(id => uniqueStudentIds.add(String(id))))
 
+        // today's own check-in status + whether it was on time against her own earliest lesson
+        // today - same judgment admin/director see, just from the teacher's own side
+        const startOfDay = new Date(); startOfDay.setUTCHours(0, 0, 0, 0)
+        const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
+        const todayCheckIn = await TeacherAttendance.findOne({ teacherId: teacher._id, date: { $gte: startOfDay, $lt: endOfDay } })
+        const firstLessonTime = earliestLessonTimeOnDate(activeGroups, startOfDay)
+
         res.json({
             teacher,
             employedSince: teacher.createdAt,
             activeGroupsCount: activeGroups.length,
             totalStudents: uniqueStudentIds.size,
+            todayAttendance: {
+                checkedIn: !!todayCheckIn,
+                scannedAt: todayCheckIn?.scannedAt || null,
+                firstLessonTime,
+                late: isLateCheckIn(todayCheckIn?.scannedAt || null, firstLessonTime),
+            },
         })
     } catch (error) {
         console.log(error)
@@ -265,19 +371,6 @@ export const scanOwnAttendance = async (req, res) => {
             throw createError
         }
 
-        // scanning in for the day defaults every one of today's real lessons (across this
-        // teacher's active groups) to "conducted" - saves having to manually confirm each one
-        // individually; still fully overridable afterward (not_conducted/substituted/unmarked) via
-        // the same Lesson Detail popup admin/teacher already use for exceptions
-        const activeGroups = await Group.find({ teacherId: req.auth.userId, status: 'active' })
-        for (const group of activeGroups) {
-            await ensureLessonsGenerated(group, today, today)
-        }
-        await Lesson.updateMany(
-            { groupId: { $in: activeGroups.map(g => g._id) }, date: today, teacherStatus: 'unmarked' },
-            { teacherStatus: 'conducted' },
-        )
-
         res.status(201).json({ alreadyMarked: false })
     } catch (error) {
         console.log(error)
@@ -303,13 +396,15 @@ export const getMyAttendanceGrid = async (req, res) => {
         const groups = []
         for (const group of groupDocs) {
             const lessons = await ensureLessonsGenerated(group, rangeStart, rangeEnd)
+            const statusByLessonId = await computeEffectiveLessonStatuses(lessons)
             const lessonRows = lessons.map(l => {
                 total++
-                if (l.teacherStatus === 'conducted' || l.teacherStatus === 'substituted') conducted++
+                const teacherStatus = statusByLessonId[String(l._id)]
+                if (teacherStatus === 'conducted' || teacherStatus === 'substituted') conducted++
                 return {
                     lessonId: l._id, date: l.date.toISOString().slice(0, 10),
                     dayOfWeek: l.date.getUTCDay(), startTime: l.startTime, endTime: l.endTime,
-                    teacherStatus: l.teacherStatus,
+                    teacherStatus,
                 }
             })
             groups.push({ groupId: group._id, languageName: group.languageId?.name, levelName: group.levelId?.name, lessons: lessonRows })
@@ -342,6 +437,27 @@ export const markStudentAttendance = async (req, res) => {
             )
         } else {
             await Attendance.findOneAndDelete({ studentId, groupId, day: Number(day) })
+        }
+
+        // also keeps the real-calendar LessonAttendance in sync - relative day N of the homework
+        // counter always corresponds to exactly startDate + (N-1) calendar days (see
+        // computeDayCounter), so the matching real Lesson can be resolved directly with no search.
+        // This is what makes manually marking a phone-less student ALSO count toward that lesson
+        // being "conducted" (see lessonStatus.service.js) - not just a QR scan.
+        const dayDate = new Date(group.startDate)
+        dayDate.setUTCDate(dayDate.getUTCDate() + (Number(day) - 1))
+        const dayStart = new Date(Date.UTC(dayDate.getUTCFullYear(), dayDate.getUTCMonth(), dayDate.getUTCDate()))
+        const [lesson] = await ensureLessonsGenerated(group, dayStart, dayStart)
+        if (lesson) {
+            if (present) {
+                await LessonAttendance.findOneAndUpdate(
+                    { lessonId: lesson._id, studentId },
+                    { status: 'present' },
+                    { upsert: true, runValidators: true }
+                )
+            } else {
+                await LessonAttendance.findOneAndDelete({ lessonId: lesson._id, studentId })
+            }
         }
 
         res.json({ present: !!present })

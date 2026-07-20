@@ -11,7 +11,7 @@ const RATE_UNIT_KEYS = {
 const PAYOUT_METHODS = ['cash', 'card', 'click', 'bank_transfer', 'payme', 'apelsin']
 
 const Salary = () => {
-  const { payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, getSalaryDetail, teachers } = useContext(AdminContext)
+  const { payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, prepaySalary, getSalaryDetail, teachers } = useContext(AdminContext)
   const { t } = useLanguage()
   const [expanded, setExpanded] = useState(false)
   // the calculator's period is chosen by calendar month (not an arbitrary day range) - the
@@ -24,6 +24,7 @@ const Salary = () => {
   const [customForm, setCustomForm] = useState({ teacherId: '', rateValue: '', rateType: 'per_student_month' })
   const [results, setResults] = useState(null)
   const [payingRow, setPayingRow] = useState(null)
+  const [payMode, setPayMode] = useState('pay') // 'pay' | 'prepay'
   const [payMethod, setPayMethod] = useState('cash')
   const [paying, setPaying] = useState(false)
   const [detailRow, setDetailRow] = useState(null)
@@ -58,7 +59,8 @@ const Salary = () => {
   const submitPay = async (e) => {
     e.preventDefault()
     setPaying(true)
-    const ok = await paySalary(payingRow.teacherId, payingRow.total, dateFrom, dateTo, payMethod)
+    const action = payMode === 'prepay' ? prepaySalary : paySalary
+    const ok = await action(payingRow.teacherId, payingRow.total, dateFrom, dateTo, payMethod)
     setPaying(false)
     if (ok) { setPayingRow(null); runCalculate() }
   }
@@ -189,7 +191,15 @@ const Salary = () => {
                   {r.paid ? (
                     <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent'>{t('paidBadge')}</span>
                   ) : (
-                    <button onClick={() => { setPayingRow(r); setPayMethod('cash') }} className='px-3 py-1.5 rounded-lg bg-[#F2542D] text-white text-xs font-medium'>{t('payBtn')}</button>
+                    <div className='flex flex-col gap-1.5 items-start'>
+                      <div className='flex gap-2'>
+                        <button onClick={() => { setPayingRow(r); setPayMode('pay'); setPayMethod('cash') }} className='px-3 py-1.5 rounded-lg bg-[#F2542D] text-white text-xs font-medium'>{t('payBtn')}</button>
+                        <button onClick={() => { setPayingRow(r); setPayMode('prepay'); setPayMethod('cash') }} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-ink text-xs font-medium'>{t('prepayBtn')}</button>
+                      </div>
+                      {r.prepayments?.length > 0 && (
+                        <span className='text-xs text-amber-600'>{t('prepaidHint', { amount: formatMoney(r.prepayments.reduce((s, p) => s + p.amount, 0)) })}</span>
+                      )}
+                    </div>
                   )}
                 </td>
                 <td className='px-4 py-4 text-right'>
@@ -218,8 +228,20 @@ const Salary = () => {
       {payingRow && (
         <div className='fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-6' onClick={() => setPayingRow(null)}>
           <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 max-w-sm w-full' onClick={e => e.stopPropagation()}>
-            <p className='font-display text-lg text-ink mb-1'>{t('payBtn')} — {payingRow.name}</p>
+            <p className='font-display text-lg text-ink mb-1'>{t(payMode === 'prepay' ? 'prepayBtn' : 'payBtn')} — {payingRow.name}</p>
             <p className='font-mono text-2xl text-ink mb-4'>{formatMoney(payingRow.total)}</p>
+
+            {payMode === 'pay' && payingRow.prepayments?.length > 0 && (
+              <div className='bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4'>
+                <p className='text-amber-700 text-xs font-medium mb-2'>{t('prepaymentWarningTitle')}</p>
+                {payingRow.prepayments.map((p, i) => (
+                  <p key={i} className='text-amber-700 text-xs'>
+                    {formatMoney(p.amount)} · {new Date(p.date).toLocaleDateString()} · {t('expenseMethod_' + p.method)}
+                  </p>
+                ))}
+              </div>
+            )}
+
             <form onSubmit={submitPay} className='flex flex-col gap-3'>
               <div>
                 <p className='text-xs text-muted mb-1'>{t('expenseMethodLabel')}</p>
@@ -228,7 +250,7 @@ const Salary = () => {
                 </select>
               </div>
               <button type='submit' disabled={paying} className='py-2 rounded-lg bg-[#F2542D] text-white text-sm font-medium disabled:opacity-50'>
-                {paying ? t('payingBtn') : t('payBtn')}
+                {paying ? t('payingBtn') : t(payMode === 'prepay' ? 'prepayBtn' : 'payBtn')}
               </button>
             </form>
           </div>

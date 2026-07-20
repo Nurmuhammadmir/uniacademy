@@ -122,24 +122,10 @@ export const getGroupAttendanceGrid = async (req, res) => {
     }
 }
 
-// cycles/sets one cell - autosaves immediately, no separate save step (per the spec)
-export const setLessonAttendance = async (req, res) => {
-    try {
-        const { lessonId, studentId, status } = req.body
-        if (!['unmarked', 'present', 'absent', 'late', 'excused'].includes(status)) {
-            return res.status(400).json({ error: 'invalid_status' })
-        }
-        const record = await LessonAttendance.findOneAndUpdate(
-            { lessonId, studentId },
-            { status },
-            { upsert: true, new: true, runValidators: true }
-        )
-        res.json({ record })
-    } catch (error) {
-        console.log(error)
-        res.status(500).json({ error: 'server_error' })
-    }
-}
+// NOTE: there is deliberately no admin-facing "set attendance" endpoint anymore - the Davomat
+// grid is read-only for admin/director. Every LessonAttendance row is written exactly once, by
+// the student's own QR scan (see studentController.scanAttendance), so this view can never be
+// biased by an admin or teacher hand-editing someone's attendance.
 
 // ==== Materials ====
 

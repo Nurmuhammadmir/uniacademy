@@ -1,12 +1,37 @@
-import React, { useContext } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import { ParentContext } from '../context/ParentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import FontSizeControl from '../components/FontSizeControl.jsx'
 import InstallAppCard from '../components/InstallAppCard.jsx'
+import { pushSupported, subscribeToPush, getExistingPushSubscription, unsubscribeFromPushLocally } from '../lib/push.js'
 
 const Profile = () => {
-  const { me, logout } = useContext(ParentContext)
+  const { me, logout, registerPushSubscription, unregisterPushSubscription } = useContext(ParentContext)
   const { t, lang, setLang, availableLanguages } = useLanguage()
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [togglingPush, setTogglingPush] = useState(false)
+
+  useEffect(() => {
+    if (pushSupported()) getExistingPushSubscription().then(sub => setPushEnabled(!!sub))
+  }, [])
+
+  const enablePush = async () => {
+    setTogglingPush(true)
+    const subscription = await subscribeToPush()
+    if (subscription) {
+      const ok = await registerPushSubscription(subscription)
+      setPushEnabled(ok)
+    }
+    setTogglingPush(false)
+  }
+
+  const disablePush = async () => {
+    setTogglingPush(true)
+    const subscription = await unsubscribeFromPushLocally()
+    if (subscription) await unregisterPushSubscription(subscription.endpoint)
+    setPushEnabled(false)
+    setTogglingPush(false)
+  }
 
   if (!me) return <div className='px-6 pt-16 text-muted'>{t('loading')}</div>
 
@@ -37,6 +62,24 @@ const Profile = () => {
       <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-4'>
         <FontSizeControl label={t('textSize')} />
       </div>
+
+      {pushSupported() && (
+        <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-4'>
+          <div className='flex justify-between items-center'>
+            <div>
+              <p className='text-ink font-medium mb-1'>{t('notificationsLabel')}</p>
+              <p className='text-muted text-xs'>{t('notificationsHint')}</p>
+            </div>
+            <button
+              onClick={pushEnabled ? disablePush : enablePush}
+              disabled={togglingPush}
+              className={`px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${pushEnabled ? 'bg-hairline text-muted' : 'bg-accent text-white'}`}
+            >
+              {togglingPush ? '…' : pushEnabled ? t('turnOffBtn') : t('turnOnBtn')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <InstallAppCard />
 

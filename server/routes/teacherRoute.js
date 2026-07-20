@@ -1,7 +1,7 @@
 import express from "express"
 import requireRole from "../middleware/auth.js"
 import {
-    getMyGroups, getGroupStudents, getStudentDayDetail,
+    getMyGroups, getGroupStudents, getStudentDayDetail, getTodayHomework,
     createAttendanceSession, getAttendanceForDay, markStudentAttendance,
     scanOwnAttendance, getMe, getMyTimetable, getMyAttendanceGrid,
 } from "../controllers/teacherController.js"
@@ -16,6 +16,7 @@ teacherRouter.post('/attendance/scan-self', scanOwnAttendance)
 
 teacherRouter.get('/my-groups', getMyGroups)
 teacherRouter.get('/my-groups/:id/students', getGroupStudents)
+teacherRouter.get('/my-groups/:id/today-homework', getTodayHomework)
 teacherRouter.get('/my-groups/:id/students/:studentId/days', getStudentDayDetail)
 teacherRouter.post('/my-groups/:id/attendance/session', createAttendanceSession)
 teacherRouter.get('/my-groups/:id/attendance/:day', getAttendanceForDay)

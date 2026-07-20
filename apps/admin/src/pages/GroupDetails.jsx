@@ -5,7 +5,6 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
 import { currentMonthISO } from '../lib/date.js'
 
-const STATUS_CYCLE = ['unmarked', 'present', 'absent', 'late', 'excused']
 const STATUS_STYLE = {
   unmarked: 'bg-bg border border-hairline text-transparent',
   present: 'bg-accent text-white',
@@ -32,7 +31,7 @@ const GroupDetails = () => {
   const navigate = useNavigate()
   const {
     getGroupDetails, updateGroup, deleteGroup, addStudentToGroup, removeStudentFromGroup,
-    getGroupAttendanceGrid, setLessonAttendance,
+    getGroupAttendanceGrid,
     getGroupMaterials, addGroupMaterial, deleteGroupMaterial,
     updateGroupDiscount, getGroupExamsTab,
     getGroupComments, addGroupComment, deleteGroupComment,
@@ -68,19 +67,6 @@ const GroupDetails = () => {
   useEffect(() => { if (tab === 'comments') getGroupComments(groupId).then(setComments) }, [tab, groupId])
 
   if (!group) return <p className='text-muted'>{t('loading')}</p>
-
-  const handleCellClick = async (studentIdx, lessonIdx) => {
-    const student = grid.students[studentIdx]
-    const lesson = grid.lessons[lessonIdx]
-    const current = student.attendance[lessonIdx]
-    const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length]
-    // optimistic update
-    setGrid(g => {
-      const copy = { ...g, students: g.students.map((s, i) => i === studentIdx ? { ...s, attendance: s.attendance.map((a, j) => j === lessonIdx ? next : a) } : s) }
-      return copy
-    })
-    await setLessonAttendance(lesson._id, student.studentId, next)
-  }
 
   const handleDelete = async () => {
     const ok = await deleteGroup(group._id)
@@ -237,6 +223,8 @@ const GroupDetails = () => {
                 <button onClick={openAddExtraLesson} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-xs font-medium whitespace-nowrap'>+ {t('addExtraLessonBtn')}</button>
               </div>
 
+              <p className='text-muted text-xs mb-3'>{t('attendanceReadOnlyHint')}</p>
+
               {!grid ? <p className='text-muted text-sm'>{t('loading')}</p> : (
                 <div className='overflow-x-auto bg-bg-elevated border border-hairline rounded-2xl'>
                   <table className='text-sm border-collapse'>
@@ -257,9 +245,9 @@ const GroupDetails = () => {
                           <td className='sticky left-0 bg-bg-elevated px-3 py-2 text-ink border-b border-hairline whitespace-nowrap'>{s.name}</td>
                           {s.attendance.map((status, li) => (
                             <td key={li} className='px-2 py-2 text-center border-b border-hairline'>
-                              <button onClick={() => handleCellClick(si, li)} className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center mx-auto ${STATUS_STYLE[status]}`}>
+                              <span title={t('attendanceReadOnlyHint')} className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center mx-auto ${STATUS_STYLE[status]}`}>
                                 {STATUS_ICON[status]}
-                              </button>
+                              </span>
                             </td>
                           ))}
                         </tr>

@@ -22,11 +22,14 @@ import Pricing from "../models/Pricing.js"
 import Payment from "../models/Payment.js"
 import Attendance from "../models/Attendance.js"
 import AttendanceSession from "../models/AttendanceSession.js"
+import LessonAttendance from "../models/LessonAttendance.js"
 import { computeDayCounter, isRestDay } from "../services/dayCounter.service.js"
 import { resolveDayStatus } from "../services/homeworkWindow.service.js"
 import { getNextLessonDate } from "../services/scheduleDays.service.js"
 import { handleExamResult } from "../services/examPromotion.service.js"
 import { promoteGroupIfLevelComplete } from "../services/groupPromotion.service.js"
+import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
+import { notifyParentsOfAttendance } from "../services/parentNotifications.service.js"
 
 // a level's homework window is however many days the director set (Level.durationDays), not a
 // fixed 30 - resolved here so every caller below gets a dayCounter capped against the level this
@@ -757,8 +760,26 @@ export const scanAttendance = async (req, res) => {
             return res.status(403).json({ error: 'not_in_this_group' })
         }
 
+        // also marks the REAL calendar lesson for today as 'present' - this is what the admin Group
+        // Details "Davomat" grid actually displays, and a QR scan is now the ONLY way that grid gets
+        // filled in (admin can no longer hand-edit it, see groupDetailsController.js's own comment on
+        // why - the whole point is this can't be biased by someone just clicking a cell). Runs
+        // regardless of whether the old day-counter Attendance row below is new or already existed,
+        // so a re-scan still keeps this in sync.
+        const markRealLessonAttendance = async () => {
+            const todayStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()))
+            const [todayLesson] = await ensureLessonsGenerated(group, todayStart, todayStart)
+            if (!todayLesson) return
+            await LessonAttendance.findOneAndUpdate(
+                { lessonId: todayLesson._id, studentId: req.auth.userId },
+                { status: 'present' },
+                { upsert: true, runValidators: true }
+            )
+        }
+
         const existing = await Attendance.findOne({ studentId: req.auth.userId, groupId: group._id, day: session.day })
         if (existing) {
+            await markRealLessonAttendance()
             return res.json({ alreadyMarked: true, day: session.day })
         }
 
@@ -768,10 +789,16 @@ export const scanAttendance = async (req, res) => {
             // duplicate key = another request for the same student+group+day won the race - that's
             // fine, it means they're already checked in, not a real error
             if (createError.code === 11000) {
+                await markRealLessonAttendance()
                 return res.json({ alreadyMarked: true, day: session.day })
             }
             throw createError
         }
+        await markRealLessonAttendance()
+        // real-time push to any linked parent - only on a genuinely NEW check-in, not a re-scan,
+        // so a parent gets exactly one "attended today" notification per real attendance event
+        const student = await User.findById(req.auth.userId).select('name')
+        notifyParentsOfAttendance(req.auth.userId, student?.name || 'Your child')
         res.status(201).json({ alreadyMarked: false, day: session.day })
     } catch (error) {
         console.log(error)

@@ -45,7 +45,10 @@ const StudentProfile = () => {
                   <p className='text-ink text-sm font-medium'>{c.languageId?.name} · {c.levelId?.name}</p>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${c.isActive ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>{c.isActive ? t('active') : t('unpaid')}</span>
                 </div>
-                <p className='text-muted text-xs'>{t('priceBalanceLine', { price: c.price !== null ? formatMoney(c.price) : '—', balance: formatMoney(c.balance) })}</p>
+                <p className='text-muted text-xs'>
+                  {t('priceBalanceLine', { price: c.price !== null ? formatMoney(c.price) : '—' })} ·{' '}
+                  <span className={c.balance > 0 ? 'text-green-600 font-medium' : ''}>{t('courseBalanceLine', { balance: formatMoney(c.balance) })}</span>
+                </p>
                 <p className='text-muted text-xs'>{t('nextDue', { date: c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).toLocaleDateString() : '—' })}</p>
               </div>
             ))}
