@@ -3,6 +3,7 @@ import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
 import AdminProfileModal from '../components/AdminProfileModal.jsx'
+import PasswordInput from '../components/PasswordInput.jsx'
 
 const Admins = () => {
   const { admins, createAdmin, updateAdmin, deleteAdminAccount, branches, getAdminProfile } = useContext(DirectorContext)
@@ -60,12 +61,12 @@ const Admins = () => {
           <tbody>
             {filtered.map(a => (
               <tr key={a._id} className='border-b border-hairline last:border-0'>
-                <td className='px-5 py-3 text-ink'>
+                <td className='px-5 py-4 text-ink'>
                   <button onClick={() => setViewingId(a._id)} className='hover:underline text-left'>{a.name}</button>
                 </td>
-                <td className='px-5 py-3 text-muted font-mono'>{a.phone}</td>
-                <td className='px-5 py-3 text-muted'>{a.branchId?.name}</td>
-                <td className='px-5 py-3 text-right whitespace-nowrap'>
+                <td className='px-5 py-4 text-muted font-mono'>{a.phone}</td>
+                <td className='px-5 py-4 text-muted'>{a.branchId?.name}</td>
+                <td className='px-5 py-4 text-right whitespace-nowrap'>
                   <button onClick={() => openEdit(a)} className='text-accent text-xs font-medium mr-3'>{t('edit')}</button>
                   <button onClick={() => deleteAdminAccount(a._id)} className='text-muted text-xs font-medium'>{t('remove')}</button>
                 </td>
@@ -85,7 +86,7 @@ const Admins = () => {
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <input placeholder={t('adminPhone')} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
-            <input placeholder={t('adminPassword')} type='password' value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+            <PasswordInput placeholder={t('adminPassword')} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <select value={form.branchId} onChange={e => setForm({ ...form, branchId: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required>
               <option value=''>{t('branch')}</option>
@@ -106,7 +107,7 @@ const Admins = () => {
             <select value={editForm.branchId} onChange={e => setEditForm({ ...editForm, branchId: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required>
               {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
             </select>
-            <input placeholder={t('newPasswordLeaveBlank')} type='password' value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })}
+            <PasswordInput placeholder={t('newPasswordLeaveBlank')} value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' />
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('saveChanges')}</button>
           </form>

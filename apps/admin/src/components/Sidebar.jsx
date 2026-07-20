@@ -11,14 +11,17 @@ const Sidebar = () => {
   const links = [
     { to: '/', label: t('navStudents') },
     { to: '/groups', label: t('navGroups') },
-    { to: '/payments', label: t('navPayments') },
+    { to: '/finance', label: t('navFinance') },
+    { to: '/leads', label: t('navLeads') },
     { to: '/teachers', label: t('navTeachers') },
+    { to: '/timetable', label: t('navTimetable') },
+    { to: '/notes', label: t('navNotes') },
     { to: '/profile', label: t('navProfile') },
   ]
 
   return (
     <aside className='w-60 fixed inset-y-0 left-0 bg-bg-elevated border-r border-hairline p-6 flex flex-col'>
-      <div className='mb-8'><Logo size={30} /></div>
+      <div className='mb-8'><Logo size={60} /></div>
       <nav className='flex flex-col gap-1 flex-1'>
         {links.map(link => (
           <NavLink key={link.to} to={link.to} end={link.to === '/'}

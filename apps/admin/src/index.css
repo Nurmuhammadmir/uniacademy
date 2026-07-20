@@ -4,19 +4,111 @@
 html, body, #root { height: 100%; }
 body { @apply bg-bg text-ink font-body; }
 
+/* default accent theme (blue) - src/lib/theme.js overwrites these two custom properties at runtime
+   from the picker on the Profile page and persists the choice to localStorage. Kept here only as
+   the pre-JS/first-paint fallback so tailwind.config.js's accent/accent-soft (which now resolve to
+   var(--accent)/var(--accent-soft)) always have a value even before theme.js's module-load effect runs. */
+:root {
+  --accent: #2F6FED;
+  --accent-soft: #E4ECFD;
+}
+
 /* subtle "raised" 3D depth for buttons and cards across the whole app - buttons lift off the page
-   and press down on tap, cards/panels get a soft ambient shadow instead of sitting flat */
+   and press down on tap, cards/panels get a soft ambient shadow instead of sitting flat. Every
+   button is also pill-shaped (rounded-full) with a gentle scale-up + brightness lift on hover - the
+   `button.rounded-*` selectors below beat a plain Tailwind rounding utility on specificity
+   (element+class always outranks class-alone) so this wins regardless of which rounded-* class a
+   given button already carries in its className, no !important needed. */
 button, [role="button"] {
+  border-radius: 9999px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
-  transition: box-shadow 0.15s ease, transform 0.1s ease;
+  transition: box-shadow 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+}
+button.rounded-none, button.rounded-sm, button.rounded, button.rounded-md, button.rounded-lg, button.rounded-xl, button.rounded-2xl, button.rounded-3xl,
+[role="button"].rounded-none, [role="button"].rounded-sm, [role="button"].rounded, [role="button"].rounded-md, [role="button"].rounded-lg, [role="button"].rounded-xl, [role="button"].rounded-2xl, [role="button"].rounded-3xl {
+  border-radius: 9999px;
+}
+/* Timetable event cards (Timetable.jsx GroupCard) are exempt from the global pill-shaped button
+   rounding above - they need to read as normal moderately-rounded rectangular cards, not capsules.
+   Declared after the global rule (and with !important) so it wins regardless of selector order. */
+button.timetable-card {
+  border-radius: 0.5rem !important;
+}
+button:hover:not(:disabled), [role="button"]:hover:not(:disabled) {
+  transform: scale(1.05);
+  filter: brightness(1.08);
 }
 button:active, [role="button"]:active {
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
-  transform: translateY(1px);
+  transform: translateY(1px) scale(1.03);
 }
 button:disabled {
   box-shadow: none;
 }
+/* opt-out for buttons that exist purely for click-handling on what should visually read as plain
+   text/rows - drag handles, name-toggle wrappers, bare icon glyphs (Leads board: drag handles, the
+   lead-card name/phone/badge toggle, subgroup/column name-edit toggles, lock/delete/auto-intake
+   icons). These have no background of their own to justify the "raised pill button" look above, and
+   a rounded-full shadow silhouette traced around a tall multi-line text block makes its own padding
+   look inconsistent/cramped near the rounded ends even though the padding value itself never changed.
+   Declared after the base rule so it wins the specificity tie (button.plain has the same
+   element+class specificity as button.rounded-*, and source order breaks the tie). */
+button.plain, [role="button"].plain {
+  border-radius: 0;
+  box-shadow: none;
+}
+button.plain:hover, [role="button"].plain:hover {
+  transform: none;
+  filter: none;
+}
+button.plain:active, [role="button"].plain:active {
+  box-shadow: none;
+  transform: none;
+}
 .bg-bg-elevated, .bg-bg-card {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* small visual gap between table rows so each row reads as a distinct block instead of running
+   together (teacher check-ins, payments, students, etc.), while keeping the row divider line visible.
+   `border` applied to a <tr> - the `border-b border-hairline last:border-0` convention every
+   list-style table in this app uses - has NO visual effect once border-collapse is `separate`, which
+   is required for border-spacing to draw the gap at all. So the divider is drawn on each cell's own
+   bottom edge instead (functionally identical line, just anchored one DOM level lower); the existing
+   border-b classes on <tr> become inert but harmless. Tables that opt into Tailwind's
+   `border-collapse` class (Timetable-style grids, GroupDetails' attendance matrix) already draw their
+   borders directly on td/th and stay properly collapsed regardless - that class outranks this plain
+   element selector - so they're unaffected either way. A table with its own inline border-spacing
+   (e.g. a heatmap) is untouched too, since inline styles always beat stylesheet rules. */
+table {
+  border-collapse: separate;
+  border-spacing: 0 2px;
+}
+table td, table th {
+  border-bottom: 1px solid #E9E1D4;
+}
+table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* print-isolation for the Ledger page's reconciliation ("Акт сверки") export - hides the sidebar,
+   nav, filter controls etc. and prints ONLY the `.print-area` content, full width. `.no-print`
+   marks anything inside that area (the filter/scope controls) that still shouldn't print even
+   though it's a sibling, not a descendant, of `.print-area` in the DOM. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
 }

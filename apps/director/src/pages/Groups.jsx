@@ -53,13 +53,13 @@ const Groups = () => {
           <tbody>
             {visibleGroups.map(g => (
               <tr key={g._id} className='border-b border-hairline last:border-0'>
-                <td className='px-5 py-3 text-muted'>{g.branchId?.name}</td>
-                <td className='px-5 py-3 text-ink'>{g.languageId?.name} · {g.levelId?.name}</td>
-                <td className='px-5 py-3 text-muted'>{g.teacherId?.name}</td>
-                <td className='px-5 py-3 text-muted text-xs'>{g.schedulePattern.replaceAll('_', '/')} {g.time}</td>
-                <td className='px-5 py-3 font-mono text-accent'>{g.studentIds.length}/{g.capacity}</td>
-                <td className='px-5 py-3 text-muted text-xs capitalize'>{g.status}</td>
-                <td className='px-5 py-3 text-right'>
+                <td className='px-5 py-4 text-muted'>{g.branchId?.name}</td>
+                <td className='px-5 py-4 text-ink'>{g.languageId?.name} · {g.levelId?.name}</td>
+                <td className='px-5 py-4 text-muted'>{g.teacherId?.name}</td>
+                <td className='px-5 py-4 text-muted text-xs'>{g.schedulePattern.replaceAll('_', '/')} {g.time}{g.roomId?.name ? ` · ${g.roomId.name}` : ''}</td>
+                <td className='px-5 py-4 font-mono text-accent'>{g.studentIds.length}/{g.capacity}</td>
+                <td className='px-5 py-4 text-muted text-xs capitalize'>{g.status}</td>
+                <td className='px-5 py-4 text-right'>
                   <button onClick={() => openEdit(g)} className='text-accent text-xs font-medium'>{t('editLimits')}</button>
                 </td>
               </tr>

@@ -8,7 +8,7 @@ const LanguageContext = createContext()
 // module-level mirror of the active language, kept in sync by the Provider below - lets
 // AdminContextProvider (which sits OUTSIDE LanguageProvider in main.jsx) translate its toast/
 // confirm messages via the standalone t() export without needing the useLanguage() hook
-let currentLang = localStorage.getItem(STORAGE_KEY) || 'en'
+let currentLang = localStorage.getItem(STORAGE_KEY) || 'uz'
 
 export const t = (key, vars) => {
   let str = TRANSLATIONS[currentLang]?.[key] ?? TRANSLATIONS.en[key] ?? key

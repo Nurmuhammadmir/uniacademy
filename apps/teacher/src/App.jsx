@@ -10,6 +10,8 @@ import MyGroups from './pages/MyGroups.jsx'
 import GroupRoster from './pages/GroupRoster.jsx'
 import StudentDetail from './pages/StudentDetail.jsx'
 import Attendance from './pages/Attendance.jsx'
+import MyAttendance from './pages/MyAttendance.jsx'
+import Timetable from './pages/Timetable.jsx'
 import Profile from './pages/Profile.jsx'
 
 const App = () => {
@@ -30,6 +32,8 @@ const App = () => {
             <Route path='/groups/:id' element={<GroupRoster />} />
             <Route path='/groups/:id/students/:studentId' element={<StudentDetail />} />
             <Route path='/groups/:id/attendance' element={<Attendance />} />
+            <Route path='/timetable' element={<Timetable />} />
+            <Route path='/my-attendance' element={<MyAttendance />} />
             <Route path='/profile' element={<Profile />} />
             <Route path='*' element={<Navigate to='/' />} />
           </Routes>

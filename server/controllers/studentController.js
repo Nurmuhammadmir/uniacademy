@@ -24,26 +24,36 @@ import Attendance from "../models/Attendance.js"
 import AttendanceSession from "../models/AttendanceSession.js"
 import { computeDayCounter, isRestDay } from "../services/dayCounter.service.js"
 import { resolveDayStatus } from "../services/homeworkWindow.service.js"
+import { getNextLessonDate } from "../services/scheduleDays.service.js"
 import { handleExamResult } from "../services/examPromotion.service.js"
 import { promoteGroupIfLevelComplete } from "../services/groupPromotion.service.js"
 
 // a level's homework window is however many days the director set (Level.durationDays), not a
 // fixed 30 - resolved here so every caller below gets a dayCounter capped against the level this
 // group actually belongs to
-const getGroupAndSyncWindow = async (studentId) => {
-    let group = await Group.findOne({ studentIds: studentId, status: 'active' })
+// groupId is now required in practice - a student can be in more than one active group at once
+// (even two of the same language), so "the student's active group" is no longer a single well
+// defined thing. Callers that omit groupId fall back to an arbitrary active group, kept only for
+// safety against any not-yet-updated caller, not as a real multi-group strategy.
+const getGroupAndSyncWindow = async (studentId, groupId) => {
+    let group = groupId
+        ? await Group.findOne({ _id: groupId, studentIds: studentId, status: 'active' }).populate('roomId', 'name')
+        : await Group.findOne({ studentIds: studentId, status: 'active' }).populate('roomId', 'name')
     if (!group) return null
 
     const level = await Level.findById(group.levelId).select('durationDays')
     const durationDays = level?.durationDays || 30
     group.dayCounter = computeDayCounter(group.startDate, durationDays)
 
+    const originalLanguageId = group.languageId
     // the whole group moves to the next level together once it finishes this one - independent of
     // any individual exam result (see groupPromotion.service.js) - so re-fetch afterwards in case
-    // this request is what just tipped the group over that line and this student landed elsewhere
+    // this request is what just tipped the group over that line and this student landed elsewhere.
+    // Re-fetched by language (not just "any active group") so a student with several concurrent
+    // languages lands back in the SAME language's replacement group, not a different course entirely.
     await promoteGroupIfLevelComplete(group, durationDays)
     if (group.status !== 'active') {
-        group = await Group.findOne({ studentIds: studentId, status: 'active' })
+        group = await Group.findOne({ studentIds: studentId, languageId: originalLanguageId, status: 'active' }).populate('roomId', 'name')
         if (!group) return null
         const newLevel = await Level.findById(group.levelId).select('durationDays')
         return { group, durationDays: newLevel?.durationDays || 30 }
@@ -64,7 +74,7 @@ const getGroupAndSyncWindow = async (studentId) => {
 
 export const getHomeworkWeek = async (req, res) => {
     try {
-        const result = await getGroupAndSyncWindow(req.auth.userId)
+        const result = await getGroupAndSyncWindow(req.auth.userId, req.query.groupId)
         if (!result) return res.status(404).json({ error: 'no_active_group' })
         const { group, durationDays } = result
 
@@ -91,14 +101,23 @@ export const getHomeworkWeek = async (req, res) => {
         const exam = await Exam.findOne({ levelId: group.levelId })
         const examAttempted = exam ? await ExamAttempt.exists({ studentId: req.auth.userId, examId: exam._id }) : false
 
+        // exam opens 3 days before the level ends, not just on the final day, so a student isn't
+        // forced to sit it the moment their last day of homework begins
+        const examOpensOnDay = Math.max(1, durationDays - 2)
+
+        const nextLessonDate = getNextLessonDate(group)
+        const nextLesson = nextLessonDate ? { date: nextLessonDate, time: group.time, room: group.roomId?.name || null } : null
+
         res.json({
             groupId: group._id,
             groupDayCounter: group.dayCounter,
             durationDays,
             days,
-            examAvailable: group.dayCounter >= durationDays,
+            examAvailable: group.dayCounter >= examOpensOnDay,
+            examOpensOnDay,
             examAttempted: !!examAttempted,
             levelId: group.levelId,
+            nextLesson,
         })
     } catch (error) {
         console.log(error)
@@ -109,7 +128,7 @@ export const getHomeworkWeek = async (req, res) => {
 // api to get one specific day's homework content - day must be inside the open window, or already done
 export const getHomeworkForDay = async (req, res) => {
     try {
-        const result = await getGroupAndSyncWindow(req.auth.userId)
+        const result = await getGroupAndSyncWindow(req.auth.userId, req.query.groupId)
         if (!result) return res.status(404).json({ error: 'no_active_group' })
         const { group } = result
 
@@ -236,9 +255,15 @@ export const submitVocab = async (req, res) => {
 
         const exercises = await VocabExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } })
         let correctCount = 0
+        // the frontend already has these exercises' full populated concept/word data loaded from
+        // when it originally fetched the day's homework, so returning bare ids is enough for it to
+        // cross-reference and show "the correct answer was X" without this route re-resolving words
+        const results = []
         for (const answer of answers) {
             const exercise = exercises.find(e => String(e._id) === String(answer.exerciseId))
-            if (exercise && String(exercise.correct) === String(answer.chosenConceptId)) correctCount++
+            const isCorrect = !!exercise && String(exercise.correct) === String(answer.chosenConceptId)
+            if (isCorrect) correctCount++
+            results.push({ exerciseId: answer.exerciseId, isCorrect, correctConceptId: exercise?.correct || null })
         }
         const score = Math.round((correctCount / (answers.length || 1)) * 100)
 
@@ -246,7 +271,7 @@ export const submitVocab = async (req, res) => {
         row.vocabScore = score
         await maybeMarkDone(row)
 
-        res.json({ score, dayStatus: row.status })
+        res.json({ score, dayStatus: row.status, results })
     } catch (error) {
         if (error.code) return res.status(error.status).json({ error: error.code })
         console.log(error)
@@ -261,16 +286,19 @@ export const submitGrammar = async (req, res) => {
 
         const exercises = await GrammarExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } })
         let correctCount = 0
+        const results = []
         for (const answer of answers) {
             const exercise = exercises.find(e => String(e._id) === String(answer.exerciseId))
-            if (exercise && String(exercise.correct).trim().toLowerCase() === String(answer.answer).trim().toLowerCase()) correctCount++
+            const isCorrect = !!exercise && String(exercise.correct).trim().toLowerCase() === String(answer.answer).trim().toLowerCase()
+            if (isCorrect) correctCount++
+            results.push({ exerciseId: answer.exerciseId, isCorrect, correctAnswer: exercise?.correct ?? null })
         }
         const score = Math.round((correctCount / (answers.length || 1)) * 100)
 
         row.grammarScore = score
         await maybeMarkDone(row)
 
-        res.json({ score, dayStatus: row.status })
+        res.json({ score, dayStatus: row.status, results })
     } catch (error) {
         if (error.code) return res.status(error.status).json({ error: error.code })
         console.log(error)
@@ -285,9 +313,10 @@ export const submitReading = async (req, res) => {
 
         const exercises = await ReadingExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } })
         let correctCount = 0
+        const results = []
         for (const answer of answers) {
             const exercise = exercises.find(e => String(e._id) === String(answer.exerciseId))
-            if (!exercise) continue
+            if (!exercise) { results.push({ exerciseId: answer.exerciseId, isCorrect: false, correctAnswer: null }); continue }
             // scalar answers (true_false as 'true'/'false' strings, short text) compare as
             // normalized strings - JSON.stringify(true) !== JSON.stringify("true"), so a strict
             // JSON comparison would never match a boolean `correct` against a string answer from
@@ -298,13 +327,14 @@ export const submitReading = async (req, res) => {
                 ? JSON.stringify(exercise.correct) === JSON.stringify(answer.answer)
                 : String(exercise.correct).trim().toLowerCase() === String(answer.answer).trim().toLowerCase()
             if (isMatch) correctCount++
+            results.push({ exerciseId: answer.exerciseId, isCorrect: isMatch, correctAnswer: exercise.correct })
         }
         const score = Math.round((correctCount / (answers.length || 1)) * 100)
 
         row.readingScore = score
         await maybeMarkDone(row)
 
-        res.json({ score, dayStatus: row.status })
+        res.json({ score, dayStatus: row.status, results })
     } catch (error) {
         if (error.code) return res.status(error.status).json({ error: error.code })
         console.log(error)
@@ -314,7 +344,7 @@ export const submitReading = async (req, res) => {
 
 export const getProgress = async (req, res) => {
     try {
-        const result = await getGroupAndSyncWindow(req.auth.userId)
+        const result = await getGroupAndSyncWindow(req.auth.userId, req.query.groupId)
         if (!result) return res.status(404).json({ error: 'no_active_group' })
         const { group, durationDays } = result
 
@@ -344,6 +374,26 @@ export const getProgress = async (req, res) => {
     }
 }
 
+// api for the student's own "how many classes have I missed" stat - counts real scanned Attendance
+// rows against how many days have actually elapsed so far in the current group, so a student who
+// hasn't scanned in yet today isn't counted as absent before the day is even over
+export const getAttendanceSummary = async (req, res) => {
+    try {
+        const result = await getGroupAndSyncWindow(req.auth.userId, req.query.groupId)
+        if (!result) return res.status(404).json({ error: 'no_active_group' })
+        const { group } = result
+
+        const daysSoFar = Math.max(0, group.dayCounter - 1)
+        const present = await Attendance.countDocuments({ studentId: req.auth.userId, groupId: group._id, day: { $lte: daysSoFar } })
+        const missed = Math.max(0, daysSoFar - present)
+
+        res.json({ daysSoFar, present, missed })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 // api for the student's own profile screen - now includes course, price, balance, next payment due
 export const getMe = async (req, res) => {
     try {
@@ -354,7 +404,7 @@ export const getMe = async (req, res) => {
         if (!student) return res.status(404).json({ error: 'not_found' })
 
         const courses = await Promise.all(student.courses.map(async (c) => {
-            const pricing = await Pricing.findOne({ languageId: c.languageId._id, levelId: c.levelId._id })
+            const pricing = c.levelId ? await Pricing.findOne({ languageId: c.languageId._id, levelId: c.levelId._id }) : null
             const payments = await Payment.find({ studentId: student._id, languageId: c.languageId._id })
             return {
                 ...c.toObject(),
@@ -370,9 +420,26 @@ export const getMe = async (req, res) => {
     }
 }
 
+// api listing every active group this student currently belongs to - a student can now be in
+// more than one at once (even two of the same language), so the app needs a real switcher instead
+// of assuming a single "the" group
+export const getMyGroups = async (req, res) => {
+    try {
+        const groups = await Group.find({ studentIds: req.auth.userId, status: 'active' })
+            .populate('languageId', 'name')
+            .populate('levelId', 'name durationDays')
+            .populate('teacherId', 'name')
+            .populate('roomId', 'name')
+        res.json({ groups })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 export const getGroupRanking = async (req, res) => {
     try {
-        const result = await getGroupAndSyncWindow(req.auth.userId)
+        const result = await getGroupAndSyncWindow(req.auth.userId, req.query.groupId)
         if (!result) return res.status(404).json({ error: 'no_active_group' })
         const { group } = result
 
@@ -405,7 +472,7 @@ export const getGroupRanking = async (req, res) => {
 // so the student app can show a real roster with daily progress bars, not just a done-only leaderboard
 export const getGroupProgress = async (req, res) => {
     try {
-        const result = await getGroupAndSyncWindow(req.auth.userId)
+        const result = await getGroupAndSyncWindow(req.auth.userId, req.query.groupId)
         if (!result) return res.status(404).json({ error: 'no_active_group' })
         const { group, durationDays } = result
 
@@ -508,6 +575,11 @@ export const getExam = async (req, res) => {
         const level = await Level.findById(req.params.levelId).select('durationDays')
         const durationDays = level?.durationDays || 30
         const dayCounter = computeDayCounter(group.startDate, durationDays)
+
+        // mirrors getHomeworkWeek's examOpensOnDay - without this, a student could hit this route
+        // directly (bypassing the client's day-gated button) and start a real exam session early
+        const examOpensOnDay = Math.max(1, durationDays - 2)
+        if (dayCounter < examOpensOnDay) return res.status(403).json({ error: 'exam_not_open_yet' })
 
         const learnedDays = []
         for (let d = 1; d <= Math.min(dayCounter, durationDays); d++) learnedDays.push(d)

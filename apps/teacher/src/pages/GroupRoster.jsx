@@ -18,7 +18,7 @@ const GroupRoster = () => {
       {!students ? (
         <p className='text-muted'>Loading…</p>
       ) : (
-        <div className='flex flex-col gap-2'>
+        <div className='flex flex-col gap-3'>
           {students.map(s => (
             <button key={s.id} onClick={() => navigate(`/groups/${id}/students/${s.id}`)} className='text-left bg-bg-card border border-hairline rounded-xl p-4'>
               <div className='flex justify-between items-center mb-2'>

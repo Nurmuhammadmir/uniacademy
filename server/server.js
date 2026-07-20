@@ -11,6 +11,8 @@ import directorRouter from './routes/directorRoute.js'
 import adminRouter from './routes/adminRoute.js'
 import teacherRouter from './routes/teacherRoute.js'
 import studentRouter from './routes/studentRoute.js'
+import parentRouter from './routes/parentRoute.js'
+import publicRouter from './routes/publicRoute.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -64,6 +66,8 @@ app.use('/api/director', directorRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/teacher', teacherRouter)
 app.use('/api/student', studentRouter)
+app.use('/api/parent', parentRouter)
+app.use('/api/public', publicRouter)
 
 app.get('/', (req, res) => res.send('uniacademy api working'))
 

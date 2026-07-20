@@ -1,6 +1,7 @@
 import React, { useContext, useState } from 'react'
 import { StudentContext } from '../context/StudentContext.jsx'
 import Logo from '../components/Logo.jsx'
+import PasswordInput from '../components/PasswordInput.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const Login = () => {
@@ -20,7 +21,7 @@ const Login = () => {
   return (
     <div className='min-h-screen flex flex-col justify-center px-6'>
       <div className='flex justify-between items-start mb-1'>
-        <Logo size={40} />
+        <Logo size={80} />
         <select value={lang} onChange={e => setLang(e.target.value)} className='px-2 py-1.5 rounded-lg bg-bg-elevated border border-hairline text-xs text-ink'>
           {availableLanguages.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
         </select>
@@ -30,7 +31,7 @@ const Login = () => {
       <form onSubmit={onSubmit} className='flex flex-col gap-4'>
         <input type='tel' inputMode='tel' placeholder={t('phone')} value={phone} onChange={(e) => setPhone(e.target.value)}
           className='w-full px-4 py-4 rounded-2xl bg-bg-elevated border border-hairline text-ink placeholder:text-muted' required />
-        <input type='password' placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)}
+        <PasswordInput placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)}
           className='w-full px-4 py-4 rounded-2xl bg-bg-elevated border border-hairline text-ink placeholder:text-muted' required />
         <button type='submit' disabled={loading} className='w-full py-4 rounded-2xl bg-accent text-white font-medium text-base disabled:opacity-60'>
           {loading ? t('signingIn') : t('signIn')}

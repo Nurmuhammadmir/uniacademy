@@ -9,6 +9,7 @@ const TeacherContextProvider = (props) => {
     const backendUrl = import.meta.env.VITE_BACKEND_URL
     const [token, setToken] = useState(localStorage.getItem('token') ? localStorage.getItem('token') : false)
     const [groups, setGroups] = useState([])
+    const [nextLesson, setNextLesson] = useState(null)
     const [me, setMe] = useState(false)
 
     const authHeader = { headers: { Authorization: `Bearer ${token}` } }
@@ -25,6 +26,7 @@ const TeacherContextProvider = (props) => {
                     localStorage.removeItem('token')
                     setToken(false)
                     setGroups([])
+                    setNextLesson(null)
                     toast.error('your session has expired - please log in again')
                 }
                 return Promise.reject(error)
@@ -54,12 +56,14 @@ const TeacherContextProvider = (props) => {
         localStorage.removeItem('token')
         setToken(false)
         setGroups([])
+        setNextLesson(null)
     }
 
     const getMyGroups = async () => {
         try {
             const { data } = await axios.get(backendUrl + '/api/teacher/my-groups', authHeader)
             setGroups(data.groups)
+            setNextLesson(data.nextLesson || null)
         } catch (error) {
             toast.error(error.response?.data?.error || 'could not load groups')
         }
@@ -107,6 +111,27 @@ const TeacherContextProvider = (props) => {
         }
     }
 
+    const getMyTimetable = async (date) => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/teacher/timetable' + (date ? `?date=${date}` : ''), authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not load timetable')
+            return null
+        }
+    }
+
+    // teacher's own Davomat-style month grid (tick/cross per day) - their own check-in history
+    const getMyAttendanceGrid = async (month) => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/teacher/attendance-grid' + (month ? `?month=${month}` : ''), authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not load attendance')
+            return null
+        }
+    }
+
     const getMe = async () => {
         try {
             const { data } = await axios.get(backendUrl + '/api/teacher/me', authHeader)
@@ -124,6 +149,7 @@ const TeacherContextProvider = (props) => {
         } catch (error) {
             const code = error.response?.data?.error
             if (code === 'invalid_qr') toast.error("that doesn't look like a valid check-in code")
+            else if (code === 'qr_expired') toast.error("that code just expired - ask the front desk to refresh it")
             else toast.error(code || 'could not check in')
             return { ok: false }
         }
@@ -140,7 +166,7 @@ const TeacherContextProvider = (props) => {
         }
     }
 
-    const value = { token, login, logout, groups, getMyGroups, getGroupStudents, getStudentDayDetail, createAttendanceSession, getAttendanceForDay, me, getMe, scanOwnAttendance, markStudentAttendance }
+    const value = { token, login, logout, groups, nextLesson, getMyGroups, getGroupStudents, getStudentDayDetail, createAttendanceSession, getAttendanceForDay, me, getMe, scanOwnAttendance, markStudentAttendance, getMyTimetable, getMyAttendanceGrid }
 
     useEffect(() => { if (token) { getMyGroups(); getMe() } }, [token])
 

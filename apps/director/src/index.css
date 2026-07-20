@@ -5,18 +5,52 @@ html, body, #root { height: 100%; }
 body { @apply bg-bg text-ink font-body; }
 
 /* subtle "raised" 3D depth for buttons and cards across the whole app - buttons lift off the page
-   and press down on tap, cards/panels get a soft ambient shadow instead of sitting flat */
+   and press down on tap, cards/panels get a soft ambient shadow instead of sitting flat. Every
+   button is also pill-shaped (rounded-full) with a gentle scale-up + brightness lift on hover - the
+   `button.rounded-*` selectors below beat a plain Tailwind rounding utility on specificity
+   (element+class always outranks class-alone) so this wins regardless of which rounded-* class a
+   given button already carries in its className, no !important needed. */
 button, [role="button"] {
+  border-radius: 9999px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
-  transition: box-shadow 0.15s ease, transform 0.1s ease;
+  transition: box-shadow 0.15s ease, transform 0.15s ease, filter 0.15s ease;
+}
+button.rounded-none, button.rounded-sm, button.rounded, button.rounded-md, button.rounded-lg, button.rounded-xl, button.rounded-2xl, button.rounded-3xl,
+[role="button"].rounded-none, [role="button"].rounded-sm, [role="button"].rounded, [role="button"].rounded-md, [role="button"].rounded-lg, [role="button"].rounded-xl, [role="button"].rounded-2xl, [role="button"].rounded-3xl {
+  border-radius: 9999px;
+}
+button:hover:not(:disabled), [role="button"]:hover:not(:disabled) {
+  transform: scale(1.05);
+  filter: brightness(1.08);
 }
 button:active, [role="button"]:active {
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
-  transform: translateY(1px);
+  transform: translateY(1px) scale(1.03);
 }
 button:disabled {
   box-shadow: none;
 }
 .bg-bg-elevated, .bg-bg-card {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* small visual gap between table rows so each row reads as a distinct block instead of running
+   together, while keeping the row divider line visible. `border` applied to a <tr> - the
+   `border-b border-hairline last:border-0` convention every list-style table in this app uses - has
+   NO visual effect once border-collapse is `separate`, which is required for border-spacing to draw
+   the gap at all. So the divider is drawn on each cell's own bottom edge instead (functionally
+   identical line, just anchored one DOM level lower); the existing border-b classes on <tr> become
+   inert but harmless. Tables that opt into Tailwind's `border-collapse` class (Timetable-style grids)
+   already draw their borders directly on td/th and stay properly collapsed regardless - that class
+   outranks this plain element selector - so they're unaffected either way. A table with its own
+   inline border-spacing is untouched too, since inline styles always beat stylesheet rules. */
+table {
+  border-collapse: separate;
+  border-spacing: 0 2px;
+}
+table td, table th {
+  border-bottom: 1px solid #E9E1D4;
+}
+table tbody tr:last-child td {
+  border-bottom: none;
 }

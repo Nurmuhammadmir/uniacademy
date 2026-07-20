@@ -1,0 +1,22 @@
+// Global text-size control. Tailwind's default type scale (text-xs..text-6xl) is defined in rem,
+// which is always relative to the ROOT element's font-size - not to whatever component it's
+// nested inside. So scaling html's font-size scales every rem-based text size everywhere at once
+// with zero changes needed in any component.
+const KEY = 'uniacademy_teacher_fontscale'
+export const MIN_SCALE = 80
+export const MAX_SCALE = 200
+
+export const getFontScale = () => {
+    const stored = Number(localStorage.getItem(KEY))
+    return stored && stored >= MIN_SCALE && stored <= MAX_SCALE ? stored : 100
+}
+
+export const setFontScale = (percent) => {
+    const clamped = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.round(percent)))
+    // !important guards against any stylesheet rule that might otherwise win over a plain inline style
+    document.documentElement.style.setProperty('font-size', `${clamped}%`, 'important')
+    localStorage.setItem(KEY, String(clamped))
+    return clamped
+}
+
+setFontScale(getFontScale())

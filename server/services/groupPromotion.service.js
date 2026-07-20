@@ -12,6 +12,7 @@ import Group from "../models/Group.js"
 import User from "../models/User.js"
 import StudentProgress from "../models/StudentProgress.js"
 import { computeDayCounter, isPastLevelEnd } from "./dayCounter.service.js"
+import { openMembership, closeMembership } from "./groupMembership.service.js"
 
 // only reuses an existing next-level group if it was ALSO created today (i.e. is itself a
 // freshly-promoted cohort, not one that's been running for weeks) AND has room for the whole
@@ -93,6 +94,7 @@ export const promoteGroupIfLevelComplete = async (group, durationDays) => {
                 courseEntry.courseCompleted = true
                 await student.save()
             }
+            await closeMembership(studentId, claimed._id)
         }
         return
     }
@@ -105,6 +107,8 @@ export const promoteGroupIfLevelComplete = async (group, durationDays) => {
         if (!student) continue // don't re-add a deleted user to the new group
 
         nextGroup.studentIds.push(studentId)
+        await closeMembership(studentId, claimed._id)
+        await openMembership(studentId, nextGroup)
 
         const courseEntry = student.courses.find(c => String(c.languageId) === String(claimed.languageId))
         if (courseEntry) {

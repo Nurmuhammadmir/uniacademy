@@ -10,6 +10,7 @@ import Login from './pages/Login.jsx'
 import Overview from './pages/Overview.jsx'
 import Branches from './pages/Branches.jsx'
 import Students from './pages/Students.jsx'
+import StudentProfile from './pages/StudentProfile.jsx'
 import Admins from './pages/Admins.jsx'
 import Teachers from './pages/Teachers.jsx'
 import Pricing from './pages/Pricing.jsx'
@@ -17,7 +18,10 @@ import Attendance from './pages/Attendance.jsx'
 import Courses from './pages/Courses.jsx'
 import Homework from './pages/Homework.jsx'
 import Groups from './pages/Groups.jsx'
+import Timetable from './pages/Timetable.jsx'
 import Settings from './pages/Settings.jsx'
+import Finance from './pages/Finance.jsx'
+import TransactionDetail from './pages/TransactionDetail.jsx'
 
 const App = () => {
   const { token } = useContext(DirectorContext)
@@ -38,6 +42,7 @@ const App = () => {
               <Route path='/' element={<Overview />} />
               <Route path='/branches' element={<Branches />} />
               <Route path='/students' element={<Students />} />
+              <Route path='/students/:id' element={<StudentProfile />} />
               <Route path='/admins' element={<Admins />} />
               <Route path='/teachers' element={<Teachers />} />
               <Route path='/pricing' element={<Pricing />} />
@@ -45,6 +50,9 @@ const App = () => {
               <Route path='/courses' element={<Courses />} />
               <Route path='/homework' element={<Homework />} />
               <Route path='/groups' element={<Groups />} />
+              <Route path='/timetable' element={<Timetable />} />
+              <Route path='/finance' element={<Finance />} />
+              <Route path='/finance/payments/:id' element={<TransactionDetail />} />
               <Route path='/settings' element={<Settings />} />
               <Route path='*' element={<Navigate to='/' />} />
             </Routes>

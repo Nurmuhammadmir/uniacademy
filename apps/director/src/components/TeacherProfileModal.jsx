@@ -33,7 +33,7 @@ const TeacherProfileModal = ({ teacherId, getTeacherProfile, onClose }) => {
 
           <div>
             <p className='text-ink font-medium mb-2'>{t('allGroupsHistory')}</p>
-            <div className='flex flex-col gap-1'>
+            <div className='flex flex-col gap-3'>
               {data.groups.map(g => (
                 <div key={g._id} className='flex justify-between text-sm bg-bg border border-hairline rounded-lg px-3 py-2'>
                   <span className='text-ink'>{g.languageId?.name} · {g.levelId?.name} · {g.schedulePattern.replaceAll('_', '/')} {g.time}</span>

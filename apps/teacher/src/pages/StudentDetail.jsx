@@ -5,6 +5,12 @@ import { TeacherContext } from '../context/TeacherContext.jsx'
 const statusLabel = { done: 'Done', open: 'In progress', expired: 'Missed', locked: 'Not yet' }
 const statusColor = { done: 'text-accent bg-accent-soft', open: 'text-ink bg-hairline', expired: 'text-red-500 bg-red-50', locked: 'text-muted bg-hairline' }
 
+const attendanceLabel = { present: 'Present', absent: 'Absent', late: 'Late', excused: 'Excused', unmarked: 'Not marked' }
+const attendanceColor = {
+  present: 'bg-accent-soft text-accent', absent: 'bg-red-100 text-red-500', late: 'bg-yellow-100 text-yellow-700',
+  excused: 'bg-hairline text-muted', unmarked: 'bg-hairline text-muted',
+}
+
 const StudentDetail = () => {
   const { id: groupId, studentId } = useParams()
   const navigate = useNavigate()
@@ -24,9 +30,19 @@ const StudentDetail = () => {
           <p className='font-display text-2xl text-ink mb-1'>{data.student.name}</p>
           <p className='text-muted text-sm font-mono mb-6'>{data.student.phone}</p>
 
-          <div className='flex flex-col gap-2'>
+          <p className='text-ink font-medium mb-2'>Attendance history</p>
+          <div className='flex flex-wrap gap-1.5 mb-6'>
+            {(data.attendance || []).map((a, i) => (
+              <span key={i} className={`text-xs font-mono px-2 py-1 rounded-lg ${attendanceColor[a.status]}`} title={attendanceLabel[a.status]}>
+                {new Date(a.date).toLocaleDateString()}
+              </span>
+            ))}
+            {(!data.attendance || data.attendance.length === 0) && <p className='text-muted text-sm'>No lessons have happened yet.</p>}
+          </div>
+
+          <div className='flex flex-col gap-3'>
             {data.days.map(row => (
-              <div key={row._id} className='bg-bg-card border border-hairline rounded-xl p-4'>
+              <div key={row.day} className='bg-bg-card border border-hairline rounded-xl p-4'>
                 <div className='flex justify-between items-center mb-2'>
                   <p className='text-ink font-medium'>Day {row.day}</p>
                   <span className={`text-xs font-medium px-2 py-1 rounded-full ${statusColor[row.status] || statusColor.open}`}>
@@ -44,7 +60,7 @@ const StudentDetail = () => {
           </div>
 
           <p className='text-ink font-medium mt-6 mb-2'>Exam results</p>
-          <div className='flex flex-col gap-2'>
+          <div className='flex flex-col gap-3'>
             {data.examAttempts?.map(a => (
               <div key={a._id} className='bg-bg-card border border-hairline rounded-xl p-4 flex justify-between items-center'>
                 <div>

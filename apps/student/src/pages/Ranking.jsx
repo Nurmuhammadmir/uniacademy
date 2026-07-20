@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import GroupSwitcher from '../components/GroupSwitcher.jsx'
 
 const dayScore = (row) => {
   const scores = [row?.vocabScore, row?.grammarScore, row?.readingScore].filter(s => s !== null && s !== undefined)
@@ -9,17 +10,26 @@ const dayScore = (row) => {
 }
 
 const Ranking = () => {
-  const { getGroupRanking, getGroupProgress } = useContext(StudentContext)
+  const { getGroupRanking, getGroupProgress, selectedGroupId } = useContext(StudentContext)
   const { t } = useLanguage()
   const [ranking, setRanking] = useState(false)
   const [groupProgress, setGroupProgress] = useState(false)
 
   useEffect(() => {
+    setRanking(false)
+    setGroupProgress(false)
     getGroupRanking().then(setRanking)
     getGroupProgress().then(setGroupProgress)
-  }, [])
+  }, [selectedGroupId])
 
-  if (!ranking || !groupProgress) return <div className='px-6 pt-16 text-muted'>{t('loading')}</div>
+  if (!ranking || !groupProgress) {
+    return (
+      <div className='px-5 pt-10'>
+        <GroupSwitcher />
+        <p className='text-muted'>{t('loading')}</p>
+      </div>
+    )
+  }
 
   const scoreByStudent = Object.fromEntries(ranking.ranking.map(r => [r.studentId, r.averageScore]))
   const sortedRoster = [...groupProgress.roster].sort((a, b) => (scoreByStudent[b.studentId] ?? -1) - (scoreByStudent[a.studentId] ?? -1))
@@ -27,6 +37,7 @@ const Ranking = () => {
 
   return (
     <div className='px-5 pt-10'>
+      <GroupSwitcher />
       <p className='font-display text-2xl text-ink mb-1'>{t('levelRanking')}</p>
       <p className='text-ink text-sm font-medium mb-1'>
         {groupProgress.group?.language} · {groupProgress.group?.level} · {groupProgress.group?.teacher} · {groupProgress.group?.schedulePattern?.replaceAll('_', '/')} {groupProgress.group?.time}
@@ -34,7 +45,7 @@ const Ranking = () => {
       <p className='text-muted mb-1'>{t('yourRank', { rank: ranking.myRank || '—' })}</p>
       <p className='text-muted text-xs mb-6'>{t('overallAverageNote')}</p>
 
-      <div className='flex flex-col gap-2 mb-8'>
+      <div className='flex flex-col gap-3 mb-8'>
         {sortedRoster.map((student, i) => {
           const isMe = String(student.studentId) === ranking.myId
           const isFirst = i === 0 && scoreByStudent[student.studentId] !== undefined

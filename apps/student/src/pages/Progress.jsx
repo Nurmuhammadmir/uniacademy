@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useRef } from 'react'
 import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import GroupSwitcher from '../components/GroupSwitcher.jsx'
 
 const SkillBar = ({ label, value }) => (
   <div className='mb-4'>
@@ -21,18 +22,25 @@ const dayScore = (row) => {
 }
 
 const Progress = () => {
-  const { progress, getProgress } = useContext(StudentContext)
+  const { progress, getProgress, selectedGroupId } = useContext(StudentContext)
   const { t } = useLanguage()
   const scrollRef = useRef(null)
   const todayRef = useRef(null)
 
-  useEffect(() => { getProgress() }, [])
+  useEffect(() => { getProgress() }, [selectedGroupId])
 
   useEffect(() => {
     if (todayRef.current) todayRef.current.scrollIntoView({ inline: 'center', block: 'nearest' })
   }, [progress])
 
-  if (!progress) return <div className='px-6 pt-16 text-muted'>{t('loading')}</div>
+  if (!progress) {
+    return (
+      <div className='px-5 pt-10'>
+        <GroupSwitcher />
+        <p className='text-muted'>{t('loading')}</p>
+      </div>
+    )
+  }
 
   const rowByDay = Object.fromEntries(progress.days.map(r => [r.day, r]))
   const lastKnownDay = progress.days.length ? Math.max(...progress.days.map(d => d.day)) : 1
@@ -41,6 +49,7 @@ const Progress = () => {
 
   return (
     <div className='px-5 pt-10'>
+      <GroupSwitcher />
       <p className='font-display text-2xl text-ink mb-1'>{t('yourProgress')}</p>
       <p className='text-muted mb-6'>{t('keepStreak')}</p>
 

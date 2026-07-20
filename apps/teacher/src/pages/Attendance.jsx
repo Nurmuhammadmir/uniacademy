@@ -73,7 +73,7 @@ const Attendance = () => {
       </div>
       <p className='text-muted text-xs mb-3'>No phone? Tap a student to mark them present or absent manually.</p>
 
-      <div className='flex flex-col gap-2'>
+      <div className='flex flex-col gap-3'>
         {roster?.roster.map(s => (
           <button
             key={s.studentId}

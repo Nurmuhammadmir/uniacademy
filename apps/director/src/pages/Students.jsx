@@ -1,12 +1,12 @@
 import React, { useContext, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
-import StudentProfileModal from '../components/StudentProfileModal.jsx'
 
 const Students = () => {
-  const { allStudents, getStudentProfile, branches, languages, levels, getLevels } = useContext(DirectorContext)
+  const { allStudents, branches, languages, levels, getLevels } = useContext(DirectorContext)
   const { t } = useLanguage()
-  const [viewingId, setViewingId] = useState(null)
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [branchFilter, setBranchFilter] = useState('')
   const [languageFilter, setLanguageFilter] = useState('')
@@ -65,13 +65,13 @@ const Students = () => {
           <tbody>
             {visibleStudents.map(s => (
               <tr key={s._id} className='border-b border-hairline last:border-0'>
-                <td className='px-5 py-3 text-ink'>
-                  <button onClick={() => setViewingId(s._id)} className='hover:underline text-left'>{s.name}</button>
+                <td className='px-5 py-4 text-ink'>
+                  <button onClick={() => navigate('/students/' + s._id)} className='hover:underline text-left'>{s.name}</button>
                 </td>
-                <td className='px-5 py-3 text-muted font-mono'>{s.phone}</td>
-                <td className='px-5 py-3 text-muted'>{s.branchId?.name}</td>
-                <td className='px-5 py-3 text-muted'>{courseSummary(s)}</td>
-                <td className='px-5 py-3'>
+                <td className='px-5 py-4 text-muted font-mono'>{s.phone}</td>
+                <td className='px-5 py-4 text-muted'>{s.branchId?.name}</td>
+                <td className='px-5 py-4 text-muted'>{courseSummary(s)}</td>
+                <td className='px-5 py-4'>
                   <span className={`px-2 py-1 rounded-full text-xs font-medium ${anyActive(s) ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>
                     {anyActive(s) ? t('active') : t('unpaid')}
                   </span>
@@ -85,9 +85,6 @@ const Students = () => {
         </table>
       </div>
 
-      {viewingId && (
-        <StudentProfileModal studentId={viewingId} getStudentProfile={getStudentProfile} onClose={() => setViewingId(null)} />
-      )}
     </div>
   )
 }

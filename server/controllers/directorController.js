@@ -12,9 +12,18 @@ import Settings from "../models/Settings.js"
 import ExamAttempt from "../models/ExamAttempt.js"
 import Attendance from "../models/Attendance.js"
 import TeacherAttendance from "../models/TeacherAttendance.js"
-import { assertNoTeacherConflict } from "../services/scheduleConflict.service.js"
+import Room from "../models/Room.js"
+import Lesson from "../models/Lesson.js"
+import TeacherPayRate, { PAY_RATE_TYPES } from "../models/TeacherPayRate.js"
+import Expense, { EXPENSE_METHODS } from "../models/Expense.js"
+import { assertNoScheduleConflict } from "../services/scheduleConflict.service.js"
 import { computeDayCounter } from "../services/dayCounter.service.js"
 import { deleteLevelContent } from "../services/contentCascade.service.js"
+import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
+import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
+import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
+import { ensureDefaultCategories } from "../services/expenseCategories.service.js"
+import { computeBusinessLedger } from "../services/businessLedger.service.js"
 
 const startOfThisMonth = () => {
     const d = new Date()
@@ -146,7 +155,7 @@ export const getStudentProfile = async (req, res) => {
         if (!student) return res.status(404).json({ error: 'not_found' })
 
         const coursesWithPrice = await Promise.all(student.courses.map(async (c) => {
-            const pricing = await Pricing.findOne({ languageId: c.languageId._id, levelId: c.levelId._id })
+            const pricing = c.levelId ? await Pricing.findOne({ languageId: c.languageId._id, levelId: c.levelId._id }) : null
             return { ...c.toObject(), price: pricing?.monthlyPrice ?? null }
         }))
 
@@ -162,7 +171,9 @@ export const getStudentProfile = async (req, res) => {
             student,
             courses: coursesWithPrice,
             payments,
-            totalPaid: payments.reduce((sum, p) => sum + p.amount, 0),
+            // net of refunds - refunded:true always means 0, even for legacy rows recorded before
+            // refundedAmount existed (theirs stayed 0 and was never backfilled)
+            totalPaid: payments.reduce((sum, p) => sum + (p.refunded ? 0 : p.amount - (p.refundedAmount || 0)), 0),
             groups,
             examAttempts,
         })
@@ -179,7 +190,11 @@ export const getBranchProfile = async (req, res) => {
         if (!branch) return res.status(404).json({ error: 'not_found' })
 
         const admins = await User.find({ role: 'admin', branchId: branch._id }).select('name phone')
-        const teachers = await User.find({ role: 'teacher', branchId: branch._id }).select('name phone')
+        // a teacher may also teach here via additionalBranchIds even if this isn't their home branch
+        const teachers = await User.find({
+            role: 'teacher',
+            $or: [{ branchId: branch._id }, { additionalBranchIds: branch._id }],
+        }).select('name phone')
         const students = await User.find({ role: 'student', branchId: branch._id }).select('name phone courses')
         const groups = await Group.find({ branchId: branch._id, status: 'active' }).populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name')
 
@@ -270,11 +285,11 @@ export const deleteAdmin = async (req, res) => {
 
 export const createTeacher = async (req, res) => {
     try {
-        const { name, phone, password, branchId } = req.body
+        const { name, phone, password, branchId, additionalBranchIds } = req.body
         const salt = await bcrypt.genSalt(10)
         const passwordHash = await bcrypt.hash(password, salt)
-        const teacher = await User.create({ name, phone, passwordHash, role: 'teacher', branchId })
-        res.status(201).json({ teacher: { id: teacher._id, name: teacher.name, branchId: teacher.branchId } })
+        const teacher = await User.create({ name, phone, passwordHash, role: 'teacher', branchId, additionalBranchIds: additionalBranchIds || [] })
+        res.status(201).json({ teacher: { id: teacher._id, name: teacher.name, branchId: teacher.branchId, additionalBranchIds: teacher.additionalBranchIds } })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -283,7 +298,7 @@ export const createTeacher = async (req, res) => {
 
 export const listTeachers = async (req, res) => {
     try {
-        const teachers = await User.find({ role: 'teacher' }).select('-passwordHash').populate('branchId', 'name')
+        const teachers = await User.find({ role: 'teacher' }).select('-passwordHash').populate('branchId', 'name').populate('additionalBranchIds', 'name')
         const activeGroups = await Group.find({ status: 'active' }).select('teacherId studentIds')
 
         const withStudentCounts = teachers.map(t => {
@@ -328,8 +343,9 @@ export const getTeacherProfile = async (req, res) => {
 
 export const updateTeacher = async (req, res) => {
     try {
-        const { name, phone, branchId, password } = req.body
+        const { name, phone, branchId, password, additionalBranchIds } = req.body
         const update = { name, phone, branchId }
+        if (additionalBranchIds !== undefined) update.additionalBranchIds = additionalBranchIds
         if (password) {
             const salt = await bcrypt.genSalt(10)
             update.passwordHash = await bcrypt.hash(password, salt)
@@ -644,6 +660,7 @@ export const listAllGroups = async (req, res) => {
             .populate('languageId', 'name')
             .populate('levelId', 'name order durationDays')
             .populate('teacherId', 'name')
+            .populate('roomId', 'name')
         const withFreshDay = groups.map(g => ({ ...g.toObject(), dayCounter: computeDayCounter(g.startDate, g.levelId?.durationDays || 30) }))
         res.json({ groups: withFreshDay })
     } catch (error) {
@@ -665,7 +682,10 @@ export const updateGroupLimits = async (req, res) => {
         const nextTime = time || group.time
 
         if (String(nextTeacherId) !== String(group.teacherId) || nextSchedule !== group.schedulePattern || nextTime !== group.time) {
-            await assertNoTeacherConflict(nextTeacherId, nextSchedule, nextTime, group._id)
+            await assertNoScheduleConflict({
+                teacherId: nextTeacherId, schedulePattern: nextSchedule, customDays: group.customDays,
+                time: nextTime, durationMinutes: group.durationMinutes, excludeGroupId: group._id,
+            })
         }
 
         group.teacherId = nextTeacherId
@@ -677,6 +697,190 @@ export const updateGroupLimits = async (req, res) => {
         res.json({ group })
     } catch (error) {
         if (error.code === 'teacher_schedule_conflict') return res.status(409).json({ error: error.code })
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// director's cross-branch timetable view - a specific branchId must be chosen (rooms/lessons are
+// inherently per-branch, there's no single combined "every room across every branch" grid that
+// would make sense to render at once)
+export const getTodayTimetable = async (req, res) => {
+    try {
+        if (!req.query.branchId) return res.status(400).json({ error: 'branch_required' })
+
+        const requestedDate = req.query.date ? new Date(req.query.date) : new Date()
+        const startOfDay = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate()))
+        const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
+
+        const branchGroups = await Group.find({ branchId: req.query.branchId, status: 'active' })
+            .populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name').populate('roomId', 'name')
+        const groupIds = branchGroups.map(g => g._id)
+
+        const lessons = await Lesson.find({ groupId: { $in: groupIds }, date: { $gte: startOfDay, $lt: endOfDay } }).sort({ startTime: 1 })
+        const rows = lessons.map(l => {
+            const group = branchGroups.find(g => String(g._id) === String(l.groupId))
+            return {
+                lessonId: l._id, startTime: l.startTime, endTime: l.endTime,
+                room: group?.roomId?.name || '—', roomId: group?.roomId?._id || null,
+                name: group?.name || null, language: group?.languageId?.name, level: group?.levelId?.name, teacher: group?.teacherId?.name,
+                groupId: group?._id,
+            }
+        })
+
+        const rooms = await Room.find({ branchId: req.query.branchId }).sort({ name: 1 })
+
+        res.json({ date: startOfDay, rooms, lessons: rows })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// ==== Finance / Salary (director) - mirrors adminController's own Finance/Salary endpoints
+// exactly, just scoped to whichever branchId the director has explicitly picked from a switcher
+// instead of req.auth.branchId, since a director isn't tied to a single home branch. Reuses the
+// exact same service functions adminController calls so the numbers can never disagree between
+// the two roles' views of the same branch. ====
+
+export const getFinanceOverview = async (req, res) => {
+    try {
+        if (!req.query.branchId) return res.status(400).json({ error: 'branch_required' })
+        const result = await getFinanceOverviewService(req.query.branchId, req.query)
+        res.json(result)
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const getBusinessLedger = async (req, res) => {
+    try {
+        const { branchId, dateFrom, dateTo } = req.query
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        if (!dateFrom || !dateTo) return res.status(400).json({ error: 'date_range_required' })
+        const result = await computeBusinessLedger(branchId, startOfLocalDay(dateFrom), endOfLocalDay(dateTo))
+        res.json(result)
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const getPaymentDetail = async (req, res) => {
+    try {
+        const payment = await Payment.findById(req.params.id)
+            .populate('studentId', 'name phone branchId')
+            .populate('languageId', 'name')
+            .populate('levelId', 'name')
+            .populate('groupId', 'schedulePattern time')
+            .populate('teacherId', 'name')
+            .populate('adminId', 'name')
+            .populate('refundedBy', 'name')
+        if (!payment) return res.status(404).json({ error: 'not_found' })
+        res.json({ payment })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const listPayRates = async (req, res) => {
+    try {
+        if (!req.query.branchId) return res.status(400).json({ error: 'branch_required' })
+        const rates = await TeacherPayRate.find({ branchId: req.query.branchId }).populate('teacherId', 'name')
+        res.json({ rates })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const setPayRate = async (req, res) => {
+    try {
+        const { branchId, teacherId, rateType, rateValue } = req.body
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        if (!PAY_RATE_TYPES.includes(rateType)) return res.status(400).json({ error: 'invalid_rate_type' })
+
+        const rate = await TeacherPayRate.findOneAndUpdate(
+            { branchId, teacherId: teacherId || null },
+            { rateType, rateValue },
+            { upsert: true, new: true, runValidators: true }
+        )
+        res.status(201).json({ rate })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const deletePayRate = async (req, res) => {
+    try {
+        if (!req.query.branchId) return res.status(400).json({ error: 'branch_required' })
+        await TeacherPayRate.findOneAndDelete({ _id: req.params.id, branchId: req.query.branchId })
+        res.json({ deleted: true })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const calculateSalary = async (req, res) => {
+    try {
+        const { branchId, dateFrom, dateTo } = req.query
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        if (!dateFrom || !dateTo) return res.status(400).json({ error: 'date_range_required' })
+
+        const rates = await TeacherPayRate.find({ branchId })
+        const from = startOfLocalDay(dateFrom)
+        const to = endOfLocalDay(dateTo)
+
+        const results = await calculateSalaries(branchId, rates, from, to)
+        res.json({ results })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const getSalaryDetail = async (req, res) => {
+    try {
+        const { branchId, dateFrom, dateTo } = req.query
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        if (!dateFrom || !dateTo) return res.status(400).json({ error: 'date_range_required' })
+
+        const rates = await TeacherPayRate.find({ branchId })
+        const from = startOfLocalDay(dateFrom)
+        const to = endOfLocalDay(dateTo)
+
+        const detail = await getTeacherSalaryDetail(branchId, req.params.teacherId, rates, from, to)
+        if (!detail) return res.status(404).json({ error: 'not_found' })
+        res.json({ detail })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const paySalary = async (req, res) => {
+    try {
+        const { branchId, teacherId, amount, dateFrom, dateTo, method } = req.body
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        if (!teacherId || !amount) return res.status(400).json({ error: 'missing_fields' })
+        if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
+
+        const teacher = await User.findById(teacherId).select('name')
+        await ensureDefaultCategories(branchId)
+        const expense = await Expense.create({
+            branchId, category: 'Salary', amount, teacherId,
+            name: dateFrom && dateTo ? `Salary for ${dateFrom} — ${dateTo}` : 'Salary payout',
+            recipient: teacher?.name || '', method,
+            date: new Date(),
+            note: dateFrom && dateTo ? `Salary for ${dateFrom} — ${dateTo}` : 'Salary payout',
+            createdBy: req.auth.userId,
+        })
+        res.status(201).json({ expense })
+    } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
     }

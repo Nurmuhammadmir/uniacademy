@@ -14,6 +14,8 @@ export const login = async (req, res) => {
         const match = await bcrypt.compare(password, user.passwordHash)
         if (!match) return res.status(401).json({ error: 'invalid_credentials' })
 
+        if (user.role === 'student' && user.status === 'archived') return res.status(403).json({ error: 'account_archived' })
+
         const token = jwt.sign(
             { userId: user._id, role: user.role, branchId: user.branchId },
             process.env.JWT_SECRET,

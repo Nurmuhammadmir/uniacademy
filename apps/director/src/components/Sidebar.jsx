@@ -18,13 +18,15 @@ const Sidebar = () => {
     { to: '/courses', label: t('navCourses') },
     { to: '/homework', label: t('navHomework') },
     { to: '/attendance', label: t('navAttendance') },
+    { to: '/timetable', label: t('navTimetable') },
+    { to: '/finance', label: t('navFinance') },
     { to: '/pricing', label: t('navPricing') },
     { to: '/settings', label: t('navSettings') },
   ]
 
   return (
     <aside className='w-60 fixed inset-y-0 left-0 bg-bg-elevated border-r border-hairline p-6 flex flex-col'>
-      <div className='mb-1'><Logo size={30} /></div>
+      <div className='mb-1'><Logo size={60} /></div>
       <p className='text-xs mb-8 ml-10' style={{ color: '#C9A15C' }}>{t('directorLabel')}</p>
       <nav className='flex flex-col gap-1 flex-1'>
         {links.map(link => (

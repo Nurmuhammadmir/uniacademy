@@ -3,6 +3,7 @@ import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
 import TeacherProfileModal from '../components/TeacherProfileModal.jsx'
+import PasswordInput from '../components/PasswordInput.jsx'
 
 const Teachers = () => {
   const { teachers, createTeacher, updateTeacher, deleteTeacherAccount, branches, getTeacherProfile } = useContext(DirectorContext)
@@ -13,18 +14,24 @@ const Teachers = () => {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [viewingId, setViewingId] = useState(null)
-  const [form, setForm] = useState({ name: '', phone: '', password: '', branchId: '' })
-  const [editForm, setEditForm] = useState({ name: '', phone: '', branchId: '', password: '' })
+  const [form, setForm] = useState({ name: '', phone: '', password: '', branchId: '', additionalBranchIds: [] })
+  const [editForm, setEditForm] = useState({ name: '', phone: '', branchId: '', password: '', additionalBranchIds: [] })
+
+  const toggleAdditionalBranch = (setter, current, branchId) => {
+    const set = new Set(current)
+    if (set.has(branchId)) set.delete(branchId); else set.add(branchId)
+    setter([...set])
+  }
 
   const submit = async (e) => {
     e.preventDefault()
     const ok = await createTeacher(form)
-    if (ok) { setShowCreate(false); setForm({ name: '', phone: '', password: '', branchId: '' }) }
+    if (ok) { setShowCreate(false); setForm({ name: '', phone: '', password: '', branchId: '', additionalBranchIds: [] }) }
   }
 
   const openEdit = (teacher) => {
     setEditing(teacher)
-    setEditForm({ name: teacher.name, phone: teacher.phone, branchId: teacher.branchId?._id, password: '' })
+    setEditForm({ name: teacher.name, phone: teacher.phone, branchId: teacher.branchId?._id, password: '', additionalBranchIds: (teacher.additionalBranchIds || []).map(b => b._id) })
   }
 
   const submitEdit = async (e) => {
@@ -82,14 +89,14 @@ const Teachers = () => {
           <tbody>
             {visibleTeachers.map(tc => (
               <tr key={tc._id} className='border-b border-hairline last:border-0'>
-                <td className='px-5 py-3 text-ink'>
+                <td className='px-5 py-4 text-ink'>
                   <button onClick={() => setViewingId(tc._id)} className='hover:underline text-left'>{tc.name}</button>
                 </td>
-                <td className='px-5 py-3 text-muted font-mono'>{tc.phone}</td>
-                <td className='px-5 py-3 text-muted'>{tc.branchId?.name}</td>
-                <td className='px-5 py-3 font-mono text-accent'>{tc.activeStudentCount ?? 0}</td>
-                <td className='px-5 py-3 text-muted text-xs'>{new Date(tc.createdAt).toLocaleDateString()}</td>
-                <td className='px-5 py-3 text-right whitespace-nowrap'>
+                <td className='px-5 py-4 text-muted font-mono'>{tc.phone}</td>
+                <td className='px-5 py-4 text-muted'>{tc.branchId?.name}</td>
+                <td className='px-5 py-4 font-mono text-accent'>{tc.activeStudentCount ?? 0}</td>
+                <td className='px-5 py-4 text-muted text-xs'>{new Date(tc.createdAt).toLocaleDateString()}</td>
+                <td className='px-5 py-4 text-right whitespace-nowrap'>
                   <button onClick={() => openEdit(tc)} className='text-accent text-xs font-medium mr-3'>{t('edit')}</button>
                   <button onClick={() => deleteTeacherAccount(tc._id)} className='text-muted text-xs font-medium'>{t('remove')}</button>
                 </td>
@@ -109,12 +116,26 @@ const Teachers = () => {
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <input placeholder={t('teacherPhone')} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
-            <input placeholder={t('teacherPassword')} type='password' value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+            <PasswordInput placeholder={t('teacherPassword')} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <select value={form.branchId} onChange={e => setForm({ ...form, branchId: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required>
               <option value=''>{t('branch')}</option>
               {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
             </select>
+            {form.branchId && branches.length > 1 && (
+              <div>
+                <p className='text-xs text-muted mb-1'>{t('additionalBranchesLabel')}</p>
+                <div className='flex flex-wrap gap-2'>
+                  {branches.filter(b => b._id !== form.branchId).map(b => (
+                    <button type='button' key={b._id}
+                      onClick={() => toggleAdditionalBranch(v => setForm({ ...form, additionalBranchIds: v }), form.additionalBranchIds, b._id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium ${form.additionalBranchIds.includes(b._id) ? 'bg-accent text-white' : 'bg-bg border border-hairline text-muted'}`}>
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('createTeacherBtn')}</button>
           </form>
         </Modal>
@@ -130,7 +151,21 @@ const Teachers = () => {
             <select value={editForm.branchId} onChange={e => setEditForm({ ...editForm, branchId: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required>
               {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
             </select>
-            <input placeholder={t('newPasswordLeaveBlank')} type='password' value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })}
+            {editForm.branchId && branches.length > 1 && (
+              <div>
+                <p className='text-xs text-muted mb-1'>{t('additionalBranchesLabel')}</p>
+                <div className='flex flex-wrap gap-2'>
+                  {branches.filter(b => b._id !== editForm.branchId).map(b => (
+                    <button type='button' key={b._id}
+                      onClick={() => toggleAdditionalBranch(v => setEditForm({ ...editForm, additionalBranchIds: v }), editForm.additionalBranchIds, b._id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium ${editForm.additionalBranchIds.includes(b._id) ? 'bg-accent text-white' : 'bg-bg border border-hairline text-muted'}`}>
+                      {b.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <PasswordInput placeholder={t('newPasswordLeaveBlank')} value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' />
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('saveChanges')}</button>
           </form>

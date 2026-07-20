@@ -9,7 +9,8 @@ import {
     createLanguage, updateLanguage, deleteLanguage,
     createLevel, updateLevel, deleteLevel,
     updateSettings,
-    listAllGroups, updateGroupLimits,
+    listAllGroups, updateGroupLimits, getTodayTimetable,
+    getFinanceOverview, getPaymentDetail, listPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, getBusinessLedger,
 } from "../controllers/directorController.js"
 import { listLanguages, listLevels, listBranches, getSettings } from "../controllers/catalogController.js"
 import {
@@ -62,6 +63,17 @@ directorRouter.get('/groups', listAllGroups)
 directorRouter.put('/groups/:id', updateGroupLimits)
 
 directorRouter.get('/attendance', getAttendanceOverview)
+directorRouter.get('/timetable', getTodayTimetable)
+
+directorRouter.get('/finance', getFinanceOverview)
+directorRouter.get('/business-ledger', getBusinessLedger)
+directorRouter.get('/payments/:id', getPaymentDetail)
+directorRouter.get('/pay-rates', listPayRates)
+directorRouter.post('/pay-rates', setPayRate)
+directorRouter.delete('/pay-rates/:id', deletePayRate)
+directorRouter.get('/salary/calculate', calculateSalary)
+directorRouter.get('/salary/detail/:teacherId', getSalaryDetail)
+directorRouter.post('/salary/pay', paySalary)
 
 directorRouter.get('/stats', getStats)
 directorRouter.get('/map-data', getMapData)

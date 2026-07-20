@@ -5,9 +5,10 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import DayRow from '../components/DayRow.jsx'
 import ExerciseModal from '../components/ExerciseModal.jsx'
 import AttendanceScanner from '../components/AttendanceScanner.jsx'
+import { groupLabel } from '../lib/format.js'
 
 const Today = () => {
-  const { week, getHomeworkWeek, getHomeworkForDay, submitVocab, submitGrammar, submitReading, progress, me } = useContext(StudentContext)
+  const { week, getHomeworkWeek, getHomeworkForDay, submitVocab, submitGrammar, submitReading, progress, me, myGroups, selectedGroupId, setSelectedGroupId } = useContext(StudentContext)
   const { t } = useLanguage()
   const [selectedDay, setSelectedDay] = useState(null)
   const [dayData, setDayData] = useState(false)
@@ -21,6 +22,11 @@ const Today = () => {
     grammar: { label: t('grammar'), icon: '✏️' },
     reading: { label: t('reading'), icon: '📖' },
   }
+
+  // switching groups means "today"/dayCounter belongs to a totally different course now - drop the
+  // previous selection so it re-syncs to the newly selected group's own day instead of showing a
+  // day number left over from whichever group was picked before
+  useEffect(() => { setSelectedDay(null) }, [selectedGroupId])
 
   useEffect(() => {
     if (week && week.days && selectedDay === null && Number.isInteger(week.groupDayCounter)) {
@@ -54,10 +60,36 @@ const Today = () => {
 
   const firstName = me?.student?.name?.split(' ')[0]
 
+  const formatNextLesson = (lesson) => {
+    if (!lesson) return null
+    const date = new Date(lesson.date)
+    const todayUTC = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()))
+    const diffDays = Math.round((date - todayUTC) / 86400000)
+    const dayLabel = diffDays === 0 ? t('todayWord') : diffDays === 1 ? t('tomorrowWord') : date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' })
+    return `${dayLabel}, ${lesson.time}${lesson.room ? ` · ${lesson.room}` : ''}`
+  }
+
+  // a student can be in more than one active group at once - only worth showing a switcher once
+  // there's actually a choice to make
+  const groupSwitcher = myGroups.length > 1 && (
+    <div className='flex gap-2 overflow-x-auto mb-3 pb-1'>
+      {myGroups.map(g => (
+        <button
+          key={g._id}
+          onClick={() => setSelectedGroupId(g._id)}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${g._id === selectedGroupId ? 'bg-accent text-white' : 'bg-bg-card border border-hairline text-muted'}`}
+        >
+          {groupLabel(g)}
+        </button>
+      ))}
+    </div>
+  )
+
   if (!week) {
     return (
       <div className='px-6 pt-16 text-center'>
         {firstName && <p className='text-muted mb-1'>{t('helloName', { name: firstName })}</p>}
+        {groupSwitcher}
         <p className='text-muted'>{t('noActiveGroup')}</p>
         <p className='text-muted text-sm mt-2'>{t('askAdminEnroll')}</p>
       </div>
@@ -68,13 +100,21 @@ const Today = () => {
 
   const examButtonLabel = week.examAttempted ? t('examAlreadyTaken')
     : week.examAvailable ? t('examOpenTapStart')
-    : t('examOpensOnDay', { day: week.durationDays })
+    : t('examOpensOnDay', { day: week.examOpensOnDay })
 
   return (
     <div className='px-5 pt-10'>
       {firstName && <p className='text-muted text-sm mb-1'>{t('helloName', { name: firstName })}</p>}
+      {groupSwitcher}
       <p className='font-display text-2xl text-ink mb-1'>{t('today')}</p>
-      <p className='text-muted text-sm mb-5'>{t('dayOf', { current: week.groupDayCounter, total: week.durationDays })}</p>
+      <p className='text-muted text-sm mb-3'>{t('dayOf', { current: week.groupDayCounter, total: week.durationDays })}</p>
+
+      {week.nextLesson && (
+        <div className='bg-accent-soft rounded-2xl px-4 py-3 mb-4 flex items-center justify-between'>
+          <span className='text-ink text-sm font-medium'>{t('nextLessonLabel')}</span>
+          <span className='text-accent text-sm font-mono'>{formatNextLesson(week.nextLesson)}</span>
+        </div>
+      )}
 
       <DayRow days={week.days} selectedDay={selectedDay} onSelect={setSelectedDay} groupDayCounter={week.groupDayCounter} />
 
@@ -192,7 +232,7 @@ const Today = () => {
           <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 max-w-xs text-center' onClick={e => e.stopPropagation()}>
             <span className='text-4xl mb-3 block'>🎓</span>
             <p className='font-display text-lg text-ink mb-2'>
-              {week.examAttempted ? t('examAlreadyTakenTitle') : t('examOpensOnDayTitle', { day: week.durationDays })}
+              {week.examAttempted ? t('examAlreadyTakenTitle') : t('examOpensOnDayTitle', { day: week.examOpensOnDay })}
             </p>
             <p className='text-muted text-sm mb-4'>
               {week.examAttempted ? t('examRetakeAdmin') : t('examCurrentlyOnDay', { day: week.groupDayCounter, total: week.durationDays })}

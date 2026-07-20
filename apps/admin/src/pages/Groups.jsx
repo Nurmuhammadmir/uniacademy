@@ -1,21 +1,23 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
-import GroupProfileModal from '../components/GroupProfileModal.jsx'
-import StudentProfileModal from '../components/StudentProfileModal.jsx'
 import TeacherProfileModal from '../components/TeacherProfileModal.jsx'
+import { groupLabel } from '../lib/format.js'
 
 const SCHEDULES = ['MON_WED_FRI', 'TUE_THU_SAT']
+const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 const Groups = () => {
   const {
-    groups, getGroups, createGroup, updateGroup, deleteGroup, unarchiveGroup, getGroupProfile,
-    teachers, languages, levels, getLevels,
+    groups, getGroups, createGroup, updateGroup, deleteGroup, unarchiveGroup,
+    teachers, languages, levels, getLevels, rooms,
     students, addStudentToGroup, removeStudentFromGroup, suggestGroup,
-    getStudentProfile, getTeacherProfile,
+    getTeacherProfile,
   } = useContext(AdminContext)
   const { t } = useLanguage()
+  const navigate = useNavigate()
 
   const [statusTab, setStatusTab] = useState('active')
   const [languageTab, setLanguageTab] = useState('all')
@@ -26,11 +28,9 @@ const Groups = () => {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [addingTo, setAddingTo] = useState(null)
-  const [viewingGroupId, setViewingGroupId] = useState(null)
-  const [viewingStudentId, setViewingStudentId] = useState(null)
   const [viewingTeacherId, setViewingTeacherId] = useState(null)
-  const [form, setForm] = useState({ languageId: '', levelId: '', teacherId: '', schedulePattern: SCHEDULES[0], time: '18:00', startDate: '' })
-  const [editForm, setEditForm] = useState({ teacherId: '', schedulePattern: '', time: '', capacity: 20, day: 1 })
+  const [form, setForm] = useState({ name: '', languageId: '', levelId: '', teacherId: '', roomId: '', schedulePattern: SCHEDULES[0], customDays: [], time: '18:00', startDate: '' })
+  const [editForm, setEditForm] = useState({ name: '', teacherId: '', schedulePattern: '', time: '', capacity: 20, day: 1 })
   const [studentId, setStudentId] = useState('')
   const [suggestion, setSuggestion] = useState(null)
 
@@ -54,13 +54,18 @@ const Groups = () => {
 
   const submitCreate = async (e) => {
     e.preventDefault()
-    const ok = await createGroup(form)
-    if (ok) setShowCreate(false)
+    const ok = await createGroup({ ...form, customDays: form.schedulePattern === 'CUSTOM' ? form.customDays : [] })
+    if (ok) {
+      setShowCreate(false)
+      setForm({ name: '', languageId: '', levelId: '', teacherId: '', roomId: '', schedulePattern: SCHEDULES[0], customDays: [], time: '18:00', startDate: '' })
+    }
   }
+
+  const toggleCustomDay = (d) => setForm(f => ({ ...f, customDays: f.customDays.includes(d) ? f.customDays.filter(x => x !== d) : [...f.customDays, d] }))
 
   const openEdit = (group) => {
     setEditing(group)
-    setEditForm({ teacherId: group.teacherId?._id, schedulePattern: group.schedulePattern, time: group.time, capacity: group.capacity, day: group.dayCounter || 1 })
+    setEditForm({ name: group.name || '', teacherId: group.teacherId?._id, schedulePattern: group.schedulePattern, time: group.time, capacity: group.capacity, day: group.dayCounter || 1 })
   }
 
   const submitEdit = async (e) => {
@@ -85,49 +90,54 @@ const Groups = () => {
 
   return (
     <div>
-      <div className='flex justify-between items-center mb-4'>
-        <p className='font-display text-2xl text-ink'>{t('groupsTitle')}</p>
-        <button onClick={() => setShowCreate(true)} className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium'>{t('newGroup')}</button>
-      </div>
+      <div className='sticky top-0 z-20 bg-bg pb-4 mb-2 border-b border-hairline'>
+        <div className='flex justify-between items-center mb-4'>
+          <p className='font-display text-2xl text-ink'>{t('groupsTitle')}</p>
+          <button onClick={() => setShowCreate(true)} className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium'>{t('newGroup')}</button>
+        </div>
 
-      {/* status tabs */}
-      <div className='flex gap-2 mb-4'>
-        {[{ key: 'active', label: t('activeTab') }, { key: 'completed', label: t('completedTab') }, { key: 'archived', label: t('archivedTab') }].map(s => (
-          <button key={s.key} onClick={() => setStatusTab(s.key)} className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize ${statusTab === s.key ? 'bg-accent text-white' : 'bg-bg-elevated border border-hairline text-muted'}`}>{s.label}</button>
-        ))}
-      </div>
+        {/* status tabs */}
+        <div className='flex gap-2 mb-4'>
+          {[{ key: 'active', label: t('activeTab') }, { key: 'completed', label: t('completedTab') }, { key: 'archived', label: t('archivedTab') }].map(s => (
+            <button key={s.key} onClick={() => setStatusTab(s.key)} className={`px-3 py-1.5 rounded-lg text-sm font-medium capitalize ${statusTab === s.key ? 'bg-accent text-white' : 'bg-bg-elevated border border-hairline text-muted'}`}>{s.label}</button>
+          ))}
+        </div>
 
-      {/* language folder tabs */}
-      <div className='flex gap-2 mb-4 flex-wrap'>
-        <button onClick={() => setLanguageTab('all')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${languageTab === 'all' ? 'bg-accent-soft text-accent' : 'bg-bg-elevated border border-hairline text-muted'}`}>{t('allLanguages')}</button>
-        {languageFolders.map(([id, name]) => (
-          <button key={id} onClick={() => setLanguageTab(id)} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${languageTab === id ? 'bg-accent-soft text-accent' : 'bg-bg-elevated border border-hairline text-muted'}`}>{name}</button>
-        ))}
-      </div>
+        {/* language folder tabs */}
+        <div className='flex gap-2 mb-4 flex-wrap'>
+          <button onClick={() => setLanguageTab('all')} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${languageTab === 'all' ? 'bg-accent-soft text-accent' : 'bg-bg-elevated border border-hairline text-muted'}`}>{t('allLanguages')}</button>
+          {languageFolders.map(([id, name]) => (
+            <button key={id} onClick={() => setLanguageTab(id)} className={`px-3 py-1.5 rounded-lg text-sm font-medium ${languageTab === id ? 'bg-accent-soft text-accent' : 'bg-bg-elevated border border-hairline text-muted'}`}>{name}</button>
+          ))}
+        </div>
 
-      {/* filters */}
-      <div className='flex gap-3 mb-6'>
-        <select value={teacherFilter} onChange={e => setTeacherFilter(e.target.value)} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm'>
-          <option value=''>{t('anyTeacher')}</option>
-          {teachers.map(t2 => <option key={t2._id} value={t2._id}>{t2.name}</option>)}
-        </select>
-        <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm'>
-          <option value=''>{t('anyLevel')}</option>
-          {[...new Map(groups.map(g => [g.levelId?._id, g.levelId?.name])).entries()].map(([id, name]) => id && <option key={id} value={id}>{name}</option>)}
-        </select>
-        <input type='time' value={timeFilter} onChange={e => setTimeFilter(e.target.value)} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm' placeholder={t('anyTimeHint')} />
-        {(teacherFilter || levelFilter || timeFilter) && (
-          <button onClick={() => { setTeacherFilter(''); setLevelFilter(''); setTimeFilter('') }} className='text-muted text-sm'>{t('clearFilters')}</button>
-        )}
+        {/* filters */}
+        <div className='flex gap-3'>
+          <select value={teacherFilter} onChange={e => setTeacherFilter(e.target.value)} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm'>
+            <option value=''>{t('anyTeacher')}</option>
+            {teachers.map(t2 => <option key={t2._id} value={t2._id}>{t2.name}</option>)}
+          </select>
+          <select value={levelFilter} onChange={e => setLevelFilter(e.target.value)} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm'>
+            <option value=''>{t('anyLevel')}</option>
+            {[...new Map(groups.map(g => [g.levelId?._id, g.levelId?.name])).entries()].map(([id, name]) => id && <option key={id} value={id}>{name}</option>)}
+          </select>
+          <input type='time' value={timeFilter} onChange={e => setTimeFilter(e.target.value)} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm' placeholder={t('anyTimeHint')} />
+          {(teacherFilter || levelFilter || timeFilter) && (
+            <button onClick={() => { setTeacherFilter(''); setLevelFilter(''); setTimeFilter('') }} className='text-muted text-sm'>{t('clearFilters')}</button>
+          )}
+        </div>
       </div>
 
       <div className='grid grid-cols-2 gap-4'>
         {visibleGroups.map(g => (
           <div key={g._id} className='bg-bg-elevated border border-hairline rounded-2xl p-5'>
             <div className='flex justify-between items-start mb-2'>
-              <button onClick={() => setViewingGroupId(g._id)} className='text-left hover:underline'>
-                <p className='text-ink font-medium'>{g.languageId?.name} · {g.levelId?.name}</p>
-                <p className='text-muted text-sm'>{g.teacherId?.name} · {g.schedulePattern.replaceAll('_', '/')} {g.time}</p>
+              <button onClick={() => navigate('/groups/' + g._id)} className='text-left hover:underline'>
+                <p className='text-ink font-medium'>{groupLabel(g)}</p>
+                <p className='text-muted text-sm'>
+                  {g.name && `${g.languageId?.name} · ${g.levelId?.name} · `}
+                  {g.teacherId?.name} · {g.schedulePattern.replaceAll('_', '/')} {g.time}{g.roomId?.name ? ` · ${g.roomId.name}` : ''}
+                </p>
               </button>
               <span className='font-mono text-xs text-accent bg-accent-soft px-2 py-1 rounded-full'>{t('dayOf', { day: g.dayCounter, total: g.levelId?.durationDays || 30 })}</span>
             </div>
@@ -164,6 +174,8 @@ const Groups = () => {
       {showCreate && (
         <Modal title={t('newGroupModalTitle')} onClose={() => setShowCreate(false)}>
           <form onSubmit={submitCreate} className='flex flex-col gap-3'>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder={t('groupNameLabel')}
+              className='px-4 py-3 rounded-xl bg-bg border border-hairline' />
             <select value={form.languageId} onChange={e => setForm({ ...form, languageId: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required>
               <option value=''>{t('languageLabel')}</option>
               {languages.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
@@ -176,9 +188,24 @@ const Groups = () => {
               <option value=''>{t('teacherLabel')}</option>
               {teachers.map(t2 => <option key={t2._id} value={t2._id}>{t2.name}</option>)}
             </select>
+            <select value={form.roomId} onChange={e => setForm({ ...form, roomId: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required>
+              <option value=''>{t('roomLabel')}</option>
+              {rooms.map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
+            </select>
             <select value={form.schedulePattern} onChange={e => setForm({ ...form, schedulePattern: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline'>
               {SCHEDULES.map(s => <option key={s} value={s}>{s.replaceAll('_', '/')}</option>)}
+              <option value='CUSTOM'>{t('otherDaysTab')}</option>
             </select>
+            {form.schedulePattern === 'CUSTOM' && (
+              <div className='flex gap-1 flex-wrap'>
+                {WEEKDAY_KEYS.map((key, idx) => (
+                  <button type='button' key={key} onClick={() => toggleCustomDay(idx)}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium ${form.customDays.includes(idx) ? 'bg-accent text-white' : 'bg-bg border border-hairline text-muted'}`}>
+                    {t('weekday_' + key)}
+                  </button>
+                ))}
+              </div>
+            )}
             <input type='time' value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <input type='date' value={form.startDate} onChange={e => setForm({ ...form, startDate: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('createGroupBtn')}</button>
@@ -189,6 +216,8 @@ const Groups = () => {
       {editing && (
         <Modal title={t('editGroupModalTitle', { language: editing.languageId?.name, level: editing.levelId?.name })} onClose={() => setEditing(null)}>
           <form onSubmit={submitEdit} className='flex flex-col gap-3'>
+            <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} placeholder={t('groupNameLabel')}
+              className='px-4 py-3 rounded-xl bg-bg border border-hairline' />
             <select value={editForm.teacherId} onChange={e => setEditForm({ ...editForm, teacherId: e.target.value })} className='px-4 py-3 rounded-xl bg-bg border border-hairline' required>
               {teachers.map(t2 => <option key={t2._id} value={t2._id}>{t2.name}</option>)}
             </select>
@@ -219,27 +248,13 @@ const Groups = () => {
               <option value=''>{t('selectStudent')}</option>
               {students
                 .filter(s => s.courses.some(c => c.isActive))
-                .filter(s => !groups.some(g => g.status === 'active' && g.languageId?._id === addingTo.languageId?._id && g.studentIds.includes(s._id)))
+                .filter(s => !addingTo.studentIds.some(id => String(id?._id || id) === String(s._id)))
                 .map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
             </select>
             <p className='text-xs text-muted'>{t('onlyActiveStudentsNote')}</p>
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('addToGroupBtn')}</button>
           </form>
         </Modal>
-      )}
-
-      {viewingGroupId && (
-        <GroupProfileModal
-          groupId={viewingGroupId}
-          getGroupProfile={getGroupProfile}
-          onViewStudent={(id) => { setViewingGroupId(null); setViewingStudentId(id) }}
-          onViewTeacher={(id) => { setViewingGroupId(null); setViewingTeacherId(id) }}
-          onClose={() => setViewingGroupId(null)}
-        />
-      )}
-
-      {viewingStudentId && (
-        <StudentProfileModal studentId={viewingStudentId} getStudentProfile={getStudentProfile} onClose={() => setViewingStudentId(null)} />
       )}
 
       {viewingTeacherId && (

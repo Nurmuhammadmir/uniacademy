@@ -42,6 +42,20 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
     }
   }
 
+  // cross-references the submit response's per-question isCorrect flags against the exercises
+  // already loaded in this modal (which already carry the resolved correct answer/word) rather than
+  // having the backend re-send answer content it knows we already have
+  const mistakes = (result?.results || [])
+    .map((r, i) => ({ r, i, ex: exercises.find(e => String(e._id) === String(r.exerciseId)) }))
+    .filter(({ r, ex }) => !r.isCorrect && ex)
+
+  const formatAnswerValue = (value) => {
+    if (value === null || value === undefined) return ''
+    if (Array.isArray(value)) return value.join(', ')
+    if (typeof value === 'object') return Object.values(value).join(', ')
+    return String(value)
+  }
+
   const allAnswered = exercises.length > 0 && exercises.every(ex => answers[ex._id] !== undefined && answers[ex._id] !== '')
   const estimatedMinutes = Math.max(1, Math.round(exercises.length * 0.6))
   const card = concepts[cardIndex]
@@ -140,10 +154,29 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
         )}
 
         {stage === 'result' && result && (
-          <div className='flex-1 flex flex-col items-center justify-center px-8 text-center'>
+          <div className='flex-1 flex flex-col items-center px-6 pt-8 pb-6 overflow-y-auto'>
             <p className='font-mono text-6xl text-accent mb-3'>{result.score}%</p>
-            <p className='text-ink italic mb-8 max-w-xs'>"{randomQuote()}"</p>
-            <button onClick={() => onClose(true)} className='w-full max-w-xs py-4 rounded-2xl bg-accent text-white font-medium'>
+            <p className='text-ink italic mb-6 max-w-xs text-center'>"{randomQuote()}"</p>
+
+            {mistakes.length > 0 && (
+              <div className='w-full mb-6'>
+                <p className='text-muted text-sm font-medium mb-2'>{t('reviewMistakes')}</p>
+                <div className='flex flex-col gap-2'>
+                  {mistakes.map(({ ex, i }) => {
+                    const vocabPrompt = section === 'vocab' ? buildVocabPrompt(ex, t) : null
+                    const correctText = section === 'vocab' ? ex.correct?.word : formatAnswerValue(ex.correct)
+                    return (
+                      <div key={ex._id} className='bg-bg-card border border-hairline rounded-xl p-3 text-left'>
+                        <p className='text-ink text-sm mb-1'>{vocabPrompt ? vocabPrompt.question : (ex.question || t('matchCorrectWord'))}</p>
+                        <p className='text-accent text-sm font-medium'>{t('correctAnswerWas', { answer: correctText })}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            <button onClick={() => onClose(true)} className='w-full max-w-xs py-4 rounded-2xl bg-accent text-white font-medium mt-auto'>
               {t('backToToday')}
             </button>
           </div>

@@ -20,6 +20,7 @@ const DirectorContextProvider = (props) => {
     const [levels, setLevels] = useState([])
     const [allGroups, setAllGroups] = useState([])
     const [settings, setSettings] = useState(false)
+    const [payRates, setPayRatesState] = useState([])
 
     const authHeader = { headers: { Authorization: `Bearer ${token}` } }
 
@@ -250,6 +251,120 @@ const DirectorContextProvider = (props) => {
             setBranches(data.branches)
         } catch (error) {
             toast.error(error.response?.data?.error || t('couldNotLoadBranches'))
+        }
+    }
+
+    // rooms/lessons are inherently per-branch - a branchId must be chosen, there's no single
+    // combined "every room across every branch" grid that would make sense to render at once
+    const getTimetable = async (branchId, date) => {
+        if (!branchId) return null
+        try {
+            const { data } = await axios.get(backendUrl + `/api/director/timetable?branchId=${branchId}` + (date ? `&date=${date}` : ''), authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadTimetable'))
+            return null
+        }
+    }
+
+    // ==== Finance / Salary (branch explicitly chosen by the caller via the Finance page's branch
+    // switcher - a director has no single home branch, unlike admin) ====
+    const getFinanceOverview = async (branchId, params) => {
+        if (!branchId) return null
+        try {
+            const query = new URLSearchParams({ branchId, ...params }).toString()
+            const { data } = await axios.get(backendUrl + `/api/director/finance?${query}`, authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadFinance'))
+            return null
+        }
+    }
+
+    const getPaymentDetail = async (id) => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/director/payments/' + id, authHeader)
+            return data.payment
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadPayments'))
+            return null
+        }
+    }
+
+    const getBusinessLedger = async (branchId, params) => {
+        if (!branchId) return null
+        try {
+            const query = new URLSearchParams({ branchId, ...params }).toString()
+            const { data } = await axios.get(backendUrl + `/api/director/business-ledger?${query}`, authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadFinance'))
+            return null
+        }
+    }
+
+    const getPayRates = async (branchId) => {
+        if (!branchId) { setPayRatesState([]); return }
+        try {
+            const { data } = await axios.get(backendUrl + `/api/director/pay-rates?branchId=${branchId}`, authHeader)
+            setPayRatesState(data.rates)
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadPayRates'))
+        }
+    }
+
+    const setPayRate = async (branchId, payload) => {
+        try {
+            await axios.post(backendUrl + '/api/director/pay-rates', { branchId, ...payload }, authHeader)
+            toast.success(t('payRateSaved'))
+            getPayRates(branchId)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotSavePayRate'))
+            return false
+        }
+    }
+
+    const deletePayRate = async (branchId, id) => {
+        if (!(await confirm(t('confirmDeletePayRate')))) return
+        try {
+            await axios.delete(backendUrl + `/api/director/pay-rates/${id}?branchId=${branchId}`, authHeader)
+            toast.success(t('payRateDeleted'))
+            getPayRates(branchId)
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeletePayRate'))
+        }
+    }
+
+    const calculateSalary = async (branchId, dateFrom, dateTo) => {
+        try {
+            const { data } = await axios.get(backendUrl + `/api/director/salary/calculate?branchId=${branchId}&dateFrom=${dateFrom}&dateTo=${dateTo}`, authHeader)
+            return data.results
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotCalculateSalary'))
+            return null
+        }
+    }
+
+    const getSalaryDetail = async (branchId, teacherId, dateFrom, dateTo) => {
+        try {
+            const { data } = await axios.get(backendUrl + `/api/director/salary/detail/${teacherId}?branchId=${branchId}&dateFrom=${dateFrom}&dateTo=${dateTo}`, authHeader)
+            return data.detail
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadSalaryDetail'))
+            return null
+        }
+    }
+
+    const paySalary = async (branchId, teacherId, amount, dateFrom, dateTo, method) => {
+        try {
+            await axios.post(backendUrl + '/api/director/salary/pay', { branchId, teacherId, amount, dateFrom, dateTo, method }, authHeader)
+            toast.success(t('salaryPaid'))
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError') : (code || t('couldNotPaySalary')))
+            return false
         }
     }
 
@@ -619,12 +734,14 @@ const DirectorContextProvider = (props) => {
         admins, getAdmins, createAdmin, updateAdmin, deleteAdminAccount, getAdminProfile,
         teachers, getTeachers, createTeacher, updateTeacher, deleteTeacherAccount, getTeacherProfile,
         pricing, getPricing, upsertPricing, deletePricing,
-        branches, getBranches, createBranch, updateBranch, deleteBranch,
+        branches, getBranches, createBranch, updateBranch, deleteBranch, getTimetable,
         languages, getLanguages, createLanguage, updateLanguage, deleteLanguage,
         levels, getLevels, createLevel, updateLevel, deleteLevel,
         getAttendanceOverview,
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,
+        getFinanceOverview, getPaymentDetail, getBusinessLedger,
+        payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary,
         backendUrl,
         getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage,
         fillVocabWordBank, fillGrammarBank, fillReadingBank,

@@ -17,7 +17,9 @@ const requireRole = (...allowedRoles) => {
 
             req.auth = decoded
 
-            if (decoded.role !== 'director') {
+            // parent has no branchId either (same as director) - their routes scope by
+            // childStudentIds membership instead, checked explicitly in parentController.js
+            if (decoded.role !== 'director' && decoded.role !== 'parent') {
                 const requestedBranchId = req.params.branchId || req.body.branchId || req.query.branchId
                 if (requestedBranchId && String(requestedBranchId) !== String(decoded.branchId)) {
                     return res.status(403).json({ error: 'branch_scope_violation' })

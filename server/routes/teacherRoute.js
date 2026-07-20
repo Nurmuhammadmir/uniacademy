@@ -3,13 +3,15 @@ import requireRole from "../middleware/auth.js"
 import {
     getMyGroups, getGroupStudents, getStudentDayDetail,
     createAttendanceSession, getAttendanceForDay, markStudentAttendance,
-    scanOwnAttendance, getMe,
+    scanOwnAttendance, getMe, getMyTimetable, getMyAttendanceGrid,
 } from "../controllers/teacherController.js"
 
 const teacherRouter = express.Router()
 teacherRouter.use(requireRole('teacher'))
 
 teacherRouter.get('/me', getMe)
+teacherRouter.get('/timetable', getMyTimetable)
+teacherRouter.get('/attendance-grid', getMyAttendanceGrid)
 teacherRouter.post('/attendance/scan-self', scanOwnAttendance)
 
 teacherRouter.get('/my-groups', getMyGroups)

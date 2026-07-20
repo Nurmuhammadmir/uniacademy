@@ -5,12 +5,14 @@ import { getSettings } from "../controllers/catalogController.js"
 import {
     getHomeworkWeek, getHomeworkForDay, submitVocab, submitGrammar, submitReading,
     getProgress, getGroupRanking, getGroupProgress, getExam, submitExam, getMe, scanAttendance,
+    getAttendanceSummary, getMyGroups,
 } from "../controllers/studentController.js"
 
 const studentRouter = express.Router()
 studentRouter.use(requireRole('student'))
 
 studentRouter.get('/me', getMe)
+studentRouter.get('/my-groups', getMyGroups)
 studentRouter.get('/settings', getSettings)
 studentRouter.post('/attendance/scan', scanAttendance)
 
@@ -21,6 +23,7 @@ studentRouter.post('/homework/grammar/submit', requireActiveSubscription, submit
 studentRouter.post('/homework/reading/submit', requireActiveSubscription, submitReading)
 
 studentRouter.get('/progress', getProgress)
+studentRouter.get('/attendance-summary', getAttendanceSummary)
 studentRouter.get('/group-ranking', getGroupRanking)
 studentRouter.get('/group-progress', getGroupProgress)
 studentRouter.get('/exam/:levelId', getExam)

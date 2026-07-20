@@ -15,3 +15,7 @@ export const resolveImageUrl = (path, backendUrl) => {
     if (/^https?:\/\//.test(path)) return path
     return `${backendUrl}${path}`
 }
+
+// a group's display label - its admin-given name if one was set, otherwise the language·level
+// composite every group used to be identified by exclusively
+export const groupLabel = (g) => g?.name || `${g?.languageId?.name || ''} · ${g?.levelId?.name || ''}`

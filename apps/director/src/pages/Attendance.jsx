@@ -1,8 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
-
-const todayISO = () => new Date().toISOString().slice(0, 10)
+import { todayISO } from '../lib/date.js'
 
 const Attendance = () => {
   const { getAttendanceOverview, branches } = useContext(DirectorContext)
@@ -40,7 +39,7 @@ const Attendance = () => {
               <p className='text-ink font-medium'>{branchName(branchId)}</p>
               <span className='font-mono text-sm text-accent'>{list.filter(tc => tc.checkedIn).length}/{list.length}</span>
             </div>
-            <div className='flex flex-col gap-1'>
+            <div className='flex flex-col gap-3'>
               {list.map(tc => (
                 <div key={tc.teacherId} className='flex justify-between text-sm'>
                   <span className={tc.checkedIn ? 'text-ink' : 'text-muted'}>{tc.name}</span>
@@ -86,10 +85,10 @@ const Attendance = () => {
           <tbody>
             {data.groups.map(g => (
               <tr key={g.groupId} className='border-b border-hairline last:border-0'>
-                <td className='px-5 py-3 text-muted'>{g.branch}</td>
-                <td className='px-5 py-3 text-ink'>{g.language} · {g.level}</td>
-                <td className='px-5 py-3 text-muted'>{g.teacher}</td>
-                <td className='px-5 py-3 font-mono text-accent'>{g.presentCount}/{g.totalCount}</td>
+                <td className='px-5 py-4 text-muted'>{g.branch}</td>
+                <td className='px-5 py-4 text-ink'>{g.language} · {g.level}</td>
+                <td className='px-5 py-4 text-muted'>{g.teacher}</td>
+                <td className='px-5 py-4 font-mono text-accent'>{g.presentCount}/{g.totalCount}</td>
               </tr>
             ))}
             {data.groups.length === 0 && (

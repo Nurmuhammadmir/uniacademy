@@ -1,9 +1,10 @@
-import React, { useContext } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
 import FontSizeControl from '../components/FontSizeControl.jsx'
 import InstallAppCard from '../components/InstallAppCard.jsx'
+import { groupLabel } from '../lib/format.js'
 
 const CourseCard = ({ course, t }) => {
   const remaining = course.price ? Math.max(0, course.price - course.balance) : null
@@ -29,8 +30,12 @@ const CourseCard = ({ course, t }) => {
 }
 
 const Profile = () => {
-  const { me, logout } = useContext(StudentContext)
+  const { me, logout, getAttendanceSummary, myGroups, selectedGroupId, setSelectedGroupId } = useContext(StudentContext)
   const { t, lang, setLang, availableLanguages } = useLanguage()
+  const [attendance, setAttendance] = useState(null)
+
+  useEffect(() => { getAttendanceSummary().then(setAttendance) }, [selectedGroupId])
+
   if (!me) return <div className='px-6 pt-16 text-muted'>{t('loading')}</div>
 
   const { student, courses } = me
@@ -47,6 +52,28 @@ const Profile = () => {
         <p className='text-muted text-sm font-mono mb-1'>{student.phone}</p>
         <p className='text-muted text-sm'>{student.branchId?.name}</p>
       </div>
+
+      {myGroups.length > 1 && (
+        <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-4'>
+          <p className='text-muted text-xs mb-2'>{t('activeGroupLabel')}</p>
+          <div className='flex flex-wrap gap-2'>
+            {myGroups.map(g => (
+              <button key={g._id} onClick={() => setSelectedGroupId(g._id)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${g._id === selectedGroupId ? 'bg-accent text-white' : 'bg-bg border border-hairline text-ink'}`}>
+                {groupLabel(g)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {attendance && attendance.daysSoFar > 0 && (
+        <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-4'>
+          <p className='text-muted text-xs mb-2'>{t('myAttendance')}</p>
+          <p className='text-ink'>{t('attendedSoFar', { present: attendance.present, total: attendance.daysSoFar })}</p>
+          {attendance.missed > 0 && <p className='text-muted text-xs mt-1'>{t('missedSoFar', { missed: attendance.missed })}</p>}
+        </div>
+      )}
 
       <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-4'>
         <p className='text-muted text-xs mb-2'>{t('language')}</p>

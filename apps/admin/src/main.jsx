@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import AdminContextProvider from './context/AdminContext.jsx'
 import './lib/fontScale.js'
+import './lib/theme.js'
 import './index.css'
 
 // registers the passthrough service worker so the browser considers this app installable

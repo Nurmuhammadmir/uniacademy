@@ -2,6 +2,7 @@ import React, { useContext } from 'react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import FontSizeControl from '../components/FontSizeControl.jsx'
+import ThemeColorControl from '../components/ThemeColorControl.jsx'
 import InstallAppCard from '../components/InstallAppCard.jsx'
 
 const Profile = () => {
@@ -47,6 +48,10 @@ const Profile = () => {
 
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 max-w-md mb-6'>
         <FontSizeControl label={t('textSize')} />
+      </div>
+
+      <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 max-w-md mb-6'>
+        <ThemeColorControl label={t('themeColorLabel')} />
       </div>
 
       <InstallAppCard />
