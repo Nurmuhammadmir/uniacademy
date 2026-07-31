@@ -4,19 +4,28 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { toast } from 'react-toastify'
 import BankFillResult from './BankFillResult.jsx'
 
+// one day's worth: 4 multiple-choice + 3 true/false + 3 gap-fill, in that order - matches the
+// director's spec exactly, and doubles as the template fillGrammarBank actually expects (10
+// exercises consumed per empty day, in the order pasted)
 const JSON_EXAMPLE = `{
   "exercises": [
     { "type": "multiple_choice", "question": "She ___ to school every day.", "options": ["go", "goes", "going", "gone"], "correct": "goes" },
     { "type": "multiple_choice", "question": "They ___ tea every morning.", "options": ["drink", "drinks", "drinking", "drank"], "correct": "drink" },
+    { "type": "multiple_choice", "question": "He ___ football on Sundays.", "options": ["play", "plays", "playing", "played"], "correct": "plays" },
+    { "type": "multiple_choice", "question": "We ___ our homework after dinner.", "options": ["do", "does", "doing", "did"], "correct": "do" },
     { "type": "true_false", "question": "'He don't like coffee' is grammatically correct.", "correct": "false" },
     { "type": "true_false", "question": "'She goes to work by bus' is grammatically correct.", "correct": "true" },
-    { "type": "fill_gap", "question": "They ___ (not/like) tea.", "options": ["doesn't like", "don't like", "not like", "isn't liking"], "correct": "don't like" }
+    { "type": "true_false", "question": "'They plays football' is grammatically correct.", "correct": "false" },
+    { "type": "fill_gap", "question": "They ___ (not/like) tea.", "options": ["doesn't like", "don't like", "not like", "isn't liking"], "correct": "don't like" },
+    { "type": "fill_gap", "question": "She ___ (study) English every day.", "options": ["study", "studies", "studying", "studied"], "correct": "studies" },
+    { "type": "fill_gap", "question": "We ___ (not/go) to school on Sundays.", "options": ["doesn't go", "don't go", "not go", "isn't going"], "correct": "don't go" }
   ]
 }`
 
 // A grammar bank is not tied to any one day - it's an unlimited list of exercises for a whole
 // level. Filling walks the level's days in order, skips any day that already has grammar, and
-// drops 5 exercises into each empty day until either the bank or the empty days run out.
+// drops 10 exercises into each empty day (4 multiple-choice + 3 true/false + 3 gap-fill, if pasted
+// in that order) until either the bank or the empty days run out.
 const GrammarBankModal = ({ languageId, levelId, levelName, onClose, onFilled }) => {
   const { fillGrammarBank } = useContext(DirectorContext)
   const { t } = useLanguage()

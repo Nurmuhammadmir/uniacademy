@@ -23,9 +23,10 @@ import Payment from "../models/Payment.js"
 import Attendance from "../models/Attendance.js"
 import AttendanceSession from "../models/AttendanceSession.js"
 import LessonAttendance from "../models/LessonAttendance.js"
-import { computeDayCounter, isRestDay } from "../services/dayCounter.service.js"
+import { computeDayCounter, isRestDay, isReviewDay, dateOfNthLessonDay } from "../services/dayCounter.service.js"
 import { resolveDayStatus } from "../services/homeworkWindow.service.js"
 import { getNextLessonDate } from "../services/scheduleDays.service.js"
+import { pickReviewExercises } from "../services/reviewHomework.service.js"
 import { handleExamResult } from "../services/examPromotion.service.js"
 import { promoteGroupIfLevelComplete } from "../services/groupPromotion.service.js"
 import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
@@ -44,9 +45,10 @@ const getGroupAndSyncWindow = async (studentId, groupId) => {
         : await Group.findOne({ studentIds: studentId, status: 'active' }).populate('roomId', 'name')
     if (!group) return null
 
-    const level = await Level.findById(group.levelId).select('durationDays')
+    const level = await Level.findById(group.levelId).select('durationDays hasReading')
     const durationDays = level?.durationDays || 30
-    group.dayCounter = computeDayCounter(group.startDate, durationDays)
+    const hasReading = level?.hasReading !== false
+    group.dayCounter = computeDayCounter(group, durationDays)
 
     const originalLanguageId = group.languageId
     // the whole group moves to the next level together once it finishes this one - independent of
@@ -58,8 +60,8 @@ const getGroupAndSyncWindow = async (studentId, groupId) => {
     if (group.status !== 'active') {
         group = await Group.findOne({ studentIds: studentId, languageId: originalLanguageId, status: 'active' }).populate('roomId', 'name')
         if (!group) return null
-        const newLevel = await Level.findById(group.levelId).select('durationDays')
-        return { group, durationDays: newLevel?.durationDays || 30 }
+        const newLevel = await Level.findById(group.levelId).select('durationDays hasReading')
+        return { group, durationDays: newLevel?.durationDays || 30, hasReading: newLevel?.hasReading !== false }
     }
 
     const rows = await StudentProgress.find({ studentId, groupId: group._id })
@@ -72,34 +74,51 @@ const getGroupAndSyncWindow = async (studentId, groupId) => {
         }
     }
 
-    return { group, durationDays }
+    return { group, durationDays, hasReading }
 }
 
 export const getHomeworkWeek = async (req, res) => {
     try {
         const result = await getGroupAndSyncWindow(req.auth.userId, req.query.groupId)
         if (!result) return res.status(404).json({ error: 'no_active_group' })
-        const { group, durationDays } = result
+        const { group, durationDays, hasReading } = result
 
-        const windowStart = Math.max(1, group.dayCounter - 2)
+        // the 3-day sliding window is still counted in LESSON days (RULE #7, homeworkWindow.service.js),
+        // but rendered as real calendar dates so rest days and the Sunday review slot show up
+        // correctly interspersed - a student's "last 3 days" is 3 classes, which usually spans
+        // closer to a week of calendar time on a Tue/Thu/Sat schedule.
+        const windowStartLessonDay = Math.max(1, group.dayCounter - 2)
+        const todayUTC = new Date(); todayUTC.setUTCHours(0, 0, 0, 0)
+        const groupStartUTC = new Date(group.startDate); groupStartUTC.setUTCHours(0, 0, 0, 0)
+        const candidateStart = dateOfNthLessonDay(group, windowStartLessonDay)
+        const windowStartDate = (candidateStart && candidateStart <= todayUTC) ? candidateStart : groupStartUTC
+
         const dayNumbers = []
-        for (let d = windowStart; d <= group.dayCounter; d++) dayNumbers.push(d)
-
+        for (let d = windowStartLessonDay; d <= group.dayCounter; d++) dayNumbers.push(d)
         const rows = await StudentProgress.find({ studentId: req.auth.userId, groupId: group._id, day: { $in: dayNumbers } })
         const rowByDay = Object.fromEntries(rows.map(r => [r.day, r]))
 
-        const days = dayNumbers.map(day => {
-            const row = rowByDay[day]
-            const restDay = isRestDay(group.startDate, day)
-            return {
-                day,
-                restDay,
-                status: restDay ? 'rest' : (row?.status || 'open'),
-                vocabDone: row?.vocabDone || false,
-                grammarDone: row?.grammarScore !== null && row?.grammarScore !== undefined,
-                readingDone: row?.readingScore !== null && row?.readingScore !== undefined,
+        const days = []
+        let lessonCounter = windowStartLessonDay - 1
+        const cursor = new Date(windowStartDate)
+        while (cursor <= todayUTC) {
+            if (isRestDay(group, cursor)) {
+                days.push({ date: new Date(cursor), type: 'rest' })
+            } else if (isReviewDay(group, cursor)) {
+                days.push({ date: new Date(cursor), type: 'review' })
+            } else {
+                lessonCounter++
+                const row = rowByDay[lessonCounter]
+                days.push({
+                    date: new Date(cursor), type: 'lesson', day: lessonCounter,
+                    status: row?.status || 'open',
+                    vocabDone: row?.vocabDone || false,
+                    grammarDone: row?.grammarScore !== null && row?.grammarScore !== undefined,
+                    readingDone: row?.readingScore !== null && row?.readingScore !== undefined,
+                })
             }
-        })
+            cursor.setUTCDate(cursor.getUTCDate() + 1)
+        }
 
         const exam = await Exam.findOne({ levelId: group.levelId })
         const examAttempted = exam ? await ExamAttempt.exists({ studentId: req.auth.userId, examId: exam._id }) : false
@@ -121,6 +140,7 @@ export const getHomeworkWeek = async (req, res) => {
             examAttempted: !!examAttempted,
             levelId: group.levelId,
             nextLesson,
+            hasReading,
         })
     } catch (error) {
         console.log(error)
@@ -152,10 +172,8 @@ export const getHomeworkForDay = async (req, res) => {
             return res.status(403).json({ error: 'day_expired' })
         }
 
-        if (isRestDay(group.startDate, day)) {
-            return res.json({ restDay: true, day, groupId: group._id })
-        }
-
+        // day numbers (1..durationDays) are lesson-content ordinals now, not calendar days - a rest
+        // day never gets one, so every reachable day here always has real curriculum content
         const curriculum = await Curriculum.findOne({ languageId: group.languageId, levelId: group.levelId, day }).populate('conceptIds')
         const vocab = await VocabExercise.find({ languageId: group.languageId, levelId: group.levelId, day })
             .populate('conceptId')
@@ -251,24 +269,43 @@ const maybeMarkDone = async (row) => {
     await row.save()
 }
 
+// shared scoring logic between a real day's vocab submit and the Sunday review's vocab submit -
+// the review is purely supplementary (see reviewHomework.service.js) so it reuses the exact same
+// grading rules without touching any StudentProgress row.
+const scoreVocabAnswers = async (answers) => {
+    const exercises = await VocabExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } })
+    let correctCount = 0
+    // the frontend already has these exercises' full populated concept/word data loaded from
+    // when it originally fetched the homework, so returning bare ids is enough for it to
+    // cross-reference and show "the correct answer was X" without this route re-resolving words
+    const results = []
+    for (const answer of answers) {
+        const exercise = exercises.find(e => String(e._id) === String(answer.exerciseId))
+        const isCorrect = !!exercise && String(exercise.correct) === String(answer.chosenConceptId)
+        if (isCorrect) correctCount++
+        results.push({ exerciseId: answer.exerciseId, isCorrect, correctConceptId: exercise?.correct || null })
+    }
+    return { score: Math.round((correctCount / (answers.length || 1)) * 100), results }
+}
+
+const scoreGrammarAnswers = async (answers) => {
+    const exercises = await GrammarExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } })
+    let correctCount = 0
+    const results = []
+    for (const answer of answers) {
+        const exercise = exercises.find(e => String(e._id) === String(answer.exerciseId))
+        const isCorrect = !!exercise && String(exercise.correct).trim().toLowerCase() === String(answer.answer).trim().toLowerCase()
+        if (isCorrect) correctCount++
+        results.push({ exerciseId: answer.exerciseId, isCorrect, correctAnswer: exercise?.correct ?? null })
+    }
+    return { score: Math.round((correctCount / (answers.length || 1)) * 100), results }
+}
+
 export const submitVocab = async (req, res) => {
     try {
         const { groupId, day, answers } = req.body
         const row = await assertDayIsOpen(req.auth.userId, groupId, day)
-
-        const exercises = await VocabExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } })
-        let correctCount = 0
-        // the frontend already has these exercises' full populated concept/word data loaded from
-        // when it originally fetched the day's homework, so returning bare ids is enough for it to
-        // cross-reference and show "the correct answer was X" without this route re-resolving words
-        const results = []
-        for (const answer of answers) {
-            const exercise = exercises.find(e => String(e._id) === String(answer.exerciseId))
-            const isCorrect = !!exercise && String(exercise.correct) === String(answer.chosenConceptId)
-            if (isCorrect) correctCount++
-            results.push({ exerciseId: answer.exerciseId, isCorrect, correctConceptId: exercise?.correct || null })
-        }
-        const score = Math.round((correctCount / (answers.length || 1)) * 100)
+        const { score, results } = await scoreVocabAnswers(answers)
 
         row.vocabDone = true
         row.vocabScore = score
@@ -286,17 +323,7 @@ export const submitGrammar = async (req, res) => {
     try {
         const { groupId, day, answers } = req.body
         const row = await assertDayIsOpen(req.auth.userId, groupId, day)
-
-        const exercises = await GrammarExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } })
-        let correctCount = 0
-        const results = []
-        for (const answer of answers) {
-            const exercise = exercises.find(e => String(e._id) === String(answer.exerciseId))
-            const isCorrect = !!exercise && String(exercise.correct).trim().toLowerCase() === String(answer.answer).trim().toLowerCase()
-            if (isCorrect) correctCount++
-            results.push({ exerciseId: answer.exerciseId, isCorrect, correctAnswer: exercise?.correct ?? null })
-        }
-        const score = Math.round((correctCount / (answers.length || 1)) * 100)
+        const { score, results } = await scoreGrammarAnswers(answers)
 
         row.grammarScore = score
         await maybeMarkDone(row)
@@ -304,6 +331,73 @@ export const submitGrammar = async (req, res) => {
         res.json({ score, dayStatus: row.status, results })
     } catch (error) {
         if (error.code) return res.status(error.status).json({ error: error.code })
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// Sunday's review recap (see reviewHomework.service.js) - graded exactly like a real day, but
+// never touches StudentProgress: it's supplementary practice over already-covered content, not a
+// new curriculum day, so it must never gate, unlock, or count toward completion.
+export const getHomeworkReview = async (req, res) => {
+    try {
+        const result = await getGroupAndSyncWindow(req.auth.userId, req.query.groupId)
+        if (!result) return res.status(404).json({ error: 'no_active_group' })
+        const { group } = result
+
+        const { vocab, grammar } = await pickReviewExercises(group, group.dayCounter)
+
+        const conceptIds = new Set()
+        vocab.forEach(v => {
+            if (v.conceptId) conceptIds.add(String(v.conceptId._id))
+            ;(v.options || []).forEach(o => conceptIds.add(String(o._id)))
+            if (v.correct) conceptIds.add(String(v.correct._id))
+        })
+        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: group.languageId })
+        const wordFormByConceptId = Object.fromEntries(wordForms.map(w => [String(w.conceptId), w]))
+        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } })
+        const translationsByConceptId = {}
+        translations.forEach(t => {
+            const key = String(t.conceptId)
+            if (!translationsByConceptId[key]) translationsByConceptId[key] = {}
+            translationsByConceptId[key][t.nativeLanguageCode] = t.text
+        })
+        const withWord = (concept) => {
+            if (!concept) return concept
+            const obj = concept.toObject ? concept.toObject() : concept
+            const wf = wordFormByConceptId[String(obj._id)]
+            const tr = translationsByConceptId[String(obj._id)] || {}
+            return { ...obj, word: wf?.word || '', example: wf?.example || '', translations: { ru: tr.ru || '', uz: tr.uz || '', kaa: tr.kaa || '' } }
+        }
+        const enrichedVocab = vocab.map(v => ({
+            ...v.toObject(),
+            conceptId: withWord(v.conceptId),
+            options: (v.options || []).map(withWord),
+            correct: withWord(v.correct),
+        }))
+
+        res.json({ groupId: group._id, vocab: enrichedVocab, grammar })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const submitReviewVocab = async (req, res) => {
+    try {
+        const { score, results } = await scoreVocabAnswers(req.body.answers || [])
+        res.json({ score, results })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const submitReviewGrammar = async (req, res) => {
+    try {
+        const { score, results } = await scoreGrammarAnswers(req.body.answers || [])
+        res.json({ score, results })
+    } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
     }
@@ -575,9 +669,10 @@ export const getExam = async (req, res) => {
             })
         }
 
-        const level = await Level.findById(req.params.levelId).select('durationDays')
+        const level = await Level.findById(req.params.levelId).select('durationDays hasReading')
         const durationDays = level?.durationDays || 30
-        const dayCounter = computeDayCounter(group.startDate, durationDays)
+        const hasReading = level?.hasReading !== false
+        const dayCounter = computeDayCounter(group, durationDays)
 
         // mirrors getHomeworkWeek's examOpensOnDay - without this, a student could hit this route
         // directly (bypassing the client's day-gated button) and start a real exam session early
@@ -633,19 +728,24 @@ export const getExam = async (req, res) => {
             _id: g._id, section: 'grammar', type: g.type, question: g.question, options: g.options,
         }))
 
-        // ---- reading: 3 DISTINCT whole texts, each kept with all of its own exercises ----
-        const readingCandidates = await ReadingText.find({ languageId: exam.languageId, levelId: exam.levelId, day: { $in: learnedDays } })
-        const chosenReadingTexts = shuffle(readingCandidates).slice(0, 3)
+        // ---- reading: 3 DISTINCT whole texts, each kept with all of its own exercises - skipped
+        // entirely for a level with hasReading:false (beginner levels), even if some ReadingText
+        // rows happen to still exist for it from before the flag was set - a beginner's exam must
+        // never include reading, full stop, not just "hidden if nothing was authored" ----
         const readingTexts = []
-        for (const rt of chosenReadingTexts) {
-            const exercises = await ReadingExercise.find({ readingTextId: rt._id })
-            readingTexts.push({
-                readingTextId: rt._id,
-                title: rt.title,
-                image: rt.image,
-                paragraphs: rt.paragraphs,
-                exercises: shuffle(exercises).map(e => ({ _id: e._id, type: e.type, question: e.question, options: e.options })),
-            })
+        if (hasReading) {
+            const readingCandidates = await ReadingText.find({ languageId: exam.languageId, levelId: exam.levelId, day: { $in: learnedDays } })
+            const chosenReadingTexts = shuffle(readingCandidates).slice(0, 3)
+            for (const rt of chosenReadingTexts) {
+                const exercises = await ReadingExercise.find({ readingTextId: rt._id })
+                readingTexts.push({
+                    readingTextId: rt._id,
+                    title: rt.title,
+                    image: rt.image,
+                    paragraphs: rt.paragraphs,
+                    exercises: shuffle(exercises).map(e => ({ _id: e._id, type: e.type, question: e.question, options: e.options })),
+                })
+            }
         }
 
         // a level with no homework content ever built would otherwise come back as a "successful"

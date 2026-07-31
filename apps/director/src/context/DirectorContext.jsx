@@ -540,6 +540,22 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // Homework builder's "delete last lesson" - the mirror of "+ Add lesson": removes whatever
+    // content sits on the level's current last day (if any) and shrinks durationDays by 1
+    const deleteLastLesson = async (id, languageId) => {
+        if (!(await confirm(t('confirmDeleteLastLesson')))) return false
+        try {
+            await axios.delete(backendUrl + `/api/director/levels/${id}/lessons/last`, authHeader)
+            toast.success(t('lessonDeleted'))
+            getLevels(languageId)
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'cannot_delete_only_lesson' ? t('cannotDeleteOnlyLesson') : (code || t('couldNotDeleteLesson')))
+            return false
+        }
+    }
+
     // ==== settings ====
     const getSettings = async () => {
         try {
@@ -749,7 +765,7 @@ const DirectorContextProvider = (props) => {
         pricing, getPricing, upsertPricing, deletePricing,
         branches, getBranches, createBranch, updateBranch, deleteBranch, getTimetable,
         languages, getLanguages, createLanguage, updateLanguage, deleteLanguage,
-        levels, getLevels, createLevel, updateLevel, deleteLevel,
+        levels, getLevels, createLevel, updateLevel, deleteLevel, deleteLastLesson,
         getAttendanceOverview,
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,

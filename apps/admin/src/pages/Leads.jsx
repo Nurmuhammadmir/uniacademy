@@ -34,7 +34,10 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onDelete, onEdi
       <div className='flex items-start gap-2'>
         <button {...attributes} {...listeners} className='plain text-muted cursor-grab pt-0.5 text-lg leading-none'>⠿</button>
         <button onClick={() => setOpen(o => !o)} className='plain flex-1 text-left'>
-          <p className='text-ink text-sm font-medium'>{lead.name}</p>
+          <div className='flex justify-between items-start gap-2'>
+            <p className='text-ink text-sm font-medium'>{lead.name}</p>
+            <span className='text-muted text-[10px] whitespace-nowrap font-mono'>{new Date(lead.createdAt).toLocaleDateString()}</span>
+          </div>
           <p className='text-muted text-xs font-mono'>{lead.phone}</p>
           <span className='inline-block mt-1 text-xs px-3 py-1.5 rounded-full bg-accent-soft text-accent'>{lead.source}</span>
         </button>

@@ -6,13 +6,20 @@ import { toast } from 'react-toastify'
 
 const emptyRow = () => ({ type: 'multiple_choice', question: '', optionsText: '', correct: '' })
 
+// one day's worth: 4 multiple-choice + 3 true/false + 3 gap-fill - matches the director's spec
+// exactly (same template GrammarBankModal's bulk-paste example uses)
 const JSON_EXAMPLE = `{
   "exercises": [
     { "type": "multiple_choice", "question": "She ___ to school every day.", "options": ["go", "goes", "going", "gone"], "correct": "goes" },
+    { "type": "multiple_choice", "question": "They ___ tea every morning.", "options": ["drink", "drinks", "drinking", "drank"], "correct": "drink" },
+    { "type": "multiple_choice", "question": "He ___ football on Sundays.", "options": ["play", "plays", "playing", "played"], "correct": "plays" },
+    { "type": "multiple_choice", "question": "We ___ our homework after dinner.", "options": ["do", "does", "doing", "did"], "correct": "do" },
     { "type": "true_false", "question": "'He don't like coffee' is grammatically correct.", "correct": "false" },
+    { "type": "true_false", "question": "'She goes to work by bus' is grammatically correct.", "correct": "true" },
+    { "type": "true_false", "question": "'They plays football' is grammatically correct.", "correct": "false" },
     { "type": "fill_gap", "question": "They ___ (not/like) tea.", "options": ["doesn't like", "don't like", "not like", "isn't liking"], "correct": "don't like" },
-    { "type": "reorder", "question": "always / She / coffee / drinks / morning / in the", "correct": "She always drinks coffee in the morning" },
-    { "type": "error_correction", "question": "He go to work by bus.", "correct": "He goes to work by bus." }
+    { "type": "fill_gap", "question": "She ___ (study) English every day.", "options": ["study", "studies", "studying", "studied"], "correct": "studies" },
+    { "type": "fill_gap", "question": "We ___ (not/go) to school on Sundays.", "options": ["doesn't go", "don't go", "not go", "isn't going"], "correct": "don't go" }
   ]
 }`
 
@@ -23,8 +30,9 @@ const rowFromRaw = (e) => ({
   correct: e.correct ?? '',
 })
 
-// Editor for the 5 grammar exercises of one day. Options are entered one-per-line; true/false has
-// no options field (the app renders the two buttons itself).
+// Editor for the 10 grammar exercises of one day (4 multiple-choice + 3 true/false + 3 gap-fill).
+// Options are entered one-per-line; true/false has no options field (the app renders the two
+// buttons itself).
 const GrammarEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) => {
   const { saveGrammar } = useContext(DirectorContext)
   const { t } = useLanguage()
@@ -40,8 +48,8 @@ const GrammarEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) 
 
   const seed = () => {
     const rows = (initial && initial.length ? initial : []).map(rowFromRaw)
-    while (rows.length < 5) rows.push(emptyRow())
-    return rows.slice(0, 5)
+    while (rows.length < 10) rows.push(emptyRow())
+    return rows.slice(0, 10)
   }
   const [rows, setRows] = useState(seed)
   const [mode, setMode] = useState('form') // 'form' | 'json'
@@ -61,8 +69,8 @@ const GrammarEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) 
     const exercises = Array.isArray(parsed) ? parsed : parsed.exercises
     if (!Array.isArray(exercises)) { toast.error(t('expectedExercisesArray')); return }
 
-    const built = exercises.slice(0, 5).map(rowFromRaw)
-    while (built.length < 5) built.push(emptyRow())
+    const built = exercises.slice(0, 10).map(rowFromRaw)
+    while (built.length < 10) built.push(emptyRow())
     setRows(built)
     setMode('form')
     toast.success(t('loadedExercisesFromJson', { count: exercises.length, plural: exercises.length === 1 ? '' : 's' }))

@@ -42,12 +42,29 @@ const extFor = (mimetype, originalname) => {
 // controllers (e.g. the vocab word-bank filler) as well as from the resolveImage HTTP handler below.
 // Returns '' rather than throwing when nothing matches - "not found yet" is a normal state while
 // the director is still typing/pasting, not an error.
+//
+// Falls back to the word with any trailing "(...)" annotation stripped - an irregular-plural entry
+// like "mouse (mice)" slugifies to "mouse-mice" on the first pass, but the actual photo on disk is
+// almost always just named after the depictable base word ("mouse.png"), never the whole annotation.
+//
+// The on-disk filename is slugified before comparing too, not just the search term - a director
+// who drops in a file literally named "deer (deer).png" (mirroring the word exactly, unslugified)
+// must still match "deer (deer)" the word - comparing the slugified search term against the RAW
+// filename would never match since "deer-deer" !== "deer (deer)".
 export const findImageByName = (kind, name) => {
     const dir = path.join(PUBLIC_ROOT, kind === 'reading' ? 'reading' : 'vocab')
     if (!fs.existsSync(dir)) return ''
     const slug = slugify(name)
     if (!slug) return ''
-    const match = fs.readdirSync(dir).find(f => path.parse(f).name.toLowerCase() === slug)
+    const files = fs.readdirSync(dir)
+    const tryMatch = (s) => files.find(f => slugify(path.parse(f).name) === s)
+
+    let match = tryMatch(slug)
+    if (!match) {
+        const baseWord = String(name || '').replace(/\s*\([^)]*\)\s*$/, '').trim()
+        const baseSlug = slugify(baseWord)
+        if (baseSlug && baseSlug !== slug) match = tryMatch(baseSlug)
+    }
     return match ? `/static/images/${kind}/${match}` : ''
 }
 
@@ -95,12 +112,24 @@ export const uploadImage = async (req, res) => {
         const dir = path.join(PUBLIC_ROOT, kind)
         fs.mkdirSync(dir, { recursive: true })
 
+        // remove any existing file(s) for this same word FIRST, regardless of their extension -
+        // otherwise "changing the photo" to a different format (e.g. replacing a .jpg with a .png)
+        // leaves the old file sitting on disk too, and findImageByName's directory scan can end up
+        // resolving back to whichever one it lists first, silently undoing the change
+        const existing = fs.readdirSync(dir).filter(f => slugify(path.parse(f).name) === name)
+        existing.forEach(f => fs.unlinkSync(path.join(dir, f)))
+
         const ext = extFor(req.file.mimetype, req.file.originalname)
         const filename = `${name}.${ext}`
         fs.writeFileSync(path.join(dir, filename), req.file.buffer)
 
-        // the path the frontends load directly as <img src> (served by server.js at /static)
-        res.json({ path: `/static/images/${kind}/${filename}` })
+        // static assets are served with a 7-day cache (server.js), so re-uploading a REPLACEMENT
+        // photo under the exact same filename would otherwise keep showing the old cached bytes in
+        // every browser that already loaded it. A cache-busting query string forces a fresh fetch
+        // without touching the actual cache policy - this exact path (with the query string) is
+        // what gets stored as the concept's `image` and used as the <img src> everywhere.
+        const servedPath = `/static/images/${kind}/${filename}?v=${Date.now()}`
+        res.json({ path: servedPath })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

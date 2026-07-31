@@ -31,23 +31,34 @@ const GroupRoster = () => {
         <div className='bg-bg-card border border-hairline rounded-2xl p-4 mb-6'>
           <div className='flex justify-between items-center mb-3'>
             <p className='text-ink font-medium'>Today's homework</p>
-            <span className='font-mono text-xs text-accent bg-accent-soft px-2 py-1 rounded-full'>day {today.dayCounter}/{today.durationDays}</span>
+            {!today.restDay && (
+              <span className={`font-mono text-xs px-2 py-1 rounded-full ${today.reviewDay ? 'text-gold bg-gold/10' : 'text-accent bg-accent-soft'}`}>
+                {today.reviewDay ? 'review day' : `day ${today.dayCounter}/${today.durationDays}`}
+              </span>
+            )}
           </div>
-          <div className='grid grid-cols-3 gap-2'>
-            {SECTION_META.map(s => (
-              <button key={s.key} onClick={() => today[s.key] && setPreviewSection(s.key)} disabled={!today[s.key]}
-                className={`rounded-xl p-3 text-center ${today[s.key] ? 'bg-accent-soft' : 'bg-bg border border-hairline opacity-50'}`}>
-                <p className='text-lg mb-1'>{s.icon}</p>
-                <p className={`text-xs font-medium ${today[s.key] ? 'text-accent' : 'text-muted'}`}>{s.label}</p>
-                <p className='text-[10px] text-muted mt-0.5'>{today[s.key] ? 'tap to view' : 'no content'}</p>
-              </button>
-            ))}
-          </div>
+          {today.restDay ? (
+            <p className='text-muted text-sm'>Rest day - no lesson, no homework for this group today.</p>
+          ) : (
+            <>
+              {today.reviewDay && <p className='text-muted text-xs mb-2'>Sunday recap - a random re-draw of already-covered vocab/grammar, not new content.</p>}
+              <div className={`grid gap-2 ${(today.hasReading === false || today.reviewDay) ? 'grid-cols-2' : 'grid-cols-3'}`}>
+                {SECTION_META.filter(s => s.key !== 'reading' || (today.hasReading !== false && !today.reviewDay)).map(s => (
+                  <button key={s.key} onClick={() => today[s.key] && setPreviewSection(s.key)} disabled={!today[s.key]}
+                    className={`rounded-xl p-3 text-center ${today[s.key] ? 'bg-accent-soft' : 'bg-bg border border-hairline opacity-50'}`}>
+                    <p className='text-lg mb-1'>{s.icon}</p>
+                    <p className={`text-xs font-medium ${today[s.key] ? 'text-accent' : 'text-muted'}`}>{s.label}</p>
+                    <p className='text-[10px] text-muted mt-0.5'>{today[s.key] ? 'tap to view' : 'no content'}</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {previewSection && (
-        <HomeworkPreviewModal groupId={id} initialSection={previewSection} onClose={() => setPreviewSection(null)} />
+        <HomeworkPreviewModal groupId={id} initialSection={previewSection} hasReading={today?.hasReading} onClose={() => setPreviewSection(null)} />
       )}
 
       {!students ? (

@@ -21,7 +21,7 @@ const JSON_EXAMPLE = `{
 
 // A word bank is not tied to any one day - it's an unlimited list of words for a whole level
 // (e.g. all 260 Beginner words at once). Filling walks the level's days in order, skips any day
-// that already has vocab, and drops 10 words into each empty day until either the bank or the
+// that already has vocab, and drops 30 words into each empty day until either the bank or the
 // empty days run out. Photos are never typed here - the director drops files into
 // server/public/images/vocab/ by hand and the backend matches them by word name at fill time.
 const WordBankModal = ({ languageId, levelId, levelName, onClose, onFilled }) => {

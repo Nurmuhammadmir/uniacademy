@@ -39,7 +39,7 @@ export const getChildAttendance = async (req, res) => {
 
         const perGroup = await Promise.all(groups.map(async (g) => {
             const durationDays = g.levelId?.durationDays || 30
-            const dayCounter = computeDayCounter(g.startDate, durationDays)
+            const dayCounter = computeDayCounter(g, durationDays)
             const daysSoFar = Math.max(0, dayCounter - 1)
             const present = await Attendance.countDocuments({ studentId: req.params.studentId, groupId: g._id, day: { $lte: daysSoFar } })
 
@@ -78,7 +78,7 @@ export const getChildProgress = async (req, res) => {
 
         const perGroup = await Promise.all(groups.map(async (g) => {
             const durationDays = g.levelId?.durationDays || 30
-            const dayCounter = computeDayCounter(g.startDate, durationDays)
+            const dayCounter = computeDayCounter(g, durationDays)
             const rows = await StudentProgress.find({ studentId: req.params.studentId, groupId: g._id })
             const done = rows.filter(r => r.status === 'done').length
             const avg = (key) => {

@@ -29,3 +29,26 @@ export const deleteLevelContent = async (languageId, levelId) => {
     await Pricing.deleteMany({ languageId, levelId })
     await Exam.deleteMany({ languageId, levelId })
 }
+
+// same cleanup as deleteLevelContent, but scoped to just ONE day - used when the director shrinks
+// a level via "delete last lesson" in the Homework builder (the mirror of "+ Add lesson"), so
+// undoing an accidental add never leaves orphaned vocab/grammar/reading sitting on a day number
+// the level no longer has. Pricing/Exam are level-wide, not per-day, so they're untouched here.
+export const deleteDayContent = async (languageId, levelId, day) => {
+    const curriculum = await Curriculum.findOne({ languageId, levelId, day })
+    if (curriculum) {
+        await WordForm.deleteMany({ conceptId: { $in: curriculum.conceptIds } })
+        await Translation.deleteMany({ conceptId: { $in: curriculum.conceptIds } })
+        await Concept.deleteMany({ _id: { $in: curriculum.conceptIds } })
+        await Curriculum.deleteOne({ _id: curriculum._id })
+    }
+
+    await VocabExercise.deleteMany({ languageId, levelId, day })
+    await GrammarExercise.deleteMany({ languageId, levelId, day })
+
+    const readingText = await ReadingText.findOne({ languageId, levelId, day })
+    if (readingText) {
+        await ReadingExercise.deleteMany({ readingTextId: readingText._id })
+        await ReadingText.deleteOne({ _id: readingText._id })
+    }
+}

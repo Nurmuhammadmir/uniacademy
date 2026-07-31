@@ -4,6 +4,7 @@ import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { resolveImageUrl } from '../lib/format.js'
 import { buildVocabPrompt } from '../lib/vocabPrompt.js'
+import Spinner from '../components/Spinner.jsx'
 import QuestionCard from '../components/QuestionCard.jsx'
 import { randomQuote } from '../lib/quotes.js'
 
@@ -141,8 +142,8 @@ const Exam = () => {
         </div>
       ))}
 
-      <button onClick={submit} disabled={!allAnswered || submitting} className='w-full py-4 rounded-2xl bg-accent text-white font-medium mt-2 disabled:opacity-50'>
-        {submitting ? t('submitting') : t('submitExam')}
+      <button onClick={submit} disabled={!allAnswered || submitting} className='w-full py-4 rounded-2xl bg-accent text-white font-medium mt-2 disabled:opacity-50 flex items-center justify-center gap-2'>
+        {submitting && <Spinner size={14} />} {submitting ? t('submitting') : t('submitExam')}
       </button>
     </div>
   )

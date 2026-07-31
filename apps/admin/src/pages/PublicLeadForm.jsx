@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import axios from 'axios'
+import Spinner from '../components/Spinner.jsx'
 
 // fully public, unauthenticated page - anyone with the link lands here with no admin session at
 // all, so this talks to the backend directly rather than through AdminContext (which assumes a
@@ -76,8 +77,8 @@ const PublicLeadForm = () => {
           </div>
         ))}
         {error && <p className='text-red-500 text-sm'>{error}</p>}
-        <button type='submit' disabled={submitting} className='py-2.5 rounded-lg bg-accent text-white font-medium disabled:opacity-50'>
-          {submitting ? '…' : 'Submit'}
+        <button type='submit' disabled={submitting} className='py-2.5 rounded-lg bg-accent text-white font-medium disabled:opacity-50 flex items-center justify-center gap-2'>
+          {submitting && <Spinner size={14} />} {submitting ? 'Submitting…' : 'Submit'}
         </button>
       </form>
     </div>

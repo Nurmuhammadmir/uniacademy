@@ -60,7 +60,7 @@ const findOrCreateNextGroup = async (group, nextLevel, cohortSize) => {
 // keeps working after a group completes.
 export const promoteGroupIfLevelComplete = async (group, durationDays) => {
     if (group.status !== 'active') return
-    if (!isPastLevelEnd(group.startDate, durationDays)) return
+    if (!isPastLevelEnd(group, durationDays)) return
 
     const currentLevel = await Level.findById(group.levelId)
     if (!currentLevel) {
@@ -100,7 +100,7 @@ export const promoteGroupIfLevelComplete = async (group, durationDays) => {
     }
 
     const nextGroup = await findOrCreateNextGroup(claimed, nextLevel, studentIds.length)
-    const nextGroupDayNow = computeDayCounter(nextGroup.startDate, nextLevel.durationDays || 30)
+    const nextGroupDayNow = computeDayCounter(nextGroup, nextLevel.durationDays || 30)
 
     for (const studentId of studentIds) {
         const student = await User.findById(studentId)

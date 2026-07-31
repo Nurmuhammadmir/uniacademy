@@ -8,14 +8,19 @@ import AttendanceScanner from '../components/AttendanceScanner.jsx'
 import { groupLabel } from '../lib/format.js'
 
 const Today = () => {
-  const { week, getHomeworkWeek, getHomeworkForDay, submitVocab, submitGrammar, submitReading, progress, me, myGroups, selectedGroupId, setSelectedGroupId } = useContext(StudentContext)
+  const {
+    week, getHomeworkWeek, getHomeworkForDay, submitVocab, submitGrammar, submitReading,
+    getHomeworkReview, submitReviewVocab, submitReviewGrammar,
+    progress, me, myGroups, selectedGroupId, setSelectedGroupId,
+  } = useContext(StudentContext)
   const { t } = useLanguage()
-  const [selectedDay, setSelectedDay] = useState(null)
+  const [selectedDay, setSelectedDay] = useState(null) // a lesson day number, or the string 'review'
   const [dayData, setDayData] = useState(false)
   const [openSection, setOpenSection] = useState(null)
   const [showExamInfo, setShowExamInfo] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
   const navigate = useNavigate()
+  const isReviewSelected = selectedDay === 'review'
 
   const SECTION_META = {
     vocab: { label: t('vocabulary'), icon: '🔤' },
@@ -35,19 +40,24 @@ const Today = () => {
   }, [week])
 
   useEffect(() => {
-    if (!Number.isInteger(selectedDay)) return
+    if (selectedDay === null) return
     setDayData(false)
-    getHomeworkForDay(selectedDay).then(setDayData)
+    if (selectedDay === 'review') getHomeworkReview().then(setDayData)
+    else if (Number.isInteger(selectedDay)) getHomeworkForDay(selectedDay).then(setDayData)
   }, [selectedDay])
 
-  const submitFns = { vocab: submitVocab, grammar: submitGrammar, reading: submitReading }
+  const submitFns = isReviewSelected
+    ? { vocab: submitReviewVocab, grammar: submitReviewGrammar }
+    : { vocab: submitVocab, grammar: submitGrammar, reading: submitReading }
 
   const closeModal = async (didSubmit) => {
     setOpenSection(null)
-    if (didSubmit) {
+    if (didSubmit && !isReviewSelected) {
       await getHomeworkWeek()
       getHomeworkForDay(selectedDay).then(setDayData)
     }
+    // review submissions never touch progress/streak (see StudentContext.submitReviewVocab) - no
+    // refetch needed, closing the modal is enough
   }
 
   const onExamButtonClick = () => {
@@ -96,7 +106,7 @@ const Today = () => {
     )
   }
 
-  const selectedDayMeta = week.days.find(d => d.day === selectedDay)
+  const selectedDayMeta = week.days.find(d => d.day === selectedDay && d.type === 'lesson')
 
   const examButtonLabel = week.examAttempted ? t('examAlreadyTaken')
     : week.examAvailable ? t('examOpenTapStart')
@@ -134,6 +144,36 @@ const Today = () => {
 
       {!dayData ? (
         <p className='text-muted'>{t('loading')}</p>
+      ) : isReviewSelected ? (
+        <>
+          <div className='bg-gold/10 border border-gold/30 rounded-2xl p-4 mb-4'>
+            <p className='font-display text-lg text-ink mb-1'>{t('reviewDayTitle')}</p>
+            <p className='text-muted text-sm'>{t('reviewDaySubtitle')}</p>
+          </div>
+          <div className='flex flex-col gap-3'>
+            {[['vocab', SECTION_META.vocab], ['grammar', SECTION_META.grammar]].map(([key, meta]) => {
+              const count = (dayData[key] || []).length
+              return (
+                <button
+                  key={key}
+                  disabled={count === 0}
+                  onClick={() => setOpenSection(key)}
+                  className={`px-5 py-4 rounded-2xl border text-left ${count === 0 ? 'border-hairline bg-bg-card opacity-40' : 'border-transparent bg-[#D3E6FF]'}`}
+                >
+                  <div className='flex items-center justify-between mb-1'>
+                    <span className='flex items-center gap-3'>
+                      <span className='text-xl'>{meta.icon}</span>
+                      <span className='text-ink font-medium'>{meta.label}</span>
+                    </span>
+                    <span className={`text-xs font-medium px-3 py-1 rounded-full ${count === 0 ? 'bg-hairline text-muted' : 'bg-[#5B93F5] text-white'}`}>
+                      {count === 0 ? t('nothingHereYet') : t('start')}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </>
       ) : dayData.restDay ? (
         <div className='bg-bg-card border border-hairline rounded-2xl p-8 text-center'>
           <p className='font-display text-lg text-ink mb-1'>{t('restDay')}</p>
@@ -159,7 +199,7 @@ const Today = () => {
           })()}
 
           <div className='flex flex-col gap-3'>
-            {Object.entries(SECTION_META).map(([key, meta]) => {
+            {Object.entries(SECTION_META).filter(([key]) => key !== 'reading' || week.hasReading !== false).map(([key, meta]) => {
               const done = key === 'vocab' ? selectedDayMeta?.vocabDone : key === 'grammar' ? selectedDayMeta?.grammarDone : selectedDayMeta?.readingDone
               const locked = selectedDayMeta?.status === 'expired' && !done
               const score = dayData.progress ? dayData.progress[`${key}Score`] : null
@@ -219,7 +259,8 @@ const Today = () => {
           section={openSection}
           dayData={dayData}
           groupId={week.groupId}
-          day={selectedDay}
+          day={isReviewSelected ? null : selectedDay}
+          dayLabel={isReviewSelected ? t('dayReview') : null}
           submitFn={submitFns[openSection]}
           onClose={closeModal}
         />

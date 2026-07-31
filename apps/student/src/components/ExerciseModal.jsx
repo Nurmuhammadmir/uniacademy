@@ -5,13 +5,14 @@ import { resolveImageUrl } from '../lib/format.js'
 import { buildVocabPrompt } from '../lib/vocabPrompt.js'
 import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import Spinner from './Spinner.jsx'
 
 const ICONS = { vocab: '🔤', grammar: '✏️', reading: '📖' }
 
 // 4-stage flow for vocab (intro -> flashcards -> questions -> result), 3-stage for grammar/reading
 // (intro -> questions -> result). The whole modal is capped at a phone-like width so nothing -
 // especially prompt photos - blows up to fill a wide desktop browser window.
-const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) => {
+const ExerciseModal = ({ section, dayData, groupId, day, dayLabel, submitFn, onClose }) => {
   const { backendUrl } = useContext(StudentContext)
   const { t } = useLanguage()
   const TITLES = { vocab: t('vocabulary'), grammar: t('grammar'), reading: t('reading') }
@@ -65,7 +66,7 @@ const ExerciseModal = ({ section, dayData, groupId, day, submitFn, onClose }) =>
       <div className='w-full max-w-md flex flex-col h-full'>
         <div className='flex items-center justify-between px-5 pt-6 pb-4 border-b border-hairline'>
           <button onClick={() => onClose(stage === 'result')} className='text-muted text-sm'>{t('close')}</button>
-          <p className='font-display text-ink'>{TITLES[section]} · {t('dayN', { day })}</p>
+          <p className='font-display text-ink'>{TITLES[section]} · {dayLabel || t('dayN', { day })}</p>
           <span className='w-10' />
         </div>
 

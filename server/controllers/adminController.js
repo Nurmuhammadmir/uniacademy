@@ -25,7 +25,7 @@ import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
 import { assertNoScheduleConflict } from "../services/scheduleConflict.service.js"
 import { suggestLeastLoadedGroup } from "../services/loadBalance.service.js"
 import { enrollStudentMidCycle } from "../services/enrollMidCycle.service.js"
-import { computeDayCounter } from "../services/dayCounter.service.js"
+import { computeDayCounter, startDateForTargetDayToday } from "../services/dayCounter.service.js"
 import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
 import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
@@ -1042,7 +1042,7 @@ export const createGroup = async (req, res) => {
             branchId: req.auth.branchId, name: name || '',
             languageId, levelId, teacherId, schedulePattern, customDays, time, durationMinutes, startDate, roomId,
             capacity: capacity || 20,
-            dayCounter: computeDayCounter(startDate, level?.durationDays || 30),
+            dayCounter: computeDayCounter({ startDate, schedulePattern, customDays }, level?.durationDays || 30),
         })
         res.status(201).json({ group })
     } catch (error) {
@@ -1059,7 +1059,7 @@ export const listGroups = async (req, res) => {
             .populate('levelId', 'name order durationDays')
             .populate('teacherId', 'name')
             .populate('roomId', 'name')
-        const withFreshDay = groups.map(g => ({ ...g.toObject(), dayCounter: computeDayCounter(g.startDate, g.levelId?.durationDays || 30) }))
+        const withFreshDay = groups.map(g => ({ ...g.toObject(), dayCounter: computeDayCounter(g, g.levelId?.durationDays || 30) }))
         res.json({ groups: withFreshDay })
     } catch (error) {
         console.log(error)
@@ -1075,7 +1075,7 @@ export const getGroupProfile = async (req, res) => {
             .populate('teacherId', 'name phone')
             .populate('studentIds', 'name phone')
         if (!group) return res.status(404).json({ error: 'not_found' })
-        res.json({ group: { ...group.toObject(), dayCounter: computeDayCounter(group.startDate, group.levelId?.durationDays || 30) } })
+        res.json({ group: { ...group.toObject(), dayCounter: computeDayCounter(group, group.levelId?.durationDays || 30) } })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -1121,18 +1121,16 @@ export const updateGroup = async (req, res) => {
         // the group's day counter is never stored as its own source of truth - it's always
         // recomputed from `startDate` (see dayCounter.service.computeDayCounter), so "editing the
         // day" really means back-dating startDate so that TODAY computes out to the requested day.
-        // e.g. asking for "day 10" on a 30-day level sets startDate to 9 days ago.
+        // Lesson-day aware: walks backward counting only this group's own scheduled weekdays (see
+        // startDateForTargetDayToday), not raw calendar days, now that non-lesson days don't count.
         if (day !== undefined && day !== null && day !== '') {
             const targetDay = Math.min(Math.max(1, Number(day)), durationDays)
-            const newStartDate = new Date()
-            newStartDate.setHours(0, 0, 0, 0)
-            newStartDate.setDate(newStartDate.getDate() - (targetDay - 1))
-            group.startDate = newStartDate
+            group.startDate = startDateForTargetDayToday(group, targetDay)
         }
 
         await group.save()
 
-        res.json({ group: { ...group.toObject(), dayCounter: computeDayCounter(group.startDate, durationDays) } })
+        res.json({ group: { ...group.toObject(), dayCounter: computeDayCounter(group, durationDays) } })
     } catch (error) {
         if (error.code === 'teacher_schedule_conflict' || error.code === 'room_schedule_conflict') return res.status(409).json({ error: error.code })
         console.log(error)
@@ -1331,7 +1329,9 @@ export const listTeacherAttendanceQRs = async (req, res) => {
 // plus any per-teacher overrides
 export const listPayRates = async (req, res) => {
     try {
-        const rates = await TeacherPayRate.find({ branchId: req.auth.branchId }).populate('teacherId', 'name')
+        const rates = await TeacherPayRate.find({ branchId: req.auth.branchId })
+            .populate('teacherId', 'name')
+            .populate('groupId', 'name languageId levelId')
         res.json({ rates })
     } catch (error) {
         console.log(error)
@@ -1339,14 +1339,17 @@ export const listPayRates = async (req, res) => {
     }
 }
 
-// upserts either the branch default (teacherId omitted) or one teacher's override (teacherId given)
+// upserts one of three specificity levels: the branch default (teacherId+groupId both omitted),
+// a teacher-wide override (teacherId only), or one specific teacher+group override (both given) -
+// see TeacherPayRate.js's own comment for why a groupId always requires a teacherId alongside it
 export const setPayRate = async (req, res) => {
     try {
-        const { teacherId, rateType, rateValue } = req.body
+        const { teacherId, groupId, rateType, rateValue } = req.body
         if (!PAY_RATE_TYPES.includes(rateType)) return res.status(400).json({ error: 'invalid_rate_type' })
+        if (groupId && !teacherId) return res.status(400).json({ error: 'teacher_required_for_group_rate' })
 
         const rate = await TeacherPayRate.findOneAndUpdate(
-            { branchId: req.auth.branchId, teacherId: teacherId || null },
+            { branchId: req.auth.branchId, teacherId: teacherId || null, groupId: groupId || null },
             { rateType, rateValue },
             { upsert: true, new: true, runValidators: true }
         )

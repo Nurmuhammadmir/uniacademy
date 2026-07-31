@@ -8,6 +8,6 @@ import { computeDayCounter } from "./dayCounter.service.js"
 // document, or a student added today could be seeded days behind (or ahead of) where the group
 // actually is.
 export const enrollStudentMidCycle = async (studentId, group, durationDays = 30) => {
-    const day = computeDayCounter(group.startDate, durationDays)
+    const day = computeDayCounter(group, durationDays)
     return StudentProgress.create({ studentId, groupId: group._id, day, status: 'open' })
 }

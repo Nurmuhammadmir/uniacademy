@@ -18,12 +18,15 @@ const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     phone: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: true },
-    role: { type: String, enum: ['director', 'admin', 'teacher', 'student', 'parent'], required: true },
+    role: { type: String, enum: ['director', 'sub_director', 'admin', 'teacher', 'student', 'parent'], required: true },
     // student-only: archiving replaces hard-deleting a student - their payment/course/exam history
     // stays intact (a hard delete would orphan every Payment/CoursePeriod row that references them),
     // they just stop appearing in the active roster and can no longer log in. Reversible via unarchive.
     status: { type: String, enum: ['active', 'archived'], default: 'active' },
-    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null }, // null only for director/parent; teacher-only, this is their "home" branch
+    // null only for director/parent (they aren't tied to one branch); required in practice (enforced
+    // in directorController.createAdmin) for sub_director - a sub_director IS one branch's scope,
+    // everything they can see/do is filtered down to this id. teacher-only, this is their "home" branch
+    branchId: { type: mongoose.Schema.Types.ObjectId, ref: 'Branch', default: null },
     additionalBranchIds: { type: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Branch' }], default: [] }, // teacher-only: other branches they're also allowed to teach in
     address: { type: String, default: '' },        // student-only, director-visible only (not admin)
     passportInfo: { type: String, default: '' },    // student-only, free text (ID/passport number etc) - required or optional per Settings.passportRequired

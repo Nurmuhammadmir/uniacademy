@@ -1,11 +1,12 @@
 // Homework-builder backend. The director builds the fixed daily programme here:
-// per (languageId, levelId, day) they author 10 vocab words, 5 grammar exercises and 1 reading
-// text with 10 exercises. Everything is idempotent - re-saving a day fully replaces that day's
-// content (upsert by {languageId, levelId, day}), so the builder is safe to re-open and re-save.
+// per (languageId, levelId, day) they author 30 vocab words, 10 grammar exercises (4 multiple-
+// choice + 3 true/false + 3 gap-fill) and 1 reading text with 10 exercises. Everything is
+// idempotent - re-saving a day fully replaces that day's content (upsert by
+// {languageId, levelId, day}), so the builder is safe to re-open and re-save.
 //
-// The 30 vocab test questions are NOT authored by hand: saveVocab generates them from the 10 words
-// (10 picture->word + 10 native->word + 10 word->native, distractors drawn only from the same 10),
-// exactly the rule in the content spec.
+// The 30 vocab test questions are NOT authored by hand: saveVocab generates exactly one question
+// per word (picture_match/translation_match/fill_gap, cycled round-robin across the 30 words so
+// each type gets used roughly 10 times), distractors drawn only from the same day's 30 words.
 import Concept from "../models/Concept.js"
 import WordForm from "../models/WordForm.js"
 import Translation from "../models/Translation.js"
@@ -156,27 +157,45 @@ const createVocabDay = async ({ languageId, levelId, day, words }) => {
 
     await Curriculum.create({ languageId, levelId, day, conceptIds: concepts.map(c => c._id) })
 
-    // auto-generate the vocab test: for each concept, one question of each of the 3 types, each
-    // with the concept as the correct answer and 3 distractors drawn from the same day
-    const exercises = []
-    for (const concept of concepts) {
+    // auto-generate the vocab test: ONE question per word (not one per type), cycling through
+    // types round-robin across the day's words so they still get used roughly evenly - 30 words
+    // in, 30 questions out, each with the word's own concept as the correct answer and 3
+    // distractors drawn from the same day's other words.
+    //
+    // picture_match is only ever handed to a word that actually HAS a resolved image - a phrasal
+    // verb or idiom ("give up", "guess what") has no realistic photo, and assigning it anyway
+    // produces an unanswerable "which picture matches this word?" question with no picture.
+    // Words with and without a photo cycle through their own separate type lists so neither pool
+    // skews the other's rotation.
+    const WITH_IMAGE_TYPES = ['picture_match', 'translation_match', 'fill_gap']
+    const NO_IMAGE_TYPES = ['translation_match', 'fill_gap']
+    let withImageIndex = 0
+    let noImageIndex = 0
+    const exercises = concepts.map((concept) => {
         const distractors = pickDistractors(concepts, concept, 3)
         const options = shuffle([concept, ...distractors]).map(c => c._id)
-        for (const type of ['picture_match', 'translation_match', 'fill_gap']) {
-            exercises.push({
-                languageId, levelId, day, type,
-                conceptId: concept._id,
-                options,
-                correct: concept._id,
-            })
+        let type
+        if (concept.image) {
+            type = WITH_IMAGE_TYPES[withImageIndex % WITH_IMAGE_TYPES.length]
+            withImageIndex++
+        } else {
+            type = NO_IMAGE_TYPES[noImageIndex % NO_IMAGE_TYPES.length]
+            noImageIndex++
         }
-    }
+        return {
+            languageId, levelId, day,
+            type,
+            conceptId: concept._id,
+            options,
+            correct: concept._id,
+        }
+    })
     await VocabExercise.insertMany(exercises)
 
     return { conceptCount: concepts.length, exerciseCount: exercises.length }
 }
 
-// ==== save the 10 vocab words for a day (+ auto-generate the 30 test questions) ====
+// ==== save the 30 vocab words for a day (+ auto-generate 30 test questions, 1 per word) ====
 export const saveVocab = async (req, res) => {
     try {
         const { languageId, levelId, day, words } = req.body
@@ -195,10 +214,15 @@ export const saveVocab = async (req, res) => {
     }
 }
 
-// ==== word bank: paste an unlimited list of words and auto-fill every EMPTY day in this level,
-// 10 words per day, in day order, until either the words or the empty days run out. A word that's
-// already used somewhere else in this level (or repeated within the same paste) is skipped and
-// reported, not silently dropped or allowed to stop the rest of the batch. ====
+// ==== word bank: paste an unlimited list of words and auto-fill every day in this level that
+// isn't already at the full 30, in day order, until either the words or the open days run out. A
+// day sitting at, say, 12/30 words (from an earlier partial paste, or a single word added by hand)
+// is topped up to 30, not skipped just because it already has SOME vocab - only a day already at
+// the full 30 is left alone. A word that's already used somewhere else in this level (or repeated
+// within the same paste) is skipped and reported, not silently dropped or allowed to stop the rest
+// of the batch. ====
+const WORDS_PER_DAY = 30
+
 export const fillVocabWordBank = async (req, res) => {
     try {
         const { languageId, levelId, words } = req.body
@@ -210,17 +234,21 @@ export const fillVocabWordBank = async (req, res) => {
         if (!level) return res.status(404).json({ error: 'level_not_found' })
         const durationDays = level.durationDays || 30
 
-        const curricula = await Curriculum.find({ languageId, levelId })
-        const filledDays = new Set(curricula.map(c => c.day))
-        const emptyDays = []
+        const curricula = await Curriculum.find({ languageId, levelId }).populate('conceptIds')
+        const curriculumByDay = new Map(curricula.map(c => [c.day, c]))
+
+        // "open" = has room for more words (< 30), not just "has zero words" - a day already at the
+        // cap is the only kind that gets skipped
+        const openDays = []
         for (let d = 1; d <= durationDays; d++) {
-            if (!filledDays.has(d)) emptyDays.push(d)
+            const existingCount = curriculumByDay.get(d)?.conceptIds?.length || 0
+            if (existingCount < WORDS_PER_DAY) openDays.push({ day: d, remaining: WORDS_PER_DAY - existingCount })
         }
 
         // every word already sitting on some day in this level, so the bank can skip it instead of
         // creating a second copy of the same word on a different day
         const conceptIdToDay = {}
-        curricula.forEach(c => c.conceptIds.forEach(cid => { conceptIdToDay[String(cid)] = c.day }))
+        curricula.forEach(c => c.conceptIds.forEach(concept => { conceptIdToDay[String(concept._id)] = c.day }))
         const existingWordForms = await WordForm.find({ conceptId: { $in: Object.keys(conceptIdToDay) }, languageId })
         const existingByKey = new Map(existingWordForms.map(wf => [wf.word.trim().toLowerCase(), conceptIdToDay[String(wf.conceptId)]]))
 
@@ -230,15 +258,41 @@ export const fillVocabWordBank = async (req, res) => {
             (w) => ({ key: w.word.trim().toLowerCase(), raw: w.word.trim() })
         )
 
+        // reconstructs a day's already-saved words back into the {word,example,translations} shape
+        // createVocabDay expects - needed because createVocabDay fully REPLACES a day's vocab, so
+        // topping up an already-partial day means re-submitting its existing words alongside the new ones
+        const reconstructExistingWords = async (curriculum) => {
+            if (!curriculum) return []
+            const conceptIds = curriculum.conceptIds.map(c => c._id)
+            const wordForms = await WordForm.find({ conceptId: { $in: conceptIds }, languageId })
+            const translations = await Translation.find({ conceptId: { $in: conceptIds } })
+            return curriculum.conceptIds.map(concept => {
+                const wf = wordForms.find(w => String(w.conceptId) === String(concept._id))
+                const tr = translations.filter(t => String(t.conceptId) === String(concept._id))
+                return {
+                    word: wf?.word || '', example: wf?.example || '', image: concept.image || '',
+                    translations: {
+                        ru: tr.find(t => t.nativeLanguageCode === 'ru')?.text || '',
+                        uz: tr.find(t => t.nativeLanguageCode === 'uz')?.text || '',
+                        kaa: tr.find(t => t.nativeLanguageCode === 'kaa')?.text || '',
+                    },
+                }
+            })
+        }
+
         const filled = []
         let cursor = 0
-        for (const day of emptyDays) {
+        for (const { day, remaining } of openDays) {
             if (cursor >= uniqueWords.length) break
-            const batch = uniqueWords.slice(cursor, cursor + 10)
-            const { conceptCount } = await createVocabDay({ languageId, levelId, day, words: batch })
-            if (conceptCount > 0) {
-                cursor += conceptCount
-                filled.push({ day, count: conceptCount })
+            const newBatch = uniqueWords.slice(cursor, cursor + remaining)
+            if (newBatch.length === 0) continue
+
+            const existingWords = await reconstructExistingWords(curriculumByDay.get(day))
+            const { conceptCount } = await createVocabDay({ languageId, levelId, day, words: [...existingWords, ...newBatch] })
+            const addedCount = conceptCount - existingWords.length
+            if (addedCount > 0) {
+                cursor += newBatch.length
+                filled.push({ day, count: addedCount })
             }
         }
 
@@ -247,7 +301,7 @@ export const fillVocabWordBank = async (req, res) => {
             daysFilled: filled.length,
             wordsUsed: cursor,
             wordsRemaining: uniqueWords.length - cursor,
-            emptyDaysRemaining: Math.max(0, emptyDays.length - filled.length),
+            emptyDaysRemaining: Math.max(0, openDays.length - filled.length),
             skipped,
             skippedCount: skipped.length,
         })
@@ -257,7 +311,7 @@ export const fillVocabWordBank = async (req, res) => {
     }
 }
 
-// ==== save the 5 grammar exercises for a day ====
+// ==== save the day's grammar exercises (10: 4 multiple-choice + 3 true/false + 3 gap-fill) ====
 export const saveGrammar = async (req, res) => {
     try {
         const { languageId, levelId, day, exercises } = req.body
@@ -285,10 +339,16 @@ export const saveGrammar = async (req, res) => {
     }
 }
 
-// ==== grammar bank: paste an unlimited list of grammar exercises and auto-fill every EMPTY day in
-// this level, 5 per day, in day order, until either the bank or the empty days run out. A question
-// that's already used somewhere else in this level (or repeated within the same paste) is skipped
-// and reported, not silently dropped or allowed to stop the rest of the batch. ====
+// ==== grammar bank: paste an unlimited list of grammar exercises and auto-fill every day in this
+// level that isn't already at the full 10 (4 multiple-choice + 3 true/false + 3 gap-fill, if
+// pasted in that order - see GrammarBankModal's example), in day order, until either the bank or
+// the open days run out. A day already sitting at some partial count (e.g. from a single manual
+// add) is topped up to 10, not skipped just because it has SOME grammar already - only a day
+// already at the full 10 is left alone. A question that's already used somewhere else in this
+// level (or repeated within the same paste) is skipped and reported, not silently dropped or
+// allowed to stop the rest of the batch. ====
+const QUESTIONS_PER_DAY = 10
+
 export const fillGrammarBank = async (req, res) => {
     try {
         const { languageId, levelId, exercises } = req.body
@@ -301,10 +361,14 @@ export const fillGrammarBank = async (req, res) => {
         const durationDays = level.durationDays || 30
 
         const existingDocs = await GrammarExercise.find({ languageId, levelId }).select('day question')
-        const filledDays = new Set(existingDocs.map(d => d.day))
-        const emptyDays = []
+        const countByDay = new Map()
+        existingDocs.forEach(d => countByDay.set(d.day, (countByDay.get(d.day) || 0) + 1))
+
+        // "open" = has room for more questions (< 10), not just "has zero questions"
+        const openDays = []
         for (let d = 1; d <= durationDays; d++) {
-            if (!filledDays.has(d)) emptyDays.push(d)
+            const existingCount = countByDay.get(d) || 0
+            if (existingCount < QUESTIONS_PER_DAY) openDays.push({ day: d, remaining: QUESTIONS_PER_DAY - existingCount })
         }
 
         const existingByKey = new Map(existingDocs.map(d => [d.question.trim().toLowerCase(), d.day]))
@@ -317,9 +381,10 @@ export const fillGrammarBank = async (req, res) => {
 
         const filled = []
         let cursor = 0
-        for (const day of emptyDays) {
+        for (const { day, remaining } of openDays) {
             if (cursor >= uniqueExercises.length) break
-            const batch = uniqueExercises.slice(cursor, cursor + 5)
+            const batch = uniqueExercises.slice(cursor, cursor + remaining)
+            if (batch.length === 0) continue
             const docs = batch.map(e => ({
                 languageId, levelId, day,
                 type: e.type,
@@ -337,7 +402,7 @@ export const fillGrammarBank = async (req, res) => {
             daysFilled: filled.length,
             questionsUsed: cursor,
             questionsRemaining: uniqueExercises.length - cursor,
-            emptyDaysRemaining: Math.max(0, emptyDays.length - filled.length),
+            emptyDaysRemaining: Math.max(0, openDays.length - filled.length),
             skipped,
             skippedCount: skipped.length,
         })

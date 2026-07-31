@@ -19,7 +19,7 @@ import Expense, { EXPENSE_METHODS } from "../models/Expense.js"
 import { assertNoScheduleConflict } from "../services/scheduleConflict.service.js"
 import { computeDayCounter } from "../services/dayCounter.service.js"
 import { earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
-import { deleteLevelContent } from "../services/contentCascade.service.js"
+import { deleteLevelContent, deleteDayContent } from "../services/contentCascade.service.js"
 import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
 import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
@@ -31,6 +31,27 @@ const startOfThisMonth = () => {
     d.setDate(1)
     d.setHours(0, 0, 0, 0)
     return d
+}
+
+// sub_director is a director scoped to exactly one branch (see requireRole gating in
+// directorRoute.js - Overview/Admins/Homework routes never reach these functions at all for that
+// role). Everywhere else, a real director sees everything; a sub_director gets these filters
+// merged in so every list/lookup below is silently narrowed to their own branchId.
+const isSubDirector = (req) => req.auth.role === 'sub_director'
+const branchOnlyFilter = (req, field = 'branchId') => isSubDirector(req) ? { [field]: req.auth.branchId } : {}
+// teachers can belong to a branch via their home branchId OR via additionalBranchIds (Phase 1.5
+// multi-branch support) - membership, not equality, same convention used everywhere else a
+// teacher's branch access is checked
+const teacherBranchMembershipFilter = (req) => isSubDirector(req)
+    ? { $or: [{ branchId: req.auth.branchId }, { additionalBranchIds: req.auth.branchId }] }
+    : {}
+const teacherBelongsToBranch = (teacher, branchId) =>
+    String(teacher.branchId) === String(branchId) || (teacher.additionalBranchIds || []).some(id => String(id) === String(branchId))
+
+// lets the frontend know its own role/branchId on every load (not just right after login) -
+// nothing here needs a DB read, the JWT payload already carries it
+export const getMe = async (req, res) => {
+    res.json({ id: req.auth.userId, role: req.auth.role, branchId: req.auth.branchId })
 }
 
 export const getStats = async (req, res) => {
@@ -135,7 +156,7 @@ export const getMapData = async (req, res) => {
 
 export const getAllStudents = async (req, res) => {
     try {
-        const students = await User.find({ role: 'student' }).select('-passwordHash')
+        const students = await User.find({ role: 'student', ...branchOnlyFilter(req) }).select('-passwordHash')
             .populate('branchId', 'name')
             .populate('courses.languageId', 'name')
             .populate('courses.levelId', 'name')
@@ -149,7 +170,7 @@ export const getAllStudents = async (req, res) => {
 // director version of the student profile - INCLUDES address/geo (admin's version does not)
 export const getStudentProfile = async (req, res) => {
     try {
-        const student = await User.findOne({ _id: req.params.id, role: 'student' }).select('-passwordHash')
+        const student = await User.findOne({ _id: req.params.id, role: 'student', ...branchOnlyFilter(req) }).select('-passwordHash')
             .populate('branchId', 'name')
             .populate('courses.languageId', 'name')
             .populate('courses.levelId', 'name order')
@@ -216,14 +237,28 @@ export const getBranchProfile = async (req, res) => {
     }
 }
 
+// this whole section (create/list/update/delete/profile) also doubles as sub_director account
+// management - a sub_director is just an admin-shaped account with a different role, so the same
+// endpoints serve both. A real director can create/edit/remove either kind, anywhere. A
+// sub_director can ALSO reach these (unlike Overview/Branches/Homework) but only ever to manage
+// plain 'admin' accounts within their own branch - they can never create/see/touch a sub_director
+// account (including their own), and never another branch's admins.
+const MANAGEABLE_ROLES = ['admin', 'sub_director']
+
 export const createAdmin = async (req, res) => {
     try {
-        const { name, phone, password, branchId } = req.body
+        const { name, phone, password, role } = req.body
+        // a sub_director can only ever create a plain admin in their own branch - role and
+        // branchId from the request body are both ignored for that role, never trusted
+        const finalRole = isSubDirector(req) ? 'admin' : (role === 'sub_director' ? 'sub_director' : 'admin')
+        const branchId = isSubDirector(req) ? req.auth.branchId : req.body.branchId
+        if (finalRole === 'sub_director' && !branchId) return res.status(400).json({ error: 'branch_required' })
         const salt = await bcrypt.genSalt(10)
         const passwordHash = await bcrypt.hash(password, salt)
-        const admin = await User.create({ name, phone, passwordHash, role: 'admin', branchId })
-        res.status(201).json({ admin: { id: admin._id, name: admin.name, branchId: admin.branchId } })
+        const admin = await User.create({ name, phone, passwordHash, role: finalRole, branchId })
+        res.status(201).json({ admin: { id: admin._id, name: admin.name, role: admin.role, branchId: admin.branchId } })
     } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ error: 'phone_already_in_use' })
         console.log(error)
         res.status(500).json({ error: 'server_error' })
     }
@@ -231,7 +266,12 @@ export const createAdmin = async (req, res) => {
 
 export const listAdmins = async (req, res) => {
     try {
-        const admins = await User.find({ role: 'admin' }).select('-passwordHash').populate('branchId', 'name')
+        // a sub_director's own "Admins" page only ever shows plain admins in their own branch -
+        // never sub_directors (including themselves), never another branch's staff
+        const filter = isSubDirector(req)
+            ? { role: 'admin', branchId: req.auth.branchId }
+            : { role: { $in: MANAGEABLE_ROLES } }
+        const admins = await User.find(filter).select('-passwordHash').populate('branchId', 'name')
         res.json({ admins })
     } catch (error) {
         console.log(error)
@@ -241,13 +281,21 @@ export const listAdmins = async (req, res) => {
 
 export const updateAdmin = async (req, res) => {
     try {
+        const existing = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } })
+        if (!existing) return res.status(404).json({ error: 'not_found' })
+        if (isSubDirector(req) && (existing.role !== 'admin' || String(existing.branchId) !== String(req.auth.branchId))) {
+            return res.status(404).json({ error: 'not_found' })
+        }
+
         const { name, phone, branchId, password } = req.body
-        const update = { name, phone, branchId }
+        // a sub_director can't move an admin to a different branch - their own branch is the only
+        // one they're allowed to touch
+        const update = isSubDirector(req) ? { name, phone } : { name, phone, branchId }
         if (password) {
             const salt = await bcrypt.genSalt(10)
             update.passwordHash = await bcrypt.hash(password, salt)
         }
-        const admin = await User.findOneAndUpdate({ _id: req.params.id, role: 'admin' }, update, { new: true, runValidators: true }).select('-passwordHash')
+        const admin = await User.findOneAndUpdate({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } }, update, { new: true, runValidators: true }).select('-passwordHash')
         if (!admin) return res.status(404).json({ error: 'not_found' })
         res.json({ admin })
     } catch (error) {
@@ -257,11 +305,16 @@ export const updateAdmin = async (req, res) => {
     }
 }
 
-// api for the admin profile modal - how many students they've registered overall and this month
+// api for the admin profile modal - how many students they've registered overall and this month.
+// Meaningless for a sub_director (nothing sets createdByAdminId to their id) - just shows 0s, no
+// special-casing needed.
 export const getAdminProfile = async (req, res) => {
     try {
-        const admin = await User.findOne({ _id: req.params.id, role: 'admin' }).select('-passwordHash').populate('branchId', 'name')
+        const admin = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } }).select('-passwordHash').populate('branchId', 'name')
         if (!admin) return res.status(404).json({ error: 'not_found' })
+        if (isSubDirector(req) && (admin.role !== 'admin' || String(admin.branchId?._id || admin.branchId) !== String(req.auth.branchId))) {
+            return res.status(404).json({ error: 'not_found' })
+        }
 
         const startOfThisMonthDate = startOfThisMonth()
         const totalStudentsAdded = await User.countDocuments({ role: 'student', createdByAdminId: admin._id })
@@ -276,7 +329,12 @@ export const getAdminProfile = async (req, res) => {
 
 export const deleteAdmin = async (req, res) => {
     try {
-        await User.findOneAndDelete({ _id: req.params.id, role: 'admin' })
+        const existing = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } })
+        if (!existing) return res.status(404).json({ error: 'not_found' })
+        if (isSubDirector(req) && (existing.role !== 'admin' || String(existing.branchId) !== String(req.auth.branchId))) {
+            return res.status(404).json({ error: 'not_found' })
+        }
+        await User.deleteOne({ _id: existing._id })
         res.json({ deleted: true })
     } catch (error) {
         console.log(error)
@@ -286,12 +344,18 @@ export const deleteAdmin = async (req, res) => {
 
 export const createTeacher = async (req, res) => {
     try {
-        const { name, phone, password, branchId, additionalBranchIds } = req.body
+        const { name, phone, password, additionalBranchIds } = req.body
+        // a sub_director can only ever create teachers in their own branch - their own branchId
+        // wins regardless of whatever the request body says, and they can't grant multi-branch
+        // access to a branch they don't themselves belong to
+        const branchId = isSubDirector(req) ? req.auth.branchId : req.body.branchId
+        const finalAdditionalBranchIds = isSubDirector(req) ? [] : (additionalBranchIds || [])
         const salt = await bcrypt.genSalt(10)
         const passwordHash = await bcrypt.hash(password, salt)
-        const teacher = await User.create({ name, phone, passwordHash, role: 'teacher', branchId, additionalBranchIds: additionalBranchIds || [] })
+        const teacher = await User.create({ name, phone, passwordHash, role: 'teacher', branchId, additionalBranchIds: finalAdditionalBranchIds })
         res.status(201).json({ teacher: { id: teacher._id, name: teacher.name, branchId: teacher.branchId, additionalBranchIds: teacher.additionalBranchIds } })
     } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ error: 'phone_already_in_use' })
         console.log(error)
         res.status(500).json({ error: 'server_error' })
     }
@@ -299,7 +363,7 @@ export const createTeacher = async (req, res) => {
 
 export const listTeachers = async (req, res) => {
     try {
-        const teachers = await User.find({ role: 'teacher' }).select('-passwordHash').populate('branchId', 'name').populate('additionalBranchIds', 'name')
+        const teachers = await User.find({ role: 'teacher', ...teacherBranchMembershipFilter(req) }).select('-passwordHash').populate('branchId', 'name').populate('additionalBranchIds', 'name')
         const activeGroups = await Group.find({ status: 'active' }).select('teacherId studentIds')
 
         const withStudentCounts = teachers.map(t => {
@@ -320,6 +384,7 @@ export const getTeacherProfile = async (req, res) => {
     try {
         const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' }).select('-passwordHash').populate('branchId', 'name')
         if (!teacher) return res.status(404).json({ error: 'not_found' })
+        if (isSubDirector(req) && !teacherBelongsToBranch(teacher, req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
 
         const groups = await Group.find({ teacherId: teacher._id })
             .populate('languageId', 'name')
@@ -344,9 +409,15 @@ export const getTeacherProfile = async (req, res) => {
 
 export const updateTeacher = async (req, res) => {
     try {
+        const existing = await User.findOne({ _id: req.params.id, role: 'teacher' })
+        if (!existing) return res.status(404).json({ error: 'not_found' })
+        if (isSubDirector(req) && !teacherBelongsToBranch(existing, req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
+
         const { name, phone, branchId, password, additionalBranchIds } = req.body
-        const update = { name, phone, branchId }
-        if (additionalBranchIds !== undefined) update.additionalBranchIds = additionalBranchIds
+        // a sub_director can't move a teacher to a different branch or grant multi-branch access -
+        // their own branch is the only one they're allowed to touch
+        const update = isSubDirector(req) ? { name, phone } : { name, phone, branchId }
+        if (!isSubDirector(req) && additionalBranchIds !== undefined) update.additionalBranchIds = additionalBranchIds
         if (password) {
             const salt = await bcrypt.genSalt(10)
             update.passwordHash = await bcrypt.hash(password, salt)
@@ -363,7 +434,10 @@ export const updateTeacher = async (req, res) => {
 
 export const deleteTeacher = async (req, res) => {
     try {
-        await User.findOneAndDelete({ _id: req.params.id, role: 'teacher' })
+        const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' })
+        if (!teacher) return res.status(404).json({ error: 'not_found' })
+        if (isSubDirector(req) && !teacherBelongsToBranch(teacher, req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
+        await User.deleteOne({ _id: teacher._id })
         res.json({ deleted: true })
     } catch (error) {
         console.log(error)
@@ -417,10 +491,15 @@ export const getAttendanceOverview = async (req, res) => {
         const startOfDay = new Date(requestedDate); startOfDay.setUTCHours(0, 0, 0, 0)
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
-        const teachers = await User.find({ role: 'teacher' }).select('name branchId').populate('branchId', 'name')
+        const teachers = await User.find({ role: 'teacher', ...teacherBranchMembershipFilter(req) }).select('name branchId').populate('branchId', 'name')
         const teacherCheckIns = await TeacherAttendance.find({ date: { $gte: startOfDay, $lt: endOfDay } })
         const checkInByTeacher = Object.fromEntries(teacherCheckIns.map(t => [String(t.teacherId), t.scannedAt]))
         const allGroups = await Group.find({ teacherId: { $in: teachers.map(t => t._id) } })
+
+        // a sub_director's teacher list is already branch-scoped above, but a teacher can also
+        // teach a group OUTSIDE this branch via additionalBranchIds - narrow the student-side
+        // aggregates below to this branch's own groups specifically, not just "this branch's teachers'" groups
+        const branchGroupIds = isSubDirector(req) ? (await Group.find({ branchId: req.auth.branchId }).select('_id')).map(g => g._id) : null
 
         const teacherRows = teachers.map(t => {
             const scannedAt = checkInByTeacher[String(t._id)] || null
@@ -437,7 +516,7 @@ export const getAttendanceOverview = async (req, res) => {
         })
 
         const studentAttendanceByBranch = await Attendance.aggregate([
-            { $match: { scannedAt: { $gte: startOfDay, $lt: endOfDay } } },
+            { $match: { scannedAt: { $gte: startOfDay, $lt: endOfDay }, ...(branchGroupIds ? { groupId: { $in: branchGroupIds } } : {}) } },
             { $lookup: { from: 'groups', localField: 'groupId', foreignField: '_id', as: 'group' } },
             { $unwind: '$group' },
             { $group: { _id: '$group.branchId', count: { $sum: 1 } } },
@@ -461,7 +540,7 @@ export const getAttendanceOverview = async (req, res) => {
         })
 
         const groupAttendanceRaw = await Attendance.aggregate([
-            { $match: { scannedAt: { $gte: startOfDay, $lt: endOfDay } } },
+            { $match: { scannedAt: { $gte: startOfDay, $lt: endOfDay }, ...(branchGroupIds ? { groupId: { $in: branchGroupIds } } : {}) } },
             { $group: { _id: '$groupId', count: { $sum: 1 } } },
         ])
         const groupDocs = await Group.find({ _id: { $in: groupAttendanceRaw.map(g => g._id) } })
@@ -595,8 +674,8 @@ export const deleteLanguage = async (req, res) => {
 // api to add a new level within a language (e.g. Advanced, order 4)
 export const createLevel = async (req, res) => {
     try {
-        const { languageId, name, order, durationDays } = req.body
-        const level = await Level.create({ languageId, name, order, durationDays: durationDays || 300 })
+        const { languageId, name, order, durationDays, hasReading } = req.body
+        const level = await Level.create({ languageId, name, order, durationDays: durationDays || 300, hasReading: hasReading !== false })
         res.status(201).json({ level })
     } catch (error) {
         console.log(error)
@@ -606,11 +685,33 @@ export const createLevel = async (req, res) => {
 
 export const updateLevel = async (req, res) => {
     try {
-        const { name, order, durationDays } = req.body
+        const { name, order, durationDays, hasReading } = req.body
         const update = { name, order }
         if (durationDays !== undefined) update.durationDays = durationDays
+        if (hasReading !== undefined) update.hasReading = hasReading
         const level = await Level.findByIdAndUpdate(req.params.id, update, { new: true, runValidators: true })
         if (!level) return res.status(404).json({ error: 'not_found' })
+        res.json({ level })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// api for the Homework builder's "delete last lesson" - the mirror of "+ Add lesson": removes
+// whatever content sits on the level's current LAST day (if any was authored) and shrinks
+// durationDays by 1. Always operates on the trailing day, never an arbitrary one, so nothing ever
+// needs renumbering.
+export const deleteLastLesson = async (req, res) => {
+    try {
+        const level = await Level.findById(req.params.id)
+        if (!level) return res.status(404).json({ error: 'not_found' })
+        if (level.durationDays <= 1) return res.status(409).json({ error: 'cannot_delete_only_lesson' })
+
+        await deleteDayContent(level.languageId, level._id, level.durationDays)
+        level.durationDays -= 1
+        await level.save()
+
         res.json({ level })
     } catch (error) {
         console.log(error)
@@ -662,13 +763,13 @@ export const updateSettings = async (req, res) => {
 // api to list every group across every branch - used for the director's group-limits management view
 export const listAllGroups = async (req, res) => {
     try {
-        const groups = await Group.find({})
+        const groups = await Group.find({ ...branchOnlyFilter(req) })
             .populate('branchId', 'name')
             .populate('languageId', 'name')
             .populate('levelId', 'name order durationDays')
             .populate('teacherId', 'name')
             .populate('roomId', 'name')
-        const withFreshDay = groups.map(g => ({ ...g.toObject(), dayCounter: computeDayCounter(g.startDate, g.levelId?.durationDays || 30) }))
+        const withFreshDay = groups.map(g => ({ ...g.toObject(), dayCounter: computeDayCounter(g, g.levelId?.durationDays || 30) }))
         res.json({ groups: withFreshDay })
     } catch (error) {
         console.log(error)
@@ -682,6 +783,7 @@ export const updateGroupLimits = async (req, res) => {
     try {
         const group = await Group.findById(req.params.id)
         if (!group) return res.status(404).json({ error: 'not_found' })
+        if (isSubDirector(req) && String(group.branchId) !== String(req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
 
         const { teacherId, schedulePattern, time, capacity } = req.body
         const nextTeacherId = teacherId || group.teacherId
@@ -785,6 +887,7 @@ export const getPaymentDetail = async (req, res) => {
             .populate('adminId', 'name')
             .populate('refundedBy', 'name')
         if (!payment) return res.status(404).json({ error: 'not_found' })
+        if (isSubDirector(req) && String(payment.branchId) !== String(req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
         res.json({ payment })
     } catch (error) {
         console.log(error)
@@ -795,7 +898,9 @@ export const getPaymentDetail = async (req, res) => {
 export const listPayRates = async (req, res) => {
     try {
         if (!req.query.branchId) return res.status(400).json({ error: 'branch_required' })
-        const rates = await TeacherPayRate.find({ branchId: req.query.branchId }).populate('teacherId', 'name')
+        const rates = await TeacherPayRate.find({ branchId: req.query.branchId })
+            .populate('teacherId', 'name')
+            .populate('groupId', 'name languageId levelId')
         res.json({ rates })
     } catch (error) {
         console.log(error)
@@ -805,12 +910,13 @@ export const listPayRates = async (req, res) => {
 
 export const setPayRate = async (req, res) => {
     try {
-        const { branchId, teacherId, rateType, rateValue } = req.body
+        const { branchId, teacherId, groupId, rateType, rateValue } = req.body
         if (!branchId) return res.status(400).json({ error: 'branch_required' })
         if (!PAY_RATE_TYPES.includes(rateType)) return res.status(400).json({ error: 'invalid_rate_type' })
+        if (groupId && !teacherId) return res.status(400).json({ error: 'teacher_required_for_group_rate' })
 
         const rate = await TeacherPayRate.findOneAndUpdate(
-            { branchId, teacherId: teacherId || null },
+            { branchId, teacherId: teacherId || null, groupId: groupId || null },
             { rateType, rateValue },
             { upsert: true, new: true, runValidators: true }
         )

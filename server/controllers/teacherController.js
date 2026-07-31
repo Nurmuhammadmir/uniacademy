@@ -19,10 +19,11 @@ import Curriculum from "../models/Curriculum.js"
 import Concept from "../models/Concept.js" // required so mongoose can resolve populate('conceptId'/'options'/'correct') refs below
 import WordForm from "../models/WordForm.js"
 import Translation from "../models/Translation.js"
-import { computeDayCounter } from "../services/dayCounter.service.js"
+import { computeDayCounter, isRestDay, isReviewDay } from "../services/dayCounter.service.js"
 import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
 import { getNextLessonDate, timeToMinutes, earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
 import { computeEffectiveLessonStatuses } from "../services/lessonStatus.service.js"
+import { pickReviewExercises } from "../services/reviewHomework.service.js"
 
 export const getMyGroups = async (req, res) => {
     try {
@@ -42,7 +43,7 @@ export const getMyGroups = async (req, res) => {
             const averageScore = rowsForGroup.length > 0
                 ? Math.round(rowsForGroup.reduce((sum, r) => sum + ((r.vocabScore || 0) + (r.grammarScore || 0) + (r.readingScore || 0)) / 3, 0) / rowsForGroup.length)
                 : null
-            return { ...g.toObject(), dayCounter: computeDayCounter(g.startDate, g.levelId?.durationDays || 30), averageScore }
+            return { ...g.toObject(), dayCounter: computeDayCounter(g, g.levelId?.durationDays || 30), averageScore }
         })
 
         // the single soonest upcoming class across every group this teacher runs - shown as a
@@ -124,19 +125,26 @@ export const getGroupStudents = async (req, res) => {
         // the curriculum (a day can legitimately be missing one, e.g. no reading text yet), so the
         // teacher sees the same shape of homework her students see on their own Today page, without
         // having to go check a student's phone
-        const level = await Level.findById(group.levelId).select('durationDays')
+        const level = await Level.findById(group.levelId).select('durationDays hasReading')
         const durationDays = level?.durationDays || 30
-        const dayCounter = computeDayCounter(group.startDate, durationDays)
-        const [vocabCount, grammarCount, readingText] = await Promise.all([
-            VocabExercise.countDocuments({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }),
-            GrammarExercise.countDocuments({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }),
-            ReadingText.exists({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }),
-        ])
+        const hasReading = level?.hasReading !== false
+        const dayCounter = computeDayCounter(group, durationDays)
+        const restDay = isRestDay(group)
+        const reviewDay = isReviewDay(group)
+
+        let vocabCount = 0, grammarCount = 0, readingText = null
+        if (!restDay && !reviewDay) {
+            ;[vocabCount, grammarCount, readingText] = await Promise.all([
+                VocabExercise.countDocuments({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }),
+                GrammarExercise.countDocuments({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }),
+                hasReading ? ReadingText.exists({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }) : null,
+            ])
+        }
 
         res.json({
             students,
             today: {
-                dayCounter, durationDays,
+                dayCounter, durationDays, hasReading, restDay, reviewDay,
                 vocab: vocabCount > 0, grammar: grammarCount > 0, reading: !!readingText,
             },
         })
@@ -159,14 +167,26 @@ export const getTodayHomework = async (req, res) => {
 
         const level = await Level.findById(group.levelId).select('durationDays')
         const durationDays = level?.durationDays || 30
-        const dayCounter = computeDayCounter(group.startDate, durationDays)
+        const dayCounter = computeDayCounter(group, durationDays)
 
-        const curriculum = await Curriculum.findOne({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }).populate('conceptIds')
-        const vocab = await VocabExercise.find({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
-            .populate('conceptId').populate('options').populate('correct')
-        const grammar = await GrammarExercise.find({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
-        const readingText = await ReadingText.findOne({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
-        const readingExercises = readingText ? await ReadingExercise.find({ readingTextId: readingText._id }) : []
+        if (isRestDay(group)) return res.json({ dayCounter, durationDays, restDay: true })
+
+        let curriculum, vocab, grammar, readingText, readingExercises
+        if (isReviewDay(group)) {
+            const review = await pickReviewExercises(group, dayCounter)
+            curriculum = null
+            vocab = review.vocab
+            grammar = review.grammar
+            readingText = null
+            readingExercises = []
+        } else {
+            curriculum = await Curriculum.findOne({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }).populate('conceptIds')
+            vocab = await VocabExercise.find({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
+                .populate('conceptId').populate('options').populate('correct')
+            grammar = await GrammarExercise.find({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
+            readingText = await ReadingText.findOne({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
+            readingExercises = readingText ? await ReadingExercise.find({ readingTextId: readingText._id }) : []
+        }
 
         // same word/translation enrichment studentController.getHomeworkForDay does, so a vocab
         // prompt here renders identically to what the student actually sees on their own phone
@@ -201,7 +221,7 @@ export const getTodayHomework = async (req, res) => {
         }))
 
         res.json({
-            dayCounter, durationDays,
+            dayCounter, durationDays, reviewDay: isReviewDay(group),
             vocab: enrichedVocab, grammar, readingText, readingExercises,
         })
     } catch (error) {
@@ -225,7 +245,7 @@ export const getStudentDayDetail = async (req, res) => {
         // hasn't opened/submitted yet has no row at all, which was silently dropping it from this
         // view entirely instead of showing it as "not started yet". Same day-count math getMyGroups uses.
         const level = await Level.findById(group.levelId).select('durationDays')
-        const dayCounter = computeDayCounter(group.startDate, level?.durationDays || 30)
+        const dayCounter = computeDayCounter(group, level?.durationDays || 30)
 
         const existingRows = await StudentProgress.find({ groupId, studentId })
         const rowByDay = Object.fromEntries(existingRows.map(r => [r.day, r]))
@@ -274,7 +294,7 @@ export const createAttendanceSession = async (req, res) => {
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         const level = await Level.findById(group.levelId).select('durationDays')
-        const day = computeDayCounter(group.startDate, level?.durationDays || 30)
+        const day = computeDayCounter(group, level?.durationDays || 30)
         const token = crypto.randomBytes(16).toString('hex')
         const expiresAt = new Date(Date.now() + 2 * 60 * 1000)
 

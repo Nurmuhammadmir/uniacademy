@@ -3,6 +3,7 @@ import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Logo from '../components/Logo.jsx'
 import PasswordInput from '../components/PasswordInput.jsx'
+import Spinner from '../components/Spinner.jsx'
 
 const Login = () => {
   const { login } = useContext(DirectorContext)
@@ -32,8 +33,8 @@ const Login = () => {
           className='w-full px-4 py-3 rounded-xl bg-bg border border-hairline text-ink placeholder:text-muted mb-3' required />
         <PasswordInput placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)}
           className='w-full px-4 py-3 rounded-xl bg-bg border border-hairline text-ink placeholder:text-muted mb-4' required />
-        <button type='submit' disabled={loading} className='w-full py-3 rounded-xl bg-accent text-white font-medium disabled:opacity-60'>
-          {loading ? t('signingIn') : t('signIn')}
+        <button type='submit' disabled={loading} className='w-full py-3 rounded-xl bg-accent text-white font-medium disabled:opacity-60 flex items-center justify-center gap-2'>
+          {loading && <Spinner size={14} />} {loading ? t('signingIn') : t('signIn')}
         </button>
       </form>
     </div>

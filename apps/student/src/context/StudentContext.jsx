@@ -155,6 +155,42 @@ const StudentContextProvider = (props) => {
         }
     }
 
+    // Sunday's review recap - a fresh random re-draw of already-covered vocab/grammar (see server's
+    // reviewHomework.service.js). Graded exactly like a real day, but never touches progress/streak,
+    // so its submit functions deliberately don't call getHomeworkWeek/getProgress afterwards.
+    const getHomeworkReview = async () => {
+        if (!selectedGroupId) return null
+        try {
+            const { data } = await axios.get(backendUrl + '/api/student/homework/review?groupId=' + selectedGroupId, authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'could not load review')
+            return null
+        }
+    }
+
+    // signature matches submitVocab/submitGrammar (groupId, day, answers) so ExerciseModal can call
+    // either interchangeably without knowing it's in review mode - groupId/day are simply unused here
+    const submitReviewVocab = async (groupId, day, answers) => {
+        try {
+            const { data } = await axios.post(backendUrl + '/api/student/homework/review/vocab/submit', { answers }, authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'submit failed')
+            return null
+        }
+    }
+
+    const submitReviewGrammar = async (groupId, day, answers) => {
+        try {
+            const { data } = await axios.post(backendUrl + '/api/student/homework/review/grammar/submit', { answers }, authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || 'submit failed')
+            return null
+        }
+    }
+
     // enabledStudentLanguages here controls which UI languages the app's language switcher offers
     const getSettings = async () => {
         try {
@@ -256,6 +292,7 @@ const StudentContextProvider = (props) => {
         myGroups, getMyGroups, selectedGroupId, setSelectedGroupId,
         week, getHomeworkWeek, getHomeworkForDay,
         submitVocab, submitGrammar, submitReading,
+        getHomeworkReview, submitReviewVocab, submitReviewGrammar,
         progress, getProgress, getAttendanceSummary, getGroupRanking, getGroupProgress, getExam, submitExam,
         scanAttendance,
         settings, getSettings,

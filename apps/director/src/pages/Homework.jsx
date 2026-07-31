@@ -15,7 +15,7 @@ import ReadingBankModal from '../components/ReadingBankModal.jsx'
 const Homework = () => {
   const {
     languages, getLanguages, levels, getLevels, getContentSummary, getDayContent,
-    getExamConfig, saveExamConfig,
+    getExamConfig, saveExamConfig, updateLevel, deleteLastLesson,
   } = useContext(DirectorContext)
   const { t } = useLanguage()
 
@@ -32,6 +32,8 @@ const Homework = () => {
   const [examConfig, setExamConfig] = useState(null)
   const [examForm, setExamForm] = useState({ durationMinutes: 90, passScore: 70 })
   const [savingExam, setSavingExam] = useState(false)
+  const [addingLesson, setAddingLesson] = useState(false)
+  const [deletingLesson, setDeletingLesson] = useState(false)
 
   useEffect(() => { if (!languages.length) getLanguages() }, [])
 
@@ -82,6 +84,27 @@ const Homework = () => {
     if (day) { const content = await getDayContent(languageId, levelId, day); setDayContent(content) }
   }
 
+  // a level's real length is now however many actual lessons the group meets for (see the
+  // schedule-based day counter) - rather than asking the director to pre-guess a total upfront,
+  // they build it out one lesson at a time here, same idea as the word/grammar/reading banks.
+  const addLesson = async () => {
+    setAddingLesson(true)
+    await updateLevel(levelId, { durationDays: durationDays + 1 }, languageId)
+    setAddingLesson(false)
+  }
+
+  // undo button for the above - always removes the CURRENT last lesson (never an arbitrary one),
+  // so nothing ever needs renumbering. Also deletes whatever vocab/grammar/reading was already
+  // authored on that day, so undoing an accidental "+ Add lesson" never leaves orphaned content.
+  const removeLastLesson = async () => {
+    setDeletingLesson(true)
+    const removedDay = durationDays
+    const ok = await deleteLastLesson(levelId, languageId)
+    setDeletingLesson(false)
+    if (ok && day === removedDay) { setDay(null); setDayContent(null) }
+    if (ok) await loadSummary(languageId, levelId)
+  }
+
   const dot = (on) => <span className={`w-1.5 h-1.5 rounded-full ${on ? 'bg-accent' : 'bg-hairline'}`} />
 
   return (
@@ -100,7 +123,7 @@ const Homework = () => {
         <select value={levelId} onChange={e => onSelectLevel(e.target.value)} disabled={!languageId}
           className='px-4 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm text-ink min-w-[180px] disabled:opacity-50'>
           <option value=''>{t('selectLevel')}</option>
-          {levelsForLanguage.sort((a, b) => a.order - b.order).map(l => <option key={l._id} value={l._id}>{l.name} · {l.durationDays || 300}d</option>)}
+          {levelsForLanguage.sort((a, b) => a.order - b.order).map(l => <option key={l._id} value={l._id}>{l.name} · {l.durationDays || 300} {t('lessonsSuffix')}</option>)}
         </select>
 
         {levelId && (
@@ -111,9 +134,11 @@ const Homework = () => {
             <button onClick={() => setShowGrammarBank(true)} className='px-4 py-2.5 rounded-xl border border-hairline text-sm text-accent font-medium'>
               {t('grammarBank')}
             </button>
-            <button onClick={() => setShowReadingBank(true)} className='px-4 py-2.5 rounded-xl border border-hairline text-sm text-accent font-medium'>
-              {t('readingBank')}
-            </button>
+            {selectedLevel?.hasReading !== false && (
+              <button onClick={() => setShowReadingBank(true)} className='px-4 py-2.5 rounded-xl border border-hairline text-sm text-accent font-medium'>
+                {t('readingBank')}
+              </button>
+            )}
           </>
         )}
       </div>
@@ -126,7 +151,7 @@ const Homework = () => {
       {levelId && (
         <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 mb-8'>
           <p className='font-display text-lg text-ink mb-1'>{t('levelExam')}</p>
-          <p className='text-xs text-muted mb-3'>{t('examAutoNote')}</p>
+          <p className='text-xs text-muted mb-3'>{selectedLevel?.hasReading === false ? t('examAutoNoteNoReading') : t('examAutoNote')}</p>
           <form onSubmit={submitExamForm} className='flex flex-wrap items-end gap-3'>
             <div>
               <label className='block text-xs text-muted mb-1'>{t('passMark')}</label>
@@ -147,7 +172,9 @@ const Homework = () => {
         </div>
       )}
 
-      {/* day grid */}
+      {/* lesson grid - one tile per real lesson this level has content for, plus a trailing "add
+          lesson" tile so the director builds this out incrementally instead of pre-guessing a
+          total count upfront */}
       {levelId && (
         <div className='grid grid-cols-[repeat(auto-fill,minmax(78px,1fr))] gap-2 mb-8'>
           {Array.from({ length: durationDays }, (_, i) => i + 1).map(d => {
@@ -158,10 +185,22 @@ const Homework = () => {
                 className={`aspect-square rounded-xl border flex flex-col items-center justify-center gap-1.5 text-sm
                   ${day === d ? 'border-accent bg-accent-soft' : anything ? 'border-accent/40 bg-bg-elevated' : 'border-hairline bg-bg-elevated'}`}>
                 <span className='text-ink font-medium'>{t('dayN', { day: d })}</span>
-                <span className='flex gap-1'>{dot(s.vocab)}{dot(s.grammar)}{dot(s.reading)}</span>
+                <span className='flex gap-1'>{dot(s.vocab)}{dot(s.grammar)}{selectedLevel?.hasReading !== false && dot(s.reading)}</span>
               </button>
             )
           })}
+          <button onClick={addLesson} disabled={addingLesson}
+            className='aspect-square rounded-xl border border-dashed border-hairline flex flex-col items-center justify-center gap-1 text-sm text-muted hover:border-accent hover:text-accent disabled:opacity-50'>
+            <span className='text-xl leading-none'>+</span>
+            <span className='text-[11px]'>{t('addLesson')}</span>
+          </button>
+          {durationDays > 1 && (
+            <button onClick={removeLastLesson} disabled={deletingLesson}
+              className='aspect-square rounded-xl border border-dashed border-hairline flex flex-col items-center justify-center gap-1 text-sm text-muted hover:border-red-500 hover:text-red-500 disabled:opacity-50'>
+              <span className='text-xl leading-none'>−</span>
+              <span className='text-[11px]'>{t('deleteLastLesson')}</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -177,9 +216,11 @@ const Homework = () => {
               <TaskCard title={t('grammar')} desc={t('grammarDesc')}
                 status={dayContent?.grammar?.length ? t('exercisesCount', { count: dayContent.grammar.length }) : t('empty')}
                 filled={!!dayContent?.grammar?.length} onEdit={() => setEditor('grammar')} t={t} />
-              <TaskCard title={t('reading')} desc={t('readingDesc')}
-                status={dayContent?.reading ? t('set') : t('empty')}
-                filled={!!dayContent?.reading} onEdit={() => setEditor('reading')} t={t} />
+              {selectedLevel?.hasReading !== false && (
+                <TaskCard title={t('reading')} desc={t('readingDesc')}
+                  status={dayContent?.reading ? t('set') : t('empty')}
+                  filled={!!dayContent?.reading} onEdit={() => setEditor('reading')} t={t} />
+              )}
             </div>
           )}
         </div>

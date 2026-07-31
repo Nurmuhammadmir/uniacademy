@@ -2,6 +2,7 @@ import React, { useContext, useState } from 'react'
 import { StudentContext } from '../context/StudentContext.jsx'
 import Logo from '../components/Logo.jsx'
 import PasswordInput from '../components/PasswordInput.jsx'
+import Spinner from '../components/Spinner.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const Login = () => {
@@ -33,8 +34,8 @@ const Login = () => {
           className='w-full px-4 py-4 rounded-2xl bg-bg-elevated border border-hairline text-ink placeholder:text-muted' required />
         <PasswordInput placeholder={t('password')} value={password} onChange={(e) => setPassword(e.target.value)}
           className='w-full px-4 py-4 rounded-2xl bg-bg-elevated border border-hairline text-ink placeholder:text-muted' required />
-        <button type='submit' disabled={loading} className='w-full py-4 rounded-2xl bg-accent text-white font-medium text-base disabled:opacity-60'>
-          {loading ? t('signingIn') : t('signIn')}
+        <button type='submit' disabled={loading} className='w-full py-4 rounded-2xl bg-accent text-white font-medium text-base disabled:opacity-60 flex items-center justify-center gap-2'>
+          {loading && <Spinner size={14} />} {loading ? t('signingIn') : t('signIn')}
         </button>
       </form>
     </div>

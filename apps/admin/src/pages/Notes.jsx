@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import Spinner from '../components/Spinner.jsx'
 
 const Notes = () => {
   const { getMyNotes, createMyNote, deleteMyNote } = useContext(AdminContext)
@@ -33,8 +34,8 @@ const Notes = () => {
       <form onSubmit={submitNote} className='bg-bg-elevated border border-hairline rounded-2xl p-5 mb-6 flex flex-col gap-3'>
         <textarea value={text} onChange={e => setText(e.target.value)} placeholder={t('noteTextPlaceholder')} rows={3}
           className='px-4 py-3 rounded-xl bg-bg border border-hairline text-sm' />
-        <button type='submit' disabled={saving} className='self-start px-5 py-2 rounded-xl bg-accent text-white text-sm font-medium disabled:opacity-50'>
-          {t('addNoteBtn')}
+        <button type='submit' disabled={saving} className='self-start px-5 py-2 rounded-xl bg-accent text-white text-sm font-medium disabled:opacity-50 flex items-center gap-2'>
+          {saving && <Spinner size={14} />} {t('addNoteBtn')}
         </button>
       </form>
 

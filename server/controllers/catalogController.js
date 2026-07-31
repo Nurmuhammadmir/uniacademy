@@ -40,9 +40,13 @@ export const listLevels = async (req, res) => {
     }
 }
 
+// only the director route mounts this - a sub_director (scoped to one branch) gets a
+// single-item list back so every branch-switcher built on top of it (Finance/Timetable/Groups/
+// Students/Teachers filters) degrades to just their own branch with zero UI changes needed there
 export const listBranches = async (req, res) => {
     try {
-        const branches = await Branch.find({}).lean()
+        const filter = req.auth?.role === 'sub_director' ? { _id: req.auth.branchId } : {}
+        const branches = await Branch.find(filter).lean()
         res.json({ branches })
     } catch (error) {
         console.log(error)

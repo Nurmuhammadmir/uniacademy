@@ -12,13 +12,13 @@ const Admins = () => {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [viewingId, setViewingId] = useState(null)
-  const [form, setForm] = useState({ name: '', phone: '', password: '', branchId: '' })
+  const [form, setForm] = useState({ name: '', phone: '', password: '', branchId: '', role: 'admin' })
   const [editForm, setEditForm] = useState({ name: '', phone: '', branchId: '', password: '' })
 
   const submit = async (e) => {
     e.preventDefault()
     const ok = await createAdmin(form)
-    if (ok) { setShowCreate(false); setForm({ name: '', phone: '', password: '', branchId: '' }) }
+    if (ok) { setShowCreate(false); setForm({ name: '', phone: '', password: '', branchId: '', role: 'admin' }) }
   }
 
   const openEdit = (admin) => {
@@ -55,6 +55,7 @@ const Admins = () => {
               <th className='px-5 py-3 font-medium'>{t('nameCol')}</th>
               <th className='px-5 py-3 font-medium'>{t('phoneCol')}</th>
               <th className='px-5 py-3 font-medium'>{t('branch')}</th>
+              <th className='px-5 py-3 font-medium'>{t('roleCol')}</th>
               <th className='px-5 py-3'></th>
             </tr>
           </thead>
@@ -66,6 +67,13 @@ const Admins = () => {
                 </td>
                 <td className='px-5 py-4 text-muted font-mono'>{a.phone}</td>
                 <td className='px-5 py-4 text-muted'>{a.branchId?.name}</td>
+                <td className='px-5 py-4'>
+                  {a.role === 'sub_director' ? (
+                    <span className='px-2 py-0.5 rounded-full text-xs font-medium bg-accent-soft text-accent'>{t('roleSubDirector')}</span>
+                  ) : (
+                    <span className='px-2 py-0.5 rounded-full text-xs font-medium bg-bg border border-hairline text-muted'>{t('roleAdmin')}</span>
+                  )}
+                </td>
                 <td className='px-5 py-4 text-right whitespace-nowrap'>
                   <button onClick={() => openEdit(a)} className='text-accent text-xs font-medium mr-3'>{t('edit')}</button>
                   <button onClick={() => deleteAdminAccount(a._id)} className='text-muted text-xs font-medium'>{t('remove')}</button>
@@ -73,7 +81,7 @@ const Admins = () => {
               </tr>
             ))}
             {filtered.length === 0 && (
-              <tr><td colSpan={4} className='px-5 py-8 text-center text-muted'>{admins.length === 0 ? t('noAdminsYet') : t('noAdminsMatchSearch')}</td></tr>
+              <tr><td colSpan={5} className='px-5 py-8 text-center text-muted'>{admins.length === 0 ? t('noAdminsYet') : t('noAdminsMatchSearch')}</td></tr>
             )}
           </tbody>
         </table>
@@ -82,6 +90,15 @@ const Admins = () => {
       {showCreate && (
         <Modal title={t('addAdminTitle')} onClose={() => setShowCreate(false)}>
           <form onSubmit={submit} className='flex flex-col gap-3'>
+            <div className='flex gap-2'>
+              {[['admin', t('roleAdmin')], ['sub_director', t('roleSubDirector')]].map(([value, label]) => (
+                <button key={value} type='button' onClick={() => setForm({ ...form, role: value })}
+                  className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-medium border ${form.role === value ? 'bg-accent text-white border-accent' : 'bg-bg border-hairline text-muted'}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            {form.role === 'sub_director' && <p className='text-xs text-muted -mt-1'>{t('subDirectorHint')}</p>}
             <input placeholder={t('adminName')} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <input placeholder={t('adminPhone')} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
@@ -92,7 +109,7 @@ const Admins = () => {
               <option value=''>{t('branch')}</option>
               {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
             </select>
-            <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('createAdminBtn')}</button>
+            <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{form.role === 'sub_director' ? t('createSubDirectorBtn') : t('createAdminBtn')}</button>
           </form>
         </Modal>
       )}

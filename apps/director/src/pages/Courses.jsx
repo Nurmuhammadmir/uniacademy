@@ -12,7 +12,7 @@ const Courses = () => {
 
   const [addingLevelFor, setAddingLevelFor] = useState(null)
   const [editingLevel, setEditingLevel] = useState(null)
-  const [levelForm, setLevelForm] = useState({ name: '', order: 0, durationDays: 300 })
+  const [levelForm, setLevelForm] = useState({ name: '', order: 0, durationDays: 300, hasReading: true })
 
   useEffect(() => { getLevels() }, [])
 
@@ -34,16 +34,16 @@ const Courses = () => {
     e.preventDefault()
     if (editingLevel) {
       const ok = await updateLevel(editingLevel._id, levelForm, editingLevel.languageId)
-      if (ok) { setEditingLevel(null); setLevelForm({ name: '', order: 0, durationDays: 300 }) }
+      if (ok) { setEditingLevel(null); setLevelForm({ name: '', order: 0, durationDays: 300, hasReading: true }) }
     } else {
       const ok = await createLevel({ languageId: addingLevelFor, ...levelForm })
-      if (ok) { setAddingLevelFor(null); setLevelForm({ name: '', order: 0, durationDays: 300 }) }
+      if (ok) { setAddingLevelFor(null); setLevelForm({ name: '', order: 0, durationDays: 300, hasReading: true }) }
     }
   }
 
   const openEditLevel = (level, languageId) => {
     setEditingLevel({ ...level, languageId })
-    setLevelForm({ name: level.name, order: level.order, durationDays: level.durationDays || 300 })
+    setLevelForm({ name: level.name, order: level.order, durationDays: level.durationDays || 300, hasReading: level.hasReading !== false })
   }
 
   return (
@@ -65,7 +65,7 @@ const Courses = () => {
               </div>
               <div className='flex gap-3'>
                 <button onClick={() => openEditLanguage(lang)} className='text-accent text-xs font-medium'>{t('edit')}</button>
-                <button onClick={() => { setAddingLevelFor(lang._id); setLevelForm({ name: '', order: (levels.filter(l => l.languageId === lang._id).length), durationDays: 300 }) }} className='text-accent text-xs font-medium'>{t('addLevel')}</button>
+                <button onClick={() => { setAddingLevelFor(lang._id); setLevelForm({ name: '', order: (levels.filter(l => l.languageId === lang._id).length), durationDays: 300, hasReading: true }) }} className='text-accent text-xs font-medium'>{t('addLevel')}</button>
                 <button onClick={() => deleteLanguage(lang._id)} className='text-red-500 text-xs font-medium'>{t('delete')}</button>
               </div>
             </div>
@@ -73,7 +73,7 @@ const Courses = () => {
             <div className='flex flex-wrap gap-2'>
               {levels.filter(l => l.languageId === lang._id).sort((a, b) => a.order - b.order).map(level => (
                 <button key={level._id} onClick={() => openEditLevel(level, lang._id)} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-sm text-ink hover:border-accent'>
-                  {level.name} <span className='text-muted font-mono text-xs'>#{level.order} · {level.durationDays || 300}d</span>
+                  {level.name} <span className='text-muted font-mono text-xs'>#{level.order} · {level.durationDays || 300} {t('lessonsSuffix')}</span>
                 </button>
               ))}
               {levels.filter(l => l.languageId === lang._id).length === 0 && <p className='text-muted text-sm'>{t('noLevelsYet')}</p>}
@@ -87,6 +87,10 @@ const Courses = () => {
                   className='w-20 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
                 <input placeholder={t('days')} type='number' min='1' max='300' title={t('durationHint')} value={levelForm.durationDays} onChange={e => setLevelForm({ ...levelForm, durationDays: Number(e.target.value) })}
                   className='w-20 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+                <label className='flex items-center gap-1.5 text-xs text-muted whitespace-nowrap'>
+                  <input type='checkbox' checked={levelForm.hasReading} onChange={e => setLevelForm({ ...levelForm, hasReading: e.target.checked })} />
+                  {t('hasReadingLabel')}
+                </label>
                 <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>{t('add')}</button>
                 <button type='button' onClick={() => setAddingLevelFor(null)} className='px-3 py-2 text-muted text-sm'>{t('cancel')}</button>
               </form>
@@ -120,6 +124,11 @@ const Courses = () => {
             <input placeholder={t('durationInDays')} type='number' min='1' max='300' value={levelForm.durationDays} onChange={e => setLevelForm({ ...levelForm, durationDays: Number(e.target.value) })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <p className='text-xs text-muted'>{t('durationHintLong')}</p>
+            <label className='flex items-center gap-2 text-sm text-ink'>
+              <input type='checkbox' checked={levelForm.hasReading} onChange={e => setLevelForm({ ...levelForm, hasReading: e.target.checked })} />
+              {t('hasReadingLabel')}
+            </label>
+            <p className='text-xs text-muted -mt-2'>{t('hasReadingHint')}</p>
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('saveChanges')}</button>
             <button type='button'
               onClick={async () => { const ok = await deleteLevel(editingLevel._id, editingLevel.languageId); if (ok) setEditingLevel(null) }}

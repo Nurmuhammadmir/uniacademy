@@ -1,5 +1,5 @@
 
-## Recent fixes & additions
+#b# Recent fixes & additions
 
 - **Bug fix:** `Cast to Number failed for value "NaN"` on `/homework/day/:day` - the endpoint now
   rejects a non-numeric `day` param with a clean 400 instead of crashing, and the frontend guards

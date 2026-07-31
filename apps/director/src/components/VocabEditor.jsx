@@ -21,10 +21,10 @@ const JSON_EXAMPLE = `{
   ]
 }`
 
-// Editor for the 10 vocab words of one day. Photos are NOT typed here - the director drops image
+// Editor for the 30 vocab words of one day. Photos are NOT typed here - the director drops image
 // files into server/public/images/vocab by hand (named after the word, e.g. market-stall.png) and
 // this editor auto-detects a match as soon as the word is typed or pasted in via JSON. The 30 test
-// questions are generated automatically on save - the director never writes them by hand.
+// questions (1 per word) are generated automatically on save - the director never writes them by hand.
 const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) => {
   const { saveVocab, uploadContentImage, resolveContentImage, backendUrl } = useContext(DirectorContext)
   const { t } = useLanguage()
@@ -34,8 +34,8 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
       word: w.word || '', example: w.example || '', image: w.image || '',
       translations: { ru: w.translations?.ru || '', uz: w.translations?.uz || '', kaa: w.translations?.kaa || '' },
     }))
-    while (rows.length < 10) rows.push(emptyRow())
-    return rows.slice(0, 10)
+    while (rows.length < 30) rows.push(emptyRow())
+    return rows.slice(0, 30)
   }
   const [rows, setRows] = useState(seed)
   const [mode, setMode] = useState('form') // 'form' | 'json'
@@ -93,16 +93,26 @@ const VocabEditor = ({ languageId, levelId, day, initial, onClose, onSaved }) =>
     const words = Array.isArray(parsed) ? parsed : parsed.words
     if (!Array.isArray(words)) { toast.error(t('expectedWordsArray')); return }
 
-    const built = words.slice(0, 10).map(w => ({
+    const newRows = words.map(w => ({
       word: w.word || '', example: w.example || '', image: '',
       translations: { ru: w.translations?.ru || '', uz: w.translations?.uz || '', kaa: w.translations?.kaa || '' },
       _imageHint: w.image || '',
     }))
-    while (built.length < 10) built.push(emptyRow())
 
-    // resolve a photo for every word - by the JSON's own "image" filename if it gave one,
-    // otherwise by matching the word itself against files already in the vocab folder
+    // pasting a batch TOPS UP whatever's already in the form (this day's already-saved words, or
+    // anything typed in before switching to the paste tab) - the new words are appended after,
+    // never replacing what's already there. Only rows that actually have a word count as "already
+    // filled"; blank placeholder rows don't.
+    const existingFilled = rows.filter(r => r.word && r.word.trim())
+    const built = [...existingFilled, ...newRows].slice(0, 30)
+    while (built.length < 30) built.push(emptyRow())
+
+    // resolve a photo for every NEW word - by the JSON's own "image" filename if it gave one,
+    // otherwise by matching the word itself against files already in the vocab folder. Existing
+    // rows (no _imageHint key at all - they came from already-saved data, not this paste) are left
+    // completely untouched, including whatever photo they already had resolved.
     const resolved = await Promise.all(built.map(async (r) => {
+      if (!('_imageHint' in r)) return r
       const { _imageHint, ...rest } = r
       if (!rest.word.trim()) return rest
       const path = _imageHint

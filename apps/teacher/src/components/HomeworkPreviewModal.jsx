@@ -7,6 +7,92 @@ import { resolveImageUrl } from '../lib/format.js'
 // shows the concept's picture, translation_match shows all 3 native translations at once,
 // fill_gap shows the example sentence with the word blanked out.
 const escapeRegExp = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+// a small table of common irregular English verbs - the fill_gap blank only forms if the exact
+// text appears somewhere in the example sentence, but a word bank almost always stores the base/
+// dictionary form ("catch") while a natural example sentence uses an inflected form ("caught").
+const IRREGULAR = {
+  catch: ['caught'], break: ['broke', 'broken'], shake: ['shook', 'shaken'],
+  steal: ['stole', 'stolen'], run: ['ran'], spend: ['spent'], have: ['has', 'had'],
+  go: ['went', 'gone', 'goes'], come: ['came'], take: ['took', 'taken'], give: ['gave', 'given'],
+  see: ['saw', 'seen'], get: ['got', 'gotten'], make: ['made'], know: ['knew', 'known'],
+  think: ['thought'], say: ['said'], do: ['did', 'done', 'does'], find: ['found'], tell: ['told'],
+  become: ['became'], leave: ['left'], feel: ['felt'], bring: ['brought'], begin: ['began', 'begun'],
+  keep: ['kept'], hold: ['held'], write: ['wrote', 'written'], stand: ['stood'], hear: ['heard'],
+  let: ['let'], mean: ['meant'], set: ['set'], meet: ['met'], pay: ['paid'], sit: ['sat'],
+  speak: ['spoke', 'spoken'], lie: ['lay', 'lain'], lead: ['led'], read: ['read'], grow: ['grew', 'grown'],
+  lose: ['lost'], fall: ['fell', 'fallen'], send: ['sent'], build: ['built'], understand: ['understood'],
+  draw: ['drew', 'drawn'], wear: ['wore', 'worn'], choose: ['chose', 'chosen'],
+  drive: ['drove', 'driven'], eat: ['ate', 'eaten'], fly: ['flew', 'flown'], forgive: ['forgave', 'forgiven'],
+  sell: ['sold'], teach: ['taught'], sing: ['sang', 'sung'], win: ['won'], swim: ['swam', 'swum'],
+  ring: ['rang', 'rung'], throw: ['threw', 'thrown'], hide: ['hid', 'hidden'], drink: ['drank', 'drunk'],
+  fight: ['fought'], hang: ['hung'], shoot: ['shot'], bite: ['bit', 'bitten'], forget: ['forgot', 'forgotten'],
+  freeze: ['froze', 'frozen'], sleep: ['slept'], sweep: ['swept'], deal: ['dealt'], feed: ['fed'],
+  bleed: ['bled'], breed: ['bred'], burn: ['burnt'], learn: ['learnt'], spell: ['spelt'],
+  spoil: ['spoilt'], dream: ['dreamt'], smell: ['smelt'], lend: ['lent'], bend: ['bent'],
+  spread: ['spread'], cut: ['cut'], hit: ['hit'], hurt: ['hurt'], put: ['put'], cost: ['cost'],
+  shut: ['shut'], quit: ['quit'], burst: ['burst'], rise: ['rose', 'risen'], ride: ['rode', 'ridden'],
+  arise: ['arose', 'arisen'], stick: ['stuck'], strike: ['struck'], swing: ['swung'], dig: ['dug'],
+  seek: ['sought'], sink: ['sank', 'sunk'], stink: ['stank', 'stunk'], weep: ['wept'],
+  buy: ['bought'], fit: ['fit'],
+}
+
+// common prefixes on an irregular base still inflect irregularly - "rebuild" -> "rebuilt",
+// "overtake" -> "overtook", not "rebuilded"/"overtaked"
+const PREFIXES = ['re', 'un', 'over', 'under', 'out', 'mis', 'up']
+const irregularFormsFor = (lower) => {
+  if (IRREGULAR[lower]) return IRREGULAR[lower]
+  for (const prefix of PREFIXES) {
+    if (lower.startsWith(prefix) && IRREGULAR[lower.slice(prefix.length)]) {
+      return IRREGULAR[lower.slice(prefix.length)].map(f => prefix + f)
+    }
+  }
+  return null
+}
+
+// builds every plausible inflected form of a word bank entry, tried in order until one is
+// literally found in the example - only the FIRST token of a multi-word phrase gets inflected
+// ("look after" also tries "looks after"), and each side of a slash-alternate ("have/has") is
+// tried independently.
+const inflectionCandidates = (word) => {
+  const parts = word.split(' ')
+  const first = parts[0]
+  const restSuffix = parts.length > 1 ? ' ' + parts.slice(1).join(' ') : ''
+  const candidates = [word]
+
+  const forToken = (token) => {
+    const out = [token]
+    const lower = token.toLowerCase()
+    const irregularForms = irregularFormsFor(lower)
+    if (irregularForms) out.push(...irregularForms)
+    out.push(token + 's')
+    if (/(s|sh|ch|x|z|o)$/i.test(token)) out.push(token + 'es')
+    if (/[^aeiou]y$/i.test(token)) out.push(token.slice(0, -1) + 'ies', token.slice(0, -1) + 'ied')
+    if (/e$/i.test(token)) {
+      out.push(token + 'd', token.slice(0, -1) + 'ing')
+    } else {
+      out.push(token + 'ed', token + 'ing')
+      if (/[^aeiou][aeiou][bcdfgklmnprstv]$/i.test(token)) {
+        const doubled = token + token.slice(-1)
+        out.push(doubled + 'ed', doubled + 'ing')
+      }
+      if (/[^aeiou]l$/i.test(token)) out.push(token + 'led', token + 'ling')
+    }
+    return out
+  }
+
+  first.split('/').forEach(tok => forToken(tok).forEach(v => candidates.push(v + restSuffix)))
+  return [...new Set(candidates)]
+}
+
+const blankOutWord = (example, word) => {
+  for (const candidate of inflectionCandidates(word)) {
+    const re = new RegExp(`\\b${escapeRegExp(candidate)}\\b`, 'i')
+    if (re.test(example)) return example.replace(re, '____')
+  }
+  return example
+}
+
 const buildVocabPrompt = (ex) => {
   const c = ex.conceptId || {}
   if (ex.type === 'picture_match') return { image: c.image || null, question: 'Which word matches this picture?' }
@@ -15,8 +101,7 @@ const buildVocabPrompt = (ex) => {
     return { image: null, question: parts.length ? `Translate: ${parts.join(' / ')}` : 'Translate this word' }
   }
   if (c.example && c.word) {
-    const blanked = c.example.replace(new RegExp(`\\b${escapeRegExp(c.word)}\\b`, 'i'), '____')
-    return { image: null, question: blanked }
+    return { image: null, question: blankOutWord(c.example, c.word) }
   }
   return { image: null, question: c.example || 'Fill in the blank' }
 }
@@ -72,7 +157,7 @@ const TABS = [
 
 // lets a teacher see (and try) the exact real homework her students get today for this group -
 // purely a preview: nothing tapped here is ever submitted, scored, or saved as progress anywhere
-const HomeworkPreviewModal = ({ groupId, initialSection, onClose }) => {
+const HomeworkPreviewModal = ({ groupId, initialSection, hasReading, onClose }) => {
   const { getTodayHomework, backendUrl } = useContext(TeacherContext)
   const [data, setData] = useState(false)
   const [tab, setTab] = useState(initialSection || 'vocab')
@@ -86,12 +171,14 @@ const HomeworkPreviewModal = ({ groupId, initialSection, onClose }) => {
       <div className='w-full max-w-md flex flex-col h-full'>
         <div className='flex items-center justify-between px-5 pt-6 pb-4 border-b border-hairline'>
           <button onClick={onClose} className='text-muted text-sm'>Close</button>
-          <p className='font-display text-ink'>Today's homework{data ? ` · day ${data.dayCounter}/${data.durationDays}` : ''}</p>
+          <p className='font-display text-ink'>
+            {data?.reviewDay ? "Today's homework · review day" : `Today's homework${data ? ` · day ${data.dayCounter}/${data.durationDays}` : ''}`}
+          </p>
           <span className='w-10' />
         </div>
 
         <div className='flex gap-2 px-5 py-3 border-b border-hairline'>
-          {TABS.map(([key, label]) => (
+          {TABS.filter(([key]) => key !== 'reading' || (hasReading !== false && !data?.reviewDay)).map(([key, label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium ${tab === key ? 'bg-accent text-white' : 'bg-bg-card border border-hairline text-muted'}`}>
               {label}
