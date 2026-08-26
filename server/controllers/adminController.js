@@ -26,6 +26,8 @@ import { assertNoScheduleConflict } from "../services/scheduleConflict.service.j
 import { suggestLeastLoadedGroup } from "../services/loadBalance.service.js"
 import { enrollStudentMidCycle } from "../services/enrollMidCycle.service.js"
 import { computeDayCounter, startDateForTargetDayToday } from "../services/dayCounter.service.js"
+import { hardDeleteStudent } from "../services/studentCascade.service.js"
+import { hardDeleteGroup } from "../services/groupCascade.service.js"
 import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
 import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
@@ -691,6 +693,22 @@ export const deleteStudent = async (req, res) => {
     }
 }
 
+// genuine, permanent delete - unlike deleteStudent above (which only archives), this actually
+// erases the student and every record referencing them (payments, attendance, exam history,
+// homework progress, group membership, parent links). Irreversible - the frontend gates this
+// behind its own explicit warning confirm before ever calling it.
+export const permanentlyDeleteStudent = async (req, res) => {
+    try {
+        const student = await User.findOne({ _id: req.params.id, branchId: req.auth.branchId, role: 'student' })
+        if (!student) return res.status(404).json({ error: 'not_found' })
+        await hardDeleteStudent(student._id)
+        res.json({ deleted: true })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 // api to bring an archived student back to active (undoes an accidental archive)
 export const unarchiveStudent = async (req, res) => {
     try {
@@ -1147,6 +1165,18 @@ export const deleteGroup = async (req, res) => {
         )
         if (!group) return res.status(404).json({ error: 'not_found' })
         res.json({ group })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const permanentlyDeleteGroup = async (req, res) => {
+    try {
+        const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId })
+        if (!group) return res.status(404).json({ error: 'not_found' })
+        await hardDeleteGroup(group._id)
+        res.json({ deleted: true })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

@@ -25,6 +25,7 @@ import { getFinanceOverview as getFinanceOverviewService } from "../services/fin
 import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
 import { ensureDefaultCategories, ensureCategoryExists } from "../services/expenseCategories.service.js"
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
+import { hardDeleteStudent } from "../services/studentCascade.service.js"
 
 const startOfThisMonth = () => {
     const d = new Date()
@@ -199,6 +200,23 @@ export const getStudentProfile = async (req, res) => {
             groups,
             examAttempts,
         })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// genuine, permanent delete - erases the student and every record referencing them (payments,
+// attendance, exam history, homework progress, group membership, parent links). Irreversible - the
+// frontend gates this behind its own explicit warning confirm before ever calling it. A
+// sub_director can only ever reach their own branch's students (branchOnlyFilter below); a real
+// director has no such restriction.
+export const permanentlyDeleteStudent = async (req, res) => {
+    try {
+        const student = await User.findOne({ _id: req.params.id, role: 'student', ...branchOnlyFilter(req) })
+        if (!student) return res.status(404).json({ error: 'not_found' })
+        await hardDeleteStudent(student._id)
+        res.json({ deleted: true })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

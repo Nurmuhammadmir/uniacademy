@@ -102,6 +102,19 @@ const SubDirectorContextProvider = (props) => {
         }
     }
 
+    const permanentlyDeleteStudent = async (id) => {
+        if (!(await confirm(t('confirmPermanentlyDeleteStudent')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/students/' + id + '/permanent', authHeader)
+            toast.success(t('studentPermanentlyDeleted'))
+            getAllStudents()
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteStudentPermanently'))
+            return false
+        }
+    }
+
     // "Admins" here only ever means plain admin accounts within this sub_director's own branch -
     // the server rejects (and hides) anything else, see directorController.js's isSubDirector checks
     const getAdmins = async () => {
@@ -533,7 +546,7 @@ const SubDirectorContextProvider = (props) => {
     const value = {
         token, login, logout,
         me, getMe,
-        allStudents, getAllStudents, getStudentProfile,
+        allStudents, getAllStudents, getStudentProfile, permanentlyDeleteStudent,
         admins, getAdmins, createAdmin, updateAdmin, deleteAdminAccount, getAdminProfile,
         teachers, getTeachers, createTeacher, updateTeacher, deleteTeacherAccount, getTeacherProfile,
         pricing, getPricing, upsertPricing, deletePricing,

@@ -1,9 +1,9 @@
 import express from "express"
 import requireRole from "../middleware/auth.js"
 import {
-    createStudent, listStudents, updateStudent, deleteStudent, unarchiveStudent, getStudentProfile, addStudentCourse, updateStudentCourse, linkParent,
+    createStudent, listStudents, updateStudent, deleteStudent, permanentlyDeleteStudent, unarchiveStudent, getStudentProfile, addStudentCourse, updateStudentCourse, linkParent,
     createPayment, listPayments, refundPayment, deletePayment, updatePayment, getFinanceOverview, getPaymentPreview, getPaymentDetail,
-    createGroup, listGroups, getGroupProfile, updateGroup, deleteGroup, unarchiveGroup, suggestGroup, addStudentToGroup, removeStudentFromGroup,
+    createGroup, listGroups, getGroupProfile, updateGroup, deleteGroup, permanentlyDeleteGroup, unarchiveGroup, suggestGroup, addStudentToGroup, removeStudentFromGroup,
     retakeExam, listBranchTeachers, getTeacherProfile, getTeacherAttendanceGrid, getStudentAttendanceGrid, getLessonDetail, setLessonTeacherStatus,
     getMe, createTeacherAttendanceQR, listTeacherAttendanceQRs, getAttendanceOverview,
     listPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, prepaySalary, getSalaryDetail,
@@ -57,6 +57,7 @@ adminRouter.get('/students/:id/attendance-grid', getStudentAttendanceGrid)
 adminRouter.get('/students/:id/statement', getStudentStatement)
 adminRouter.put('/students/:id', updateStudent)
 adminRouter.delete('/students/:id', deleteStudent)
+adminRouter.delete('/students/:id/permanent', permanentlyDeleteStudent)
 adminRouter.post('/students/:id/unarchive', unarchiveStudent)
 adminRouter.post('/students/:id/parent', linkParent)
 adminRouter.post('/students/:id/courses', addStudentCourse)
@@ -69,6 +70,7 @@ adminRouter.get('/groups/suggest', suggestGroup)
 adminRouter.get('/groups/:id', getGroupProfile)
 adminRouter.put('/groups/:id', updateGroup)
 adminRouter.delete('/groups/:id', deleteGroup)
+adminRouter.delete('/groups/:id/permanent', permanentlyDeleteGroup)
 adminRouter.post('/groups/:id/unarchive', unarchiveGroup)
 adminRouter.post('/groups/:id/students', addStudentToGroup)
 adminRouter.delete('/groups/:id/students/:studentId', removeStudentFromGroup)

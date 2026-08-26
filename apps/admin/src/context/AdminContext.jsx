@@ -138,6 +138,22 @@ const AdminContextProvider = (props) => {
         }
     }
 
+    // genuinely irreversible - erases the student and every payment/attendance/exam/homework
+    // record referencing them, not just an archive. The strong warning lives in the confirm text
+    // itself since confirm() here is a plain yes/no, not a type-to-confirm dialog.
+    const permanentlyDeleteStudent = async (id) => {
+        if (!(await confirm(t('confirmPermanentlyDeleteStudent')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/admin/students/' + id + '/permanent', authHeader)
+            toast.success(t('studentPermanentlyDeleted'))
+            getStudents()
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteStudentPermanently'))
+            return false
+        }
+    }
+
     const getStudentProfile = async (id) => {
         try {
             const { data } = await axios.get(backendUrl + '/api/admin/students/' + id, authHeader)
@@ -504,6 +520,19 @@ const AdminContextProvider = (props) => {
             getGroups()
         } catch (error) {
             toast.error(error.response?.data?.error || t('couldNotReactivateGroup'))
+        }
+    }
+
+    const permanentlyDeleteGroup = async (id) => {
+        if (!(await confirm(t('confirmPermanentlyDeleteGroup')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/admin/groups/' + id + '/permanent', authHeader)
+            toast.success(t('groupPermanentlyDeleted'))
+            getGroups()
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteGroupPermanently'))
+            return false
         }
     }
 
@@ -1223,12 +1252,12 @@ const AdminContextProvider = (props) => {
 
     const value = {
         token, login, logout,
-        students, getStudents, createStudent, updateStudent, deleteStudent, unarchiveStudent, getStudentProfile, addStudentCourse, updateStudentCourse, linkParent,
+        students, getStudents, createStudent, updateStudent, deleteStudent, permanentlyDeleteStudent, unarchiveStudent, getStudentProfile, addStudentCourse, updateStudentCourse, linkParent,
         applyDiscountToStudents,
         payments, getPayments, createPayment, refundPayment, updatePayment, getFinanceOverview, getPaymentPreview, getPaymentDetail,
         getStudentStatement, getReconciliation, deletePayment, getBusinessLedger,
         payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, prepaySalary, getSalaryDetail,
-        groups, getGroups, createGroup, getGroupProfile, updateGroup, deleteGroup, unarchiveGroup, suggestGroup, addStudentToGroup, removeStudentFromGroup, retakeExam,
+        groups, getGroups, createGroup, getGroupProfile, updateGroup, deleteGroup, permanentlyDeleteGroup, unarchiveGroup, suggestGroup, addStudentToGroup, removeStudentFromGroup, retakeExam,
         teachers, getTeachers,
         languages, getLanguages,
         levels, getLevels,

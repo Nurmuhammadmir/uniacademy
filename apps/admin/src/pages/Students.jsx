@@ -9,7 +9,7 @@ import { formatMoney } from '../lib/format.js'
 import { currentMonthISO } from '../lib/date.js'
 
 const Students = () => {
-  const { students, createStudent, updateStudent, deleteStudent, unarchiveStudent, createPayment, getPaymentPreview, applyDiscountToStudents, languages, levels, getLevels, settings } = useContext(AdminContext)
+  const { students, createStudent, updateStudent, deleteStudent, permanentlyDeleteStudent, unarchiveStudent, createPayment, getPaymentPreview, applyDiscountToStudents, languages, levels, getLevels, settings } = useContext(AdminContext)
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -219,11 +219,12 @@ const Students = () => {
                     <>
                       <button onClick={() => openEdit(s)} className='text-accent text-xs font-medium mr-3'>{t('edit')}</button>
                       <button onClick={() => openPay(s)} className='text-accent text-xs font-medium mr-3'>{t('recordPayment')}</button>
-                      <button onClick={() => deleteStudent(s._id)} className='text-muted text-xs font-medium'>{t('archiveBtn')}</button>
+                      <button onClick={() => deleteStudent(s._id)} className='text-muted text-xs font-medium mr-3'>{t('archiveBtn')}</button>
                     </>
                   ) : (
-                    <button onClick={() => unarchiveStudent(s._id)} className='text-accent text-xs font-medium'>{t('reactivateBtn')}</button>
+                    <button onClick={() => unarchiveStudent(s._id)} className='text-accent text-xs font-medium mr-3'>{t('reactivateBtn')}</button>
                   )}
+                  <button onClick={() => permanentlyDeleteStudent(s._id)} className='text-red-500 text-xs font-medium'>{t('deletePermanentlyBtn')}</button>
                 </td>
               </tr>
             ))}

@@ -104,6 +104,19 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    const permanentlyDeleteStudent = async (id) => {
+        if (!(await confirm(t('confirmPermanentlyDeleteStudent')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/students/' + id + '/permanent', authHeader)
+            toast.success(t('studentPermanentlyDeleted'))
+            getAllStudents()
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteStudentPermanently'))
+            return false
+        }
+    }
+
     // api for the branch detail modal - admins/teachers/students/revenue for one branch
     const getBranchProfile = async (id) => {
         try {
@@ -758,7 +771,7 @@ const DirectorContextProvider = (props) => {
         token, login, logout,
         stats, getStats,
         mapData, getMapData,
-        allStudents, getAllStudents, getStudentProfile,
+        allStudents, getAllStudents, getStudentProfile, permanentlyDeleteStudent,
         getBranchProfile,
         admins, getAdmins, createAdmin, updateAdmin, deleteAdminAccount, getAdminProfile,
         teachers, getTeachers, createTeacher, updateTeacher, deleteTeacherAccount, getTeacherProfile,

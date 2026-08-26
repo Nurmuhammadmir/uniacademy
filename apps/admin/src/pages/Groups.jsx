@@ -11,7 +11,7 @@ const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 const Groups = () => {
   const {
-    groups, getGroups, createGroup, updateGroup, deleteGroup, unarchiveGroup,
+    groups, getGroups, createGroup, updateGroup, deleteGroup, permanentlyDeleteGroup, unarchiveGroup,
     teachers, languages, levels, getLevels, rooms,
     students, addStudentToGroup, removeStudentFromGroup, suggestGroup,
     getTeacherProfile,
@@ -165,6 +165,7 @@ const Groups = () => {
               ) : (
                 <span className='text-muted text-xs'>{t('completedGroupNote')}</span>
               )}
+              <button onClick={() => permanentlyDeleteGroup(g._id)} className='text-red-500 text-sm font-medium'>{t('deletePermanentlyBtn')}</button>
             </div>
           </div>
         ))}

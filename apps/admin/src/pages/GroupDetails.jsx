@@ -30,7 +30,7 @@ const GroupDetails = () => {
   const { id: groupId } = useParams()
   const navigate = useNavigate()
   const {
-    getGroupDetails, updateGroup, deleteGroup, addStudentToGroup, removeStudentFromGroup,
+    getGroupDetails, updateGroup, deleteGroup, permanentlyDeleteGroup, addStudentToGroup, removeStudentFromGroup,
     getGroupAttendanceGrid,
     getGroupMaterials, addGroupMaterial, deleteGroupMaterial,
     updateGroupDiscount, getGroupExamsTab,
@@ -70,6 +70,11 @@ const GroupDetails = () => {
 
   const handleDelete = async () => {
     const ok = await deleteGroup(group._id)
+    if (ok) navigate('/groups')
+  }
+
+  const handlePermanentDelete = async () => {
+    const ok = await permanentlyDeleteGroup(group._id)
     if (ok) navigate('/groups')
   }
 
@@ -170,6 +175,7 @@ const GroupDetails = () => {
             <div className='absolute top-4 right-4 flex flex-col gap-3'>
               <button onClick={() => setShowEdit(true)} title={t('edit')} className='text-muted hover:text-accent'>✏️</button>
               <button onClick={handleDelete} title={t('archiveBtn')} className='text-muted hover:text-red-500'>🗑️</button>
+              <button onClick={handlePermanentDelete} title={t('deletePermanentlyBtn')} className='text-muted hover:text-red-500'>❌</button>
               <button onClick={() => setTab('comments')} title={t('messageIconHint')} className='text-muted hover:text-accent'>✉️</button>
               <button onClick={() => setShowAdd(true)} title={t('addStudentBtn')} className='text-muted hover:text-accent'>➕</button>
               <button onClick={() => navigate(`/finance?groupId=${group._id}`)} title={t('paymentsLabel')} className='text-muted hover:text-accent'>💰</button>

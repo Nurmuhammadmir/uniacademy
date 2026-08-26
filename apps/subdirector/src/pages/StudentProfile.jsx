@@ -10,17 +10,24 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 const StudentProfile = () => {
   const { id: studentId } = useParams()
   const navigate = useNavigate()
-  const { getStudentProfile } = useContext(SubDirectorContext)
+  const { getStudentProfile, permanentlyDeleteStudent } = useContext(SubDirectorContext)
   const [data, setData] = useState(false)
   const { t } = useLanguage()
 
   useEffect(() => { getStudentProfile(studentId).then(setData) }, [studentId])
 
+  const handlePermanentDelete = async () => {
+    if (await permanentlyDeleteStudent(studentId)) navigate('/students')
+  }
+
   if (!data) return <p className='text-muted'>{t('loading')}</p>
 
   return (
     <div>
-      <button onClick={() => navigate('/students')} className='text-muted text-sm mb-4'>‹ {t('back')}</button>
+      <div className='flex justify-between items-center mb-4'>
+        <button onClick={() => navigate('/students')} className='text-muted text-sm'>‹ {t('back')}</button>
+        <button onClick={handlePermanentDelete} className='text-red-500 text-xs font-medium'>{t('deletePermanentlyBtn')}</button>
+      </div>
 
       <div className='flex flex-col gap-5'>
         <div>
