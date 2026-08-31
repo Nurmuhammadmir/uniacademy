@@ -8,7 +8,8 @@ import Attendance from "../models/Attendance.js"
 import LessonAttendance from "../models/LessonAttendance.js"
 import ExtraLesson from "../models/ExtraLesson.js"
 import Payment from "../models/Payment.js"
-import Pricing from "../models/Pricing.js"
+import { getOrCreateAccount } from "../services/ledger.service.js"
+import { computeCourseOwed } from "../services/billingCycle.service.js"
 import PushSubscription from "../models/PushSubscription.js"
 import { computeDayCounter } from "../services/dayCounter.service.js"
 import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
@@ -19,7 +20,7 @@ const assertOwnChild = (parent, studentId) => {
 
 export const getMe = async (req, res) => {
     try {
-        const parent = await User.findById(req.auth.userId).select('-passwordHash').populate('childStudentIds', 'name phone')
+        const parent = await User.findById(req.auth.userId).select('-passwordHash').populate('childStudentIds', 'name phone').lean()
         if (!parent) return res.status(404).json({ error: 'not_found' })
         res.json({ parent, children: parent.childStudentIds })
     } catch (error) {
@@ -31,11 +32,11 @@ export const getMe = async (req, res) => {
 // how many of this child's classes (across every active group) have they attended so far
 export const getChildAttendance = async (req, res) => {
     try {
-        const parent = await User.findById(req.auth.userId)
+        const parent = await User.findById(req.auth.userId).lean()
         if (!assertOwnChild(parent, req.params.studentId)) return res.status(403).json({ error: 'not_your_child' })
 
-        const groups = await Group.find({ studentIds: req.params.studentId, status: 'active' })
-            .populate('languageId', 'name').populate('levelId', 'name durationDays')
+        const groups = await Group.find({ studentIds: req.params.studentId, status: 'active', levelCompletedAt: null })
+            .populate('languageId', 'name').populate('levelId', 'name durationDays').lean()
 
         const perGroup = await Promise.all(groups.map(async (g) => {
             const durationDays = g.levelId?.durationDays || 30
@@ -49,7 +50,7 @@ export const getChildAttendance = async (req, res) => {
             const today = new Date()
             const rangeEnd = g.endDate && g.endDate < today ? g.endDate : today
             const lessons = await ensureLessonsGenerated(g, g.startDate, rangeEnd)
-            const records = await LessonAttendance.find({ lessonId: { $in: lessons.map(l => l._id) }, studentId: req.params.studentId })
+            const records = await LessonAttendance.find({ lessonId: { $in: lessons.map(l => l._id) }, studentId: req.params.studentId }).lean()
             const statusByLesson = Object.fromEntries(records.map(r => [String(r.lessonId), r.status]))
             const lessonHistory = lessons.map(l => ({ date: l.date, status: statusByLesson[String(l._id)] || 'unmarked' })).reverse()
 
@@ -70,16 +71,16 @@ export const getChildAttendance = async (req, res) => {
 // homework completion rate per active group - "how much homework are they completing"
 export const getChildProgress = async (req, res) => {
     try {
-        const parent = await User.findById(req.auth.userId)
+        const parent = await User.findById(req.auth.userId).lean()
         if (!assertOwnChild(parent, req.params.studentId)) return res.status(403).json({ error: 'not_your_child' })
 
-        const groups = await Group.find({ studentIds: req.params.studentId, status: 'active' })
-            .populate('languageId', 'name').populate('levelId', 'name durationDays')
+        const groups = await Group.find({ studentIds: req.params.studentId, status: 'active', levelCompletedAt: null })
+            .populate('languageId', 'name').populate('levelId', 'name durationDays').lean()
 
         const perGroup = await Promise.all(groups.map(async (g) => {
             const durationDays = g.levelId?.durationDays || 30
             const dayCounter = computeDayCounter(g, durationDays)
-            const rows = await StudentProgress.find({ studentId: req.params.studentId, groupId: g._id })
+            const rows = await StudentProgress.find({ studentId: req.params.studentId, groupId: g._id }).lean()
             const done = rows.filter(r => r.status === 'done').length
             const avg = (key) => {
                 const scored = rows.filter(r => r[key] !== null && r[key] !== undefined)
@@ -104,13 +105,13 @@ export const getChildProgress = async (req, res) => {
 // expected at, just outside the group's normal recurring schedule
 export const getChildExtraLessons = async (req, res) => {
     try {
-        const parent = await User.findById(req.auth.userId)
+        const parent = await User.findById(req.auth.userId).lean()
         if (!assertOwnChild(parent, req.params.studentId)) return res.status(403).json({ error: 'not_your_child' })
 
         const extraLessons = await ExtraLesson.find({ studentIds: req.params.studentId })
             .populate('teacherId', 'name')
             .populate({ path: 'groupId', select: 'languageId levelId', populate: [{ path: 'languageId', select: 'name' }, { path: 'levelId', select: 'name' }] })
-            .sort({ date: -1 })
+            .sort({ date: -1 }).lean()
 
         res.json({ extraLessons })
     } catch (error) {
@@ -122,19 +123,24 @@ export const getChildExtraLessons = async (req, res) => {
 // payment history + next-due date per course, same shape family as studentController.getMe's own courses
 export const getChildPayments = async (req, res) => {
     try {
-        const parent = await User.findById(req.auth.userId)
+        const parent = await User.findById(req.auth.userId).lean()
         if (!assertOwnChild(parent, req.params.studentId)) return res.status(403).json({ error: 'not_your_child' })
 
         const student = await User.findById(req.params.studentId)
             .populate('courses.languageId', 'name').populate('courses.levelId', 'name')
         if (!student) return res.status(404).json({ error: 'not_found' })
 
-        const courses = await Promise.all(student.courses.map(async (c) => {
-            const pricing = c.levelId ? await Pricing.findOne({ languageId: c.languageId._id, levelId: c.levelId._id }) : null
-            return { ...c.toObject(), price: pricing?.monthlyPrice ?? null }
+        const account = await getOrCreateAccount('student', student._id)
+        // only courses the child is CURRENTLY placed in a group for - see studentController.getMe's
+        // identical filter for why a left course's entry can still exist (with groupId cleared) yet
+        // shouldn't show up as something they're "taking"
+        const courses = await Promise.all(student.courses.filter(c => c.groupId).map(async (c) => {
+            const group = await Group.findById(c.groupId).select('price').lean()
+            const owed = await computeCourseOwed(account._id, c.languageId._id)
+            return { ...c.toObject(), price: group?.price ?? null, owed: Math.max(0, owed) }
         }))
 
-        const payments = await Payment.find({ studentId: student._id, refunded: { $ne: true } }).sort({ date: -1 }).populate('languageId', 'name')
+        const payments = await Payment.find({ studentId: student._id, refunded: { $ne: true } }).sort({ date: -1 }).populate('languageId', 'name').lean()
 
         res.json({ courses, payments })
     } catch (error) {

@@ -37,9 +37,9 @@ const MyGroups = () => {
           <p className='text-muted text-sm'>tap a group to see the roster</p>
         </div>
         <div className='flex gap-2'>
-          <button onClick={() => navigate('/timetable')} className='w-9 h-9 rounded-full bg-accent-soft text-accent flex items-center justify-center font-display text-sm'>🕐</button>
-          <button onClick={() => navigate('/my-attendance')} className='w-9 h-9 rounded-full bg-accent-soft text-accent flex items-center justify-center font-display text-sm'>📋</button>
-          <button onClick={() => navigate('/profile')} className='w-9 h-9 rounded-full bg-accent-soft text-accent flex items-center justify-center font-display text-sm'>👤</button>
+          <button onClick={() => navigate('/timetable')} className='w-9 h-9 rounded-full bg-accent-soft dark:bg-white/10 text-accent flex items-center justify-center font-display text-sm'>🕐</button>
+          <button onClick={() => navigate('/my-attendance')} className='w-9 h-9 rounded-full bg-accent-soft dark:bg-white/10 text-accent flex items-center justify-center font-display text-sm'>📋</button>
+          <button onClick={() => navigate('/profile')} className='w-9 h-9 rounded-full bg-accent-soft dark:bg-white/10 text-accent flex items-center justify-center font-display text-sm'>👤</button>
         </div>
       </div>
 
@@ -51,7 +51,7 @@ const MyGroups = () => {
         </div>
       )}
 
-      <div className='bg-accent-soft rounded-2xl px-4 py-3 mb-4'>
+      <div className='bg-accent-soft dark:bg-white/10 rounded-2xl px-4 py-3 mb-4'>
         <p className='text-ink text-sm italic'>"{randomQuote()}"</p>
       </div>
 
@@ -73,7 +73,7 @@ const MyGroups = () => {
                   <p className='text-muted text-xs mt-0.5'>{PARITY_LABEL[g.schedulePattern] || ''}</p>
                 </div>
                 <div className='flex flex-col items-end gap-1'>
-                  <span className='font-mono text-xs text-accent bg-accent-soft px-2 py-1 rounded-full'>day {g.dayCounter}/{g.levelId?.durationDays || 30}</span>
+                  <span className='font-mono text-xs text-accent bg-accent-soft dark:bg-white/10 px-2 py-1 rounded-full'>day {g.dayCounter}/{g.levelId?.durationDays || 30}</span>
                   {g.averageScore !== null && g.averageScore !== undefined && (
                     <span className='font-mono text-xs text-muted'>avg {g.averageScore}%</span>
                   )}

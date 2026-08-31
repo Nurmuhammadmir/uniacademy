@@ -40,7 +40,7 @@ const Ledger = ({ branchId }) => {
 
       {!data ? <p className='text-muted text-sm'>{t('loading')}</p> : (
         <>
-          <div className='grid grid-cols-4 gap-4 mb-4'>
+          <div className='grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4'>
             <div className='bg-bg rounded-xl p-3'>
               <p className='text-muted text-xs mb-1'>{t('openingBalanceLabel')}</p>
               <p className='font-mono text-ink'>{formatMoney(data.openingBalance)}</p>
@@ -60,7 +60,7 @@ const Ledger = ({ branchId }) => {
           </div>
 
           <p className='text-ink font-medium mb-2'>{t('paymentMethodAccountsTitle')}</p>
-          <div className='grid grid-cols-3 md:grid-cols-6 gap-3 mb-4'>
+          <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4'>
             {data.byMethod.map(m => (
               <button key={m.method} onClick={() => toggleMethodFilter(m.method)}
                 className={`text-left rounded-xl p-3 ${methodFilter === m.method ? 'bg-accent text-white' : 'bg-bg text-ink'}`}>

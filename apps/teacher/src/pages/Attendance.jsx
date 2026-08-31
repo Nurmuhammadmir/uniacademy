@@ -78,7 +78,7 @@ const Attendance = () => {
           <button
             key={s.studentId}
             onClick={() => toggleManual(s.studentId, s.present)}
-            className={`flex justify-between items-center rounded-xl px-4 py-3 border text-left ${s.present ? 'border-accent bg-accent-soft' : 'border-hairline bg-bg-card'}`}
+            className={`flex justify-between items-center rounded-xl px-4 py-3 border text-left ${s.present ? 'border-accent bg-accent-soft dark:bg-white/10' : 'border-hairline bg-bg-card'}`}
           >
             <span className='text-ink'>{s.name}</span>
             <span className={`text-xs font-medium ${s.present ? 'text-accent' : 'text-muted'}`}>

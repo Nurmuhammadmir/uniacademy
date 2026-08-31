@@ -1,11 +1,22 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { lazy, Suspense, useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import DayRow from '../components/DayRow.jsx'
 import ExerciseModal from '../components/ExerciseModal.jsx'
-import AttendanceScanner from '../components/AttendanceScanner.jsx'
+import Spinner from '../components/Spinner.jsx'
 import { groupLabel } from '../lib/format.js'
+
+// html5-qrcode is a heavy camera/decoding library that every single student would otherwise
+// download on first load, even though almost none of them tap "scan attendance" in a given
+// session - Today is this app's landing route, so anything imported at the top here ships with
+// literally everyone's first paint. Lazy so it's fetched only when the scanner is actually opened.
+const AttendanceScanner = lazy(() => import('../components/AttendanceScanner.jsx'))
+const ScannerFallback = () => (
+  <div className='fixed inset-0 bg-black z-50 flex items-center justify-center'>
+    <Spinner size={28} className='text-white' />
+  </div>
+)
 
 const Today = () => {
   const {
@@ -120,7 +131,7 @@ const Today = () => {
       <p className='text-muted text-sm mb-3'>{t('dayOf', { current: week.groupDayCounter, total: week.durationDays })}</p>
 
       {week.nextLesson && (
-        <div className='bg-accent-soft rounded-2xl px-4 py-3 mb-4 flex items-center justify-between'>
+        <div className='bg-accent-soft dark:bg-white/10 rounded-2xl px-4 py-3 mb-4 flex items-center justify-between'>
           <span className='text-ink text-sm font-medium'>{t('nextLessonLabel')}</span>
           <span className='text-accent text-sm font-mono'>{formatNextLesson(week.nextLesson)}</span>
         </div>
@@ -158,7 +169,7 @@ const Today = () => {
                   key={key}
                   disabled={count === 0}
                   onClick={() => setOpenSection(key)}
-                  className={`px-5 py-4 rounded-2xl border text-left ${count === 0 ? 'border-hairline bg-bg-card opacity-40' : 'border-transparent bg-[#D3E6FF]'}`}
+                  className={`px-5 py-4 rounded-2xl border text-left ${count === 0 ? 'border-hairline bg-bg-card opacity-40' : 'border-transparent bg-[#D3E6FF] dark:bg-blue-500/10'}`}
                 >
                   <div className='flex items-center justify-between mb-1'>
                     <span className='flex items-center gap-3'>
@@ -208,7 +219,7 @@ const Today = () => {
                   key={key}
                   disabled={done || locked}
                   onClick={() => setOpenSection(key)}
-                  className={`px-5 py-4 rounded-2xl border text-left ${locked ? 'border-hairline bg-bg-card opacity-40' : 'border-transparent bg-[#D3E6FF]'}`}
+                  className={`px-5 py-4 rounded-2xl border text-left ${locked ? 'border-hairline bg-bg-card opacity-40' : 'border-transparent bg-[#D3E6FF] dark:bg-blue-500/10'}`}
                 >
                   <div className='flex items-center justify-between mb-1'>
                     <span className='flex items-center gap-3'>
@@ -220,7 +231,7 @@ const Today = () => {
                     </span>
                   </div>
                   {done && (
-                    <div className='h-1.5 rounded-full bg-white overflow-hidden mt-2'>
+                    <div className='h-1.5 rounded-full bg-white dark:bg-white/20 overflow-hidden mt-2'>
                       <div className='h-full bg-[#F2542D] rounded-full' style={{ width: `${score || 0}%` }} />
                     </div>
                   )}
@@ -266,10 +277,14 @@ const Today = () => {
         />
       )}
 
-      {showScanner && <AttendanceScanner onClose={() => setShowScanner(false)} />}
+      {showScanner && (
+        <Suspense fallback={<ScannerFallback />}>
+          <AttendanceScanner onClose={() => setShowScanner(false)} />
+        </Suspense>
+      )}
 
       {showExamInfo && (
-        <div className='fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-6' onClick={() => setShowExamInfo(false)}>
+        <div className='fixed inset-0 z-50 bg-slate-900/20 backdrop-blur-md dark:bg-[#0B0F19]/60 dark:backdrop-blur-lg transition-all duration-300 flex items-center justify-center px-6' onClick={() => setShowExamInfo(false)}>
           <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 max-w-xs text-center' onClick={e => e.stopPropagation()}>
             <span className='text-4xl mb-3 block'>🎓</span>
             <p className='font-display text-lg text-ink mb-2'>

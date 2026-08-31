@@ -7,6 +7,7 @@ import {
     upsertPricing, listPricing, deletePricing, getAttendanceOverview,
     createBranch, updateBranch, deleteBranch,
     createLanguage, updateLanguage, deleteLanguage,
+    listCourseCategories, createCourseCategory, updateCourseCategory, deleteCourseCategory,
     createLevel, updateLevel, deleteLevel, deleteLastLesson,
     updateSettings,
     listAllGroups, updateGroupLimits, getTodayTimetable,
@@ -61,6 +62,11 @@ directorRouter.get('/languages', listLanguages)
 directorRouter.post('/languages', createLanguage)
 directorRouter.put('/languages/:id', updateLanguage)
 directorRouter.delete('/languages/:id', deleteLanguage)
+
+directorRouter.get('/course-categories', listCourseCategories)
+directorRouter.post('/course-categories', createCourseCategory)
+directorRouter.put('/course-categories/:id', updateCourseCategory)
+directorRouter.delete('/course-categories/:id', deleteCourseCategory)
 
 directorRouter.get('/levels', listLevels)
 directorRouter.post('/levels', createLevel)

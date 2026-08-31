@@ -74,10 +74,10 @@ export const getDayContent = async (req, res) => {
             return res.status(400).json({ error: 'missing_params' })
         }
 
-        const curriculum = await Curriculum.findOne({ languageId, levelId, day }).populate('conceptIds')
+        const curriculum = await Curriculum.findOne({ languageId, levelId, day }).populate('conceptIds').lean()
         const concepts = curriculum?.conceptIds || []
-        const wordForms = await WordForm.find({ conceptId: { $in: concepts.map(c => c._id) }, languageId })
-        const translations = await Translation.find({ conceptId: { $in: concepts.map(c => c._id) } })
+        const wordForms = await WordForm.find({ conceptId: { $in: concepts.map(c => c._id) }, languageId }).lean()
+        const translations = await Translation.find({ conceptId: { $in: concepts.map(c => c._id) } }).lean()
 
         // shape vocab back into the builder's row format
         const vocab = concepts.map(concept => {
@@ -95,10 +95,10 @@ export const getDayContent = async (req, res) => {
             }
         })
 
-        const grammar = await GrammarExercise.find({ languageId, levelId, day }).sort({ createdAt: 1 })
-        const readingText = await ReadingText.findOne({ languageId, levelId, day })
+        const grammar = await GrammarExercise.find({ languageId, levelId, day }).sort({ createdAt: 1 }).lean()
+        const readingText = await ReadingText.findOne({ languageId, levelId, day }).lean()
         const readingExercises = readingText
-            ? await ReadingExercise.find({ readingTextId: readingText._id }).sort({ createdAt: 1 })
+            ? await ReadingExercise.find({ readingTextId: readingText._id }).sort({ createdAt: 1 }).lean()
             : []
 
         res.json({
@@ -121,7 +121,7 @@ export const getDayContent = async (req, res) => {
 // itself - so a word-bank fill picks up photos the director drops into that folder with no extra
 // step, and a normal single-day save gets the same safety net if the frontend's own check missed it.
 const createVocabDay = async ({ languageId, levelId, day, words }) => {
-    const existing = await Curriculum.findOne({ languageId, levelId, day })
+    const existing = await Curriculum.findOne({ languageId, levelId, day }).lean()
     if (existing) {
         const oldConceptIds = existing.conceptIds
         await WordForm.deleteMany({ conceptId: { $in: oldConceptIds } })
@@ -230,11 +230,11 @@ export const fillVocabWordBank = async (req, res) => {
             return res.status(400).json({ error: 'missing_params' })
         }
 
-        const level = await Level.findById(levelId).select('durationDays')
+        const level = await Level.findById(levelId).select('durationDays').lean()
         if (!level) return res.status(404).json({ error: 'level_not_found' })
         const durationDays = level.durationDays || 30
 
-        const curricula = await Curriculum.find({ languageId, levelId }).populate('conceptIds')
+        const curricula = await Curriculum.find({ languageId, levelId }).populate('conceptIds').lean()
         const curriculumByDay = new Map(curricula.map(c => [c.day, c]))
 
         // "open" = has room for more words (< 30), not just "has zero words" - a day already at the
@@ -249,7 +249,7 @@ export const fillVocabWordBank = async (req, res) => {
         // creating a second copy of the same word on a different day
         const conceptIdToDay = {}
         curricula.forEach(c => c.conceptIds.forEach(concept => { conceptIdToDay[String(concept._id)] = c.day }))
-        const existingWordForms = await WordForm.find({ conceptId: { $in: Object.keys(conceptIdToDay) }, languageId })
+        const existingWordForms = await WordForm.find({ conceptId: { $in: Object.keys(conceptIdToDay) }, languageId }).lean()
         const existingByKey = new Map(existingWordForms.map(wf => [wf.word.trim().toLowerCase(), conceptIdToDay[String(wf.conceptId)]]))
 
         const { unique: uniqueWords, skipped } = dedupeAgainstExisting(
@@ -264,8 +264,8 @@ export const fillVocabWordBank = async (req, res) => {
         const reconstructExistingWords = async (curriculum) => {
             if (!curriculum) return []
             const conceptIds = curriculum.conceptIds.map(c => c._id)
-            const wordForms = await WordForm.find({ conceptId: { $in: conceptIds }, languageId })
-            const translations = await Translation.find({ conceptId: { $in: conceptIds } })
+            const wordForms = await WordForm.find({ conceptId: { $in: conceptIds }, languageId }).lean()
+            const translations = await Translation.find({ conceptId: { $in: conceptIds } }).lean()
             return curriculum.conceptIds.map(concept => {
                 const wf = wordForms.find(w => String(w.conceptId) === String(concept._id))
                 const tr = translations.filter(t => String(t.conceptId) === String(concept._id))
@@ -356,11 +356,11 @@ export const fillGrammarBank = async (req, res) => {
             return res.status(400).json({ error: 'missing_params' })
         }
 
-        const level = await Level.findById(levelId).select('durationDays')
+        const level = await Level.findById(levelId).select('durationDays').lean()
         if (!level) return res.status(404).json({ error: 'level_not_found' })
         const durationDays = level.durationDays || 30
 
-        const existingDocs = await GrammarExercise.find({ languageId, levelId }).select('day question')
+        const existingDocs = await GrammarExercise.find({ languageId, levelId }).select('day question').lean()
         const countByDay = new Map()
         existingDocs.forEach(d => countByDay.set(d.day, (countByDay.get(d.day) || 0) + 1))
 
@@ -427,7 +427,7 @@ const resolveReadingImage = (image) => {
 // day, from the builder form/JSON paste) and fillReadingBank (many days at once, from a bulk
 // reading-bank paste). Fully replaces whatever reading content already exists for that day.
 const createReadingDay = async ({ languageId, levelId, day, title, image, paragraphs, exercises }) => {
-    const old = await ReadingText.findOne({ languageId, levelId, day })
+    const old = await ReadingText.findOne({ languageId, levelId, day }).lean()
     if (old) {
         await ReadingExercise.deleteMany({ readingTextId: old._id })
         await ReadingText.deleteOne({ _id: old._id })
@@ -491,11 +491,11 @@ export const fillReadingBank = async (req, res) => {
             return res.status(400).json({ error: 'missing_params' })
         }
 
-        const level = await Level.findById(levelId).select('durationDays')
+        const level = await Level.findById(levelId).select('durationDays').lean()
         if (!level) return res.status(404).json({ error: 'level_not_found' })
         const durationDays = level.durationDays || 30
 
-        const existingDocs = await ReadingText.find({ languageId, levelId }).select('day title')
+        const existingDocs = await ReadingText.find({ languageId, levelId }).select('day title').lean()
         const filledDays = new Set(existingDocs.map(d => d.day))
         const emptyDays = []
         for (let d = 1; d <= durationDays; d++) {
@@ -541,9 +541,9 @@ export const getLevelContentSummary = async (req, res) => {
         const { languageId, levelId } = req.query
         if (!languageId || !levelId) return res.status(400).json({ error: 'missing_params' })
 
-        const curricula = await Curriculum.find({ languageId, levelId }).select('day conceptIds')
-        const grammar = await GrammarExercise.find({ languageId, levelId }).select('day')
-        const reading = await ReadingText.find({ languageId, levelId }).select('day')
+        const curricula = await Curriculum.find({ languageId, levelId }).select('day conceptIds').lean()
+        const grammar = await GrammarExercise.find({ languageId, levelId }).select('day').lean()
+        const reading = await ReadingText.find({ languageId, levelId }).select('day').lean()
 
         const vocabDays = Object.fromEntries(curricula.map(c => [c.day, c.conceptIds.length]))
         const grammarDays = new Set(grammar.map(g => g.day))

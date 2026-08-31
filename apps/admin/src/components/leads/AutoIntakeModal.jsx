@@ -28,7 +28,7 @@ const AutoIntakeModal = ({ subgroup, onClose, onSaved, t }) => {
           </label>
         ))}
       </div>
-      <button onClick={save} className='w-full py-2 rounded-lg bg-accent text-white text-sm font-medium'>{t('save')}</button>
+      <button onClick={save} className='w-full py-2 rounded-lg bg-accent dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-white text-sm font-medium'>{t('save')}</button>
     </Modal>
   )
 }

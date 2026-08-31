@@ -43,7 +43,7 @@ export const sendDailyParentDigest = async () => {
             const child = await User.findById(childId).select('name courses')
             if (!child) continue
 
-            const groups = await Group.find({ studentIds: childId, status: 'active' })
+            const groups = await Group.find({ studentIds: childId, status: 'active', levelCompletedAt: null })
             for (const group of groups) {
                 const lesson = await Lesson.findOne({ groupId: group._id, date: { $gte: dayStart, $lt: dayEnd } })
                 if (!lesson) continue // group had no lesson yesterday - nothing to judge
@@ -59,7 +59,7 @@ export const sendDailyParentDigest = async () => {
             }
 
             for (const course of child.courses || []) {
-                const needsPayment = !course.isActive || (course.subscriptionExpiresAt && new Date(course.subscriptionExpiresAt) < new Date())
+                const needsPayment = course.enrollmentStatus !== 'active'
                 if (needsPayment) {
                     await sendPushToParent(parent._id, {
                         title: 'Payment due',

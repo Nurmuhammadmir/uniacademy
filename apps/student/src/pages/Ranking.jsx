@@ -50,7 +50,7 @@ const Ranking = () => {
           const isMe = String(student.studentId) === ranking.myId
           const isFirst = i === 0 && scoreByStudent[student.studentId] !== undefined
           return (
-            <div key={student.studentId} className={`flex items-center justify-between rounded-xl px-4 py-3 border ${isMe ? 'border-accent bg-accent-soft' : isFirst ? 'border-gold bg-gold-soft' : 'border-hairline bg-bg-card'}`}>
+            <div key={student.studentId} className={`flex items-center justify-between rounded-xl px-4 py-3 border ${isMe ? 'border-accent bg-accent-soft dark:bg-white/10' : isFirst ? 'border-gold bg-gold-soft dark:bg-white/10' : 'border-hairline bg-bg-card'}`}>
               <span className='flex items-center gap-3'>
                 {isFirst ? (
                   <span className='w-5 h-5 rounded-full bg-gold text-white flex items-center justify-center text-xs'>🏆</span>
@@ -89,7 +89,7 @@ const Ranking = () => {
                   {Array.from({ length: dayCount }, (_, i) => i + 1).map(d => {
                     const row = student.days.find(r => r.day === d)
                     const score = dayScore(row)
-                    const bg = row?.status === 'done' ? 'bg-gold text-white' : row?.status === 'expired' ? 'bg-red-100 text-red-500' : 'bg-hairline text-muted'
+                    const bg = row?.status === 'done' ? 'bg-gold text-white' : row?.status === 'expired' ? 'bg-red-100 text-red-500 dark:bg-red-500/10 dark:text-red-400' : 'bg-hairline text-muted'
                     return (
                       <td key={d} className='text-center'>
                         <span className={`inline-flex w-8 h-6 items-center justify-center rounded-md text-[10px] font-mono ${bg}`}>

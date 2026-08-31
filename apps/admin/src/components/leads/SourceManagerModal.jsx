@@ -30,7 +30,7 @@ const SourceManagerModal = ({ onClose, t }) => {
               <form onSubmit={submitEdit} className='flex gap-2 items-center flex-1'>
                 <input type='color' value={editing.color} onChange={e => setEditing({ ...editing, color: e.target.value })} className='w-7 h-7 rounded' />
                 <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} className='flex-1 px-2 py-1.5 rounded-lg bg-bg-elevated border border-hairline text-sm' />
-                <button type='submit' className='text-accent text-sm font-medium'>{t('save')}</button>
+                <button type='submit' className='text-accent dark:text-[#818CF8] text-sm font-medium'>{t('save')}</button>
               </form>
             ) : (
               <>
@@ -39,7 +39,7 @@ const SourceManagerModal = ({ onClose, t }) => {
                   <span className='text-ink text-sm'>{s.name}</span>
                 </span>
                 <span className='flex gap-3'>
-                  <button onClick={() => setEditing(s)} className='text-accent text-sm font-medium'>{t('edit')}</button>
+                  <button onClick={() => setEditing(s)} className='text-accent dark:text-[#818CF8] text-sm font-medium'>{t('edit')}</button>
                   {s.name !== 'Other' && <button onClick={() => deleteLeadSource(s._id)} className='text-muted text-sm font-medium'>{t('removeBtn')}</button>}
                 </span>
               </>
@@ -52,10 +52,10 @@ const SourceManagerModal = ({ onClose, t }) => {
           <input type='color' value={newSource.color} onChange={e => setNewSource({ ...newSource, color: e.target.value })} className='w-7 h-7 rounded' />
           <input autoFocus value={newSource.name} onChange={e => setNewSource({ ...newSource, name: e.target.value })} placeholder={t('sourceNamePlaceholder')}
             className='flex-1 px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm' />
-          <button type='submit' className='px-3 py-1.5 rounded-lg bg-accent text-white text-sm font-medium'>{t('add')}</button>
+          <button type='submit' className='px-3 py-1.5 rounded-lg bg-accent dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-white text-sm font-medium'>{t('add')}</button>
         </form>
       ) : (
-        <button onClick={() => setAdding(true)} className='text-accent text-sm font-medium'>+ {t('addSourceBtn')}</button>
+        <button onClick={() => setAdding(true)} className='text-accent dark:text-[#818CF8] text-sm font-medium'>+ {t('addSourceBtn')}</button>
       )}
     </Modal>
   )

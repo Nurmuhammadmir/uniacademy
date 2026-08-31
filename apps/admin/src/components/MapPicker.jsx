@@ -50,6 +50,21 @@ const MapPicker = ({ address, lat, lng, onChange }) => {
     if (lat && lng) placeMarker(lat, lng, false)
     mapRef.current.on('click', (e) => placeMarker(e.lngLat.lat, e.lngLat.lng, true))
 
+    // the default streets-v12 style prefers `name_en` for place/street/POI labels, which is why
+    // everything (even inside Uzbekistan) was rendering in English. Mapbox's own documented fix
+    // (docs.mapbox.com/mapbox-gl-js/example/language-switch) is to rewrite every symbol layer's
+    // text-field to prefer `name_uz` and fall back to the tileset's local `name` field - for places
+    // inside Uzbekistan that local name IS Uzbek (occasionally Russian), so even where the tileset
+    // has no explicit `name_uz` entry the fallback still gets us off English.
+    const localizeLabels = () => {
+      mapRef.current.getStyle().layers.forEach((layer) => {
+        if (layer.type === 'symbol' && layer.layout && layer.layout['text-field']) {
+          mapRef.current.setLayoutProperty(layer.id, 'text-field', ['coalesce', ['get', 'name_uz'], ['get', 'name']])
+        }
+      })
+    }
+    mapRef.current.on('load', localizeLabels)
+
     // BUG FIX: Mapbox renders its own <button> elements for zoom/compass/attribution controls
     // without an explicit type="button". Inside a <form>, a button with no type defaults to
     // type="submit" - so clicking a zoom button was silently submitting the surrounding
@@ -89,7 +104,7 @@ const MapPicker = ({ address, lat, lng, onChange }) => {
     setQuery(text)
     if (text.length < 3) { setSuggestions([]); return }
     try {
-      const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${mapboxgl.accessToken}&limit=5`)
+      const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${mapboxgl.accessToken}&language=uz&limit=5`)
       const data = await res.json()
       if (!res.ok) {
         console.error('Mapbox geocoding error', res.status, data)

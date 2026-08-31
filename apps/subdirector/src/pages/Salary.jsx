@@ -3,48 +3,63 @@ import { SubDirectorContext } from '../context/SubDirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney, groupLabel } from '../lib/format.js'
 import Spinner from '../components/Spinner.jsx'
-import { currentMonthISO, lastDayOfMonthISO } from '../lib/date.js'
+import { currentMonthISO, lastDayOfMonthISO, formatUTCDate } from '../lib/date.js'
 
+// kept for every rate TYPE the backend still supports (so an existing rate set before this change
+// still renders a real label instead of "undefined"), but the dropdown below only ever OFFERS the
+// two confirmed-common ones - per_student_month/per_lesson/per_hour stay valid, just not selectable
+// from here going forward
 const RATE_UNIT_KEYS = {
   per_student_month: 'rateUnitPerStudentMonth', per_lesson: 'rateUnitPerLesson', per_hour: 'rateUnitPerHour',
   fixed_monthly: 'rateUnitFixedMonthly', percent_of_revenue: 'rateUnitPercentRevenue',
 }
+const SELECTABLE_RATE_TYPES = ['fixed_monthly', 'percent_of_revenue']
 const PAYOUT_METHODS = ['cash', 'card', 'click', 'bank_transfer', 'payme', 'apelsin']
 
 // same calculator as admin's own Salary page, just driven by whichever branchId the Finance page's
 // switcher has selected instead of the caller's own home branch
 const Salary = ({ branchId }) => {
-  const { payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, prepaySalary, getSalaryDetail, teachers, allGroups } = useContext(SubDirectorContext)
+  const { payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, prepaySalary, getSalaryDetail, teachers, allGroups, languages } = useContext(SubDirectorContext)
   const { t } = useLanguage()
   const [expanded, setExpanded] = useState(false)
   const [month, setMonth] = useState(currentMonthISO())
   const dateFrom = month + '-01'
   const dateTo = lastDayOfMonthISO(month)
-  const [defaultForm, setDefaultForm] = useState({ rateValue: '', rateType: 'per_student_month' })
-  // groupId blank = applies to every group this teacher runs; picking one narrows the override to
-  // just that group, so the same teacher can have a different rate per group (see
-  // salaryCalculation.service.js's resolveRateForGroup for the precedence order)
-  const [customForm, setCustomForm] = useState({ teacherId: '', groupId: '', rateValue: '', rateType: 'per_student_month' })
+  const [defaultForm, setDefaultForm] = useState({ rateValue: '', rateType: 'fixed_monthly' })
+  // confirmed spec: an individual rate can be scoped three independent ways - to one TEACHER
+  // (every group/course they run), to one COURSE (every teacher who runs it), or to one exact
+  // GROUP (the most specific, always wins - see salaryCalculation.service.js's resolveRateForGroup
+  // for the full precedence order). Only one scope is ever active at a time, never combined.
+  const [customForm, setCustomForm] = useState({ scope: 'teacher', teacherId: '', groupId: '', languageId: '', rateValue: '', rateType: 'fixed_monthly' })
   const [results, setResults] = useState(null)
   const [payingRow, setPayingRow] = useState(null)
   const [payMode, setPayMode] = useState('pay')
   const [payMethod, setPayMethod] = useState('cash')
   const [paying, setPaying] = useState(false)
+  const [amountMode, setAmountMode] = useState('amount') // 'amount' | 'percent'
+  const [payAmount, setPayAmount] = useState('')
+  const [payPercent, setPayPercent] = useState('')
   const [detailRow, setDetailRow] = useState(null)
   const [detail, setDetail] = useState(null)
   const [loadingDetail, setLoadingDetail] = useState(false)
 
-  const branchTeachers = teachers.filter(tc => String(tc.branchId) === String(branchId) || (tc.additionalBranchIds || []).some(id => String(id) === String(branchId)))
-  const teacherGroupOptions = allGroups.filter(g => String(g.teacherId?._id || g.teacherId) === String(customForm.teacherId))
+  // branchId/additionalBranchIds come back populated (directorController.listTeachers populates
+  // both to the branch's name) - String() on the raw object always produced "[object Object]",
+  // never matching a real branchId, so this teacher dropdown was always empty
+  const branchTeachers = teachers.filter(tc => String(tc.branchId?._id || tc.branchId) === String(branchId)
+    || (tc.additionalBranchIds || []).some(b => String(b?._id || b) === String(branchId)))
+  // "by group" picks the group directly (not teacher-first) - the teacherId a group-scoped rate
+  // needs is derived from whichever group gets picked, not chosen separately
+  const branchGroupOptions = allGroups.filter(g => String(g.branchId?._id || g.branchId) === String(branchId))
 
   useEffect(() => { getPayRates(branchId); setResults(null) }, [branchId])
 
-  const defaultRate = payRates.find(r => !r.teacherId)
-  const overrides = payRates.filter(r => r.teacherId)
+  const defaultRate = payRates.find(r => !r.teacherId && !r.groupId && !r.languageId)
+  const overrides = payRates.filter(r => r.teacherId || r.languageId)
 
   useEffect(() => {
     if (defaultRate) setDefaultForm({ rateValue: defaultRate.rateValue, rateType: defaultRate.rateType })
-    else setDefaultForm({ rateValue: '', rateType: 'per_student_month' })
+    else setDefaultForm({ rateValue: '', rateType: 'fixed_monthly' })
   }, [defaultRate?._id])
 
   const submitDefault = async (e) => {
@@ -54,8 +69,14 @@ const Salary = ({ branchId }) => {
 
   const submitCustom = async (e) => {
     e.preventDefault()
-    const ok = await setPayRate(branchId, { teacherId: customForm.teacherId, groupId: customForm.groupId || undefined, rateType: customForm.rateType, rateValue: Number(customForm.rateValue) })
-    if (ok) setCustomForm({ teacherId: '', groupId: '', rateValue: '', rateType: 'per_student_month' })
+    const payload = { rateType: customForm.rateType, rateValue: Number(customForm.rateValue) }
+    if (customForm.scope === 'course') payload.languageId = customForm.languageId
+    else {
+      payload.teacherId = customForm.teacherId
+      if (customForm.scope === 'group') payload.groupId = customForm.groupId
+    }
+    const ok = await setPayRate(branchId, payload)
+    if (ok) setCustomForm({ scope: customForm.scope, teacherId: '', groupId: '', languageId: '', rateValue: '', rateType: 'fixed_monthly' })
   }
 
   const runCalculate = async () => {
@@ -63,11 +84,21 @@ const Salary = ({ branchId }) => {
     if (data) setResults(data)
   }
 
+  const openPay = (row, mode) => {
+    setPayingRow(row); setPayMode(mode); setPayMethod('cash'); setAmountMode('amount')
+    setPayAmount(String(row.remaining)); setPayPercent('')
+  }
+
   const submitPay = async (e) => {
     e.preventDefault()
+    const baseAmount = payingRow.remaining
+    const amount = payMode === 'prepay' && amountMode === 'percent'
+      ? Math.round(baseAmount * (Number(payPercent) || 0) / 100)
+      : Number(payAmount) || baseAmount
+    if (!(amount > 0)) return
     setPaying(true)
     const action = payMode === 'prepay' ? prepaySalary : paySalary
-    const ok = await action(branchId, payingRow.teacherId, payingRow.total, dateFrom, dateTo, payMethod)
+    const ok = await action(branchId, payingRow.teacherId, amount, dateFrom, dateTo, payMethod)
     setPaying(false)
     if (ok) { setPayingRow(null); runCalculate() }
   }
@@ -81,7 +112,7 @@ const Salary = ({ branchId }) => {
     setLoadingDetail(false)
   }
 
-  const totalToPay = (results || []).filter(r => !r.paid).reduce((sum, r) => sum + r.total, 0)
+  const totalToPay = (results || []).reduce((sum, r) => sum + r.remaining, 0)
 
   return (
     <div>
@@ -115,7 +146,7 @@ const Salary = ({ branchId }) => {
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('rateUnitLabel')}</p>
                   <select value={defaultForm.rateType} onChange={e => setDefaultForm({ ...defaultForm, rateType: e.target.value })} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm'>
-                    {Object.entries(RATE_UNIT_KEYS).map(([val, key]) => <option key={val} value={val}>{t(key)}</option>)}
+                    {SELECTABLE_RATE_TYPES.map(val => <option key={val} value={val}>{t(RATE_UNIT_KEYS[val])}</option>)}
                   </select>
                 </div>
                 <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>{t('save')}</button>
@@ -127,21 +158,49 @@ const Salary = ({ branchId }) => {
                 <span className='w-6 h-6 rounded-full bg-accent text-white text-xs font-bold flex items-center justify-center'>2</span>
                 <p className='text-ink text-sm font-medium'>{t('setCustomRateStep')}</p>
               </div>
+              <div className='mb-3'>
+                <p className='text-xs text-muted mb-1'>{t('calcScopeLabel')}</p>
+                <div className='flex gap-1 bg-bg-elevated rounded-lg p-1 w-fit'>
+                  {['teacher', 'group', 'course'].map(scope => (
+                    <button key={scope} type='button'
+                      onClick={() => setCustomForm({ scope, teacherId: '', groupId: '', languageId: '', rateValue: '', rateType: 'fixed_monthly' })}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium ${customForm.scope === scope ? 'bg-accent text-white' : 'text-muted'}`}>
+                      {t('calcScope_' + scope)}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <form onSubmit={submitCustom} className='flex gap-2 items-end flex-wrap mb-4'>
-                <div>
-                  <p className='text-xs text-muted mb-1'>{t('selectTeacherLabel')}</p>
-                  <select value={customForm.teacherId} onChange={e => setCustomForm({ ...customForm, teacherId: e.target.value, groupId: '' })} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm' required>
-                    <option value=''>{t('selectTeacherLabel')}</option>
-                    {branchTeachers.map(tc => <option key={tc._id} value={tc._id}>{tc.name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <p className='text-xs text-muted mb-1'>{t('groupOptionalLabel')}</p>
-                  <select value={customForm.groupId} onChange={e => setCustomForm({ ...customForm, groupId: e.target.value })} disabled={!customForm.teacherId} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm disabled:opacity-50'>
-                    <option value=''>{t('allGroupsLabel')}</option>
-                    {teacherGroupOptions.map(g => <option key={g._id} value={g._id}>{groupLabel(g)}</option>)}
-                  </select>
-                </div>
+                {customForm.scope === 'course' ? (
+                  <div>
+                    <p className='text-xs text-muted mb-1'>{t('selectCourseLabel')}</p>
+                    <select value={customForm.languageId} onChange={e => setCustomForm({ ...customForm, languageId: e.target.value })} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm' required>
+                      <option value=''>{t('selectCourseLabel')}</option>
+                      {languages.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
+                    </select>
+                  </div>
+                ) : customForm.scope === 'group' ? (
+                  <div>
+                    <p className='text-xs text-muted mb-1'>{t('selectGroupForRateLabel')}</p>
+                    <select value={customForm.groupId}
+                      onChange={e => {
+                        const group = branchGroupOptions.find(g => g._id === e.target.value)
+                        setCustomForm({ ...customForm, groupId: e.target.value, teacherId: group?.teacherId?._id || group?.teacherId || '' })
+                      }}
+                      className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm' required>
+                      <option value=''>{t('selectGroupForRateLabel')}</option>
+                      {branchGroupOptions.map(g => <option key={g._id} value={g._id}>{groupLabel(g)} · {g.teacherId?.name}</option>)}
+                    </select>
+                  </div>
+                ) : (
+                  <div>
+                    <p className='text-xs text-muted mb-1'>{t('selectTeacherLabel')}</p>
+                    <select value={customForm.teacherId} onChange={e => setCustomForm({ ...customForm, teacherId: e.target.value })} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm' required>
+                      <option value=''>{t('selectTeacherLabel')}</option>
+                      {branchTeachers.map(tc => <option key={tc._id} value={tc._id}>{tc.name}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('rateValueLabel')}</p>
                   <input type='number' value={customForm.rateValue} onChange={e => setCustomForm({ ...customForm, rateValue: e.target.value })}
@@ -150,39 +209,53 @@ const Salary = ({ branchId }) => {
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('rateUnitLabel')}</p>
                   <select value={customForm.rateType} onChange={e => setCustomForm({ ...customForm, rateType: e.target.value })} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm'>
-                    {Object.entries(RATE_UNIT_KEYS).map(([val, key]) => <option key={val} value={val}>{t(key)}</option>)}
+                    {SELECTABLE_RATE_TYPES.map(val => <option key={val} value={val}>{t(RATE_UNIT_KEYS[val])}</option>)}
                   </select>
                 </div>
                 <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>{t('save')}</button>
               </form>
 
-              <table className='w-full text-sm'>
-                <thead>
-                  <tr className='text-left text-muted border-b border-hairline'>
-                    <th className='py-2 font-medium'>{t('teacherFilterLabel')}</th>
-                    <th className='py-2 font-medium'>{t('groupCol')}</th>
-                    <th className='py-2 font-medium'>{t('teacherCalcMethodCol')}</th>
-                    <th className='py-2'></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overrides.map(r => (
-                    <tr key={r._id} className='border-b border-hairline last:border-0'>
-                      <td className='py-3 text-ink'>{r.teacherId?.name}</td>
-                      <td className='py-3 text-muted'>{r.groupId ? groupLabel(r.groupId) : t('allGroupsLabel')}</td>
-                      <td className='py-3 text-muted'>{formatMoney(r.rateValue)} {t(RATE_UNIT_KEYS[r.rateType])}</td>
-                      <td className='py-3 text-right'><button onClick={() => deletePayRate(branchId, r._id)} className='text-muted text-xs font-medium'>{t('removeBtn')}</button></td>
+              <div className='hidden md:block overflow-x-auto'>
+                <table className='w-full text-sm'>
+                  <thead>
+                    <tr className='text-left text-muted border-b border-hairline'>
+                      <th className='py-2 font-medium'>{t('calcScopeLabel')}</th>
+                      <th className='py-2 font-medium'>{t('groupCol')}</th>
+                      <th className='py-2 font-medium'>{t('teacherCalcMethodCol')}</th>
+                      <th className='py-2'></th>
                     </tr>
-                  ))}
-                  {overrides.length === 0 && <tr><td colSpan={4} className='py-4 text-center text-muted'>—</td></tr>}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {overrides.map(r => (
+                      <tr key={r._id} className='border-b border-hairline last:border-0'>
+                        <td className='py-3 text-ink'>{r.languageId ? `${t('calcScope_course')}: ${r.languageId.name}` : r.teacherId?.name}</td>
+                        <td className='py-3 text-muted'>{r.languageId ? '—' : (r.groupId ? groupLabel(r.groupId) : t('allGroupsLabel'))}</td>
+                        <td className='py-3 text-muted'>{formatMoney(r.rateValue)} {t(RATE_UNIT_KEYS[r.rateType])}</td>
+                        <td className='py-3 text-right'><button onClick={() => deletePayRate(branchId, r._id)} className='text-muted text-xs font-medium'>{t('removeBtn')}</button></td>
+                      </tr>
+                    ))}
+                    {overrides.length === 0 && <tr><td colSpan={4} className='py-4 text-center text-muted'>—</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              <div className='flex md:hidden flex-col gap-2'>
+                {overrides.length === 0 && <p className='text-muted text-sm text-center py-3'>—</p>}
+                {overrides.map(r => (
+                  <div key={r._id} className='bg-bg rounded-xl p-3 flex justify-between items-center gap-2'>
+                    <div className='min-w-0'>
+                      <p className='text-ink text-sm font-medium truncate'>{r.languageId ? `${t('calcScope_course')}: ${r.languageId.name}` : r.teacherId?.name}</p>
+                      <p className='text-muted text-xs mt-0.5'>{r.languageId ? '' : (r.groupId ? groupLabel(r.groupId) : t('allGroupsLabel')) + ' · '}{formatMoney(r.rateValue)} {t(RATE_UNIT_KEYS[r.rateType])}</p>
+                    </div>
+                    <button onClick={() => deletePayRate(branchId, r._id)} className='text-muted text-xs font-medium flex-shrink-0'>{t('removeBtn')}</button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
       </div>
 
-      <div className='bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
+      <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden overflow-x-auto'>
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
@@ -202,19 +275,24 @@ const Salary = ({ branchId }) => {
                 <td className='px-4 py-4 font-mono text-muted'>{r.groupCount}</td>
                 <td className='px-4 py-4 font-mono text-muted'>{r.studentCount}</td>
                 <td className='px-4 py-4 text-muted'>{r.rateType === 'mixed' ? <span className='italic'>{t('mixedRatesLabel')}</span> : `${formatMoney(r.rateValue)} ${t(RATE_UNIT_KEYS[r.rateType])}`}</td>
-                <td className='px-4 py-4 font-mono text-ink'>{formatMoney(r.total)}</td>
                 <td className='px-4 py-4'>
-                  {r.paid ? (
+                  <p className='font-mono text-ink'>{formatMoney(r.total)}</p>
+                  {r.paidAmount > 0 && (
+                    <p className='text-[11px] text-muted mt-1'>{t('alreadyPaidLabel')}: {formatMoney(r.paidAmount)}</p>
+                  )}
+                </td>
+                <td className='px-4 py-4'>
+                  {r.remaining <= 0 ? (
                     <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent'>{t('paidBadge')}</span>
                   ) : (
                     <div className='flex flex-col gap-1.5 items-start'>
-                      <div className='flex gap-2'>
-                        <button onClick={() => { setPayingRow(r); setPayMode('pay'); setPayMethod('cash') }} className='px-3 py-1.5 rounded-lg bg-[#F2542D] text-white text-xs font-medium'>{t('payBtn')}</button>
-                        <button onClick={() => { setPayingRow(r); setPayMode('prepay'); setPayMethod('cash') }} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-ink text-xs font-medium'>{t('prepayBtn')}</button>
-                      </div>
-                      {r.prepayments?.length > 0 && (
-                        <span className='text-xs text-amber-600'>{t('prepaidHint', { amount: formatMoney(r.prepayments.reduce((s, p) => s + p.amount, 0)) })}</span>
+                      {r.paidAmount > 0 && (
+                        <span className='text-xs text-amber-600'>{t('remainingToPayLabel')}: {formatMoney(r.remaining)}</span>
                       )}
+                      <div className='flex gap-2'>
+                        <button onClick={() => openPay(r, 'pay')} className='px-3 py-1.5 rounded-lg bg-[#F2542D] text-white text-xs font-medium'>{t('payBtn')}</button>
+                        <button onClick={() => openPay(r, 'prepay')} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-ink text-xs font-medium'>{t('prepayBtn')}</button>
+                      </div>
                     </div>
                   )}
                 </td>
@@ -241,24 +319,86 @@ const Salary = ({ branchId }) => {
         </table>
       </div>
 
+      <div className='block md:hidden flex flex-col gap-2.5'>
+        {!results && <p className='text-muted text-sm text-center py-8'>{t('noSalaryResultsYet')}</p>}
+        {results && results.length === 0 && <p className='text-muted text-sm text-center py-8'>{t('noSalaryResultsYet')}</p>}
+        {(results || []).map(r => (
+          <div key={r.teacherId} className='bg-bg-elevated border border-hairline rounded-2xl p-4'>
+            <div className='flex justify-between items-start gap-2'>
+              <div className='min-w-0'>
+                <p className='text-ink font-medium text-sm truncate'>{r.name}</p>
+                <p className='text-muted text-xs mt-0.5'>{r.groupCount} {t('groupsCountCol')} · {r.studentCount} {t('studentsCountCol')}</p>
+              </div>
+              <button onClick={() => openDetails(r)} className='text-accent text-xs font-medium flex-shrink-0'>{t('detailsBtn')}</button>
+            </div>
+            <p className='text-xs text-muted mt-2'>{r.rateType === 'mixed' ? <span className='italic'>{t('mixedRatesLabel')}</span> : `${formatMoney(r.rateValue)} ${t(RATE_UNIT_KEYS[r.rateType])}`}</p>
+            <div className='flex justify-between items-end mt-2.5 pt-2.5 border-t border-hairline'>
+              <div>
+                <p className='font-mono text-ink text-base'>{formatMoney(r.total)}</p>
+                {r.paidAmount > 0 && <p className='text-[11px] text-muted mt-0.5'>{t('alreadyPaidLabel')}: {formatMoney(r.paidAmount)}</p>}
+              </div>
+              {r.remaining <= 0 ? (
+                <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent'>{t('paidBadge')}</span>
+              ) : (
+                <div className='flex flex-col gap-1.5 items-end'>
+                  {r.paidAmount > 0 && <span className='text-xs text-amber-600'>{t('remainingToPayLabel')}: {formatMoney(r.remaining)}</span>}
+                  <div className='flex gap-2'>
+                    <button onClick={() => openPay(r, 'pay')} className='px-3 py-1.5 rounded-lg bg-[#F2542D] text-white text-xs font-medium'>{t('payBtn')}</button>
+                    <button onClick={() => openPay(r, 'prepay')} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-ink text-xs font-medium'>{t('prepayBtn')}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {results && results.length > 0 && (
+          <div className='flex justify-between items-center px-1 pt-1'>
+            <p className='text-ink font-medium text-sm'>{t('totalToPayLabel')}</p>
+            <p className='font-mono text-ink font-medium'>{formatMoney(totalToPay)}</p>
+          </div>
+        )}
+      </div>
+
       {payingRow && (
         <div className='fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-6' onClick={() => setPayingRow(null)}>
           <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 max-w-sm w-full' onClick={e => e.stopPropagation()}>
             <p className='font-display text-lg text-ink mb-1'>{t(payMode === 'prepay' ? 'prepayBtn' : 'payBtn')} — {payingRow.name}</p>
-            <p className='font-mono text-2xl text-ink mb-4'>{formatMoney(payingRow.total)}</p>
-
-            {payMode === 'pay' && payingRow.prepayments?.length > 0 && (
-              <div className='bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4'>
-                <p className='text-amber-700 text-xs font-medium mb-2'>{t('prepaymentWarningTitle')}</p>
-                {payingRow.prepayments.map((p, i) => (
-                  <p key={i} className='text-amber-700 text-xs'>
-                    {formatMoney(p.amount)} · {new Date(p.date).toLocaleDateString()} · {t('expenseMethod_' + p.method)}
-                  </p>
-                ))}
-              </div>
-            )}
+            <p className='font-mono text-2xl text-ink mb-1'>{formatMoney(payingRow.remaining)}</p>
+            <p className='text-xs text-muted mb-4'>
+              {t('totalSalaryCol')}: {formatMoney(payingRow.total)}
+              {payingRow.paidAmount > 0 && ` · ${t('alreadyPaidLabel')}: ${formatMoney(payingRow.paidAmount)}`}
+            </p>
 
             <form onSubmit={submitPay} className='flex flex-col gap-3'>
+              {payMode === 'prepay' && (
+                <div>
+                  <p className='text-xs text-muted mb-1'>{t('prepayModeLabel')}</p>
+                  <div className='flex gap-1 bg-bg rounded-lg p-1 mb-2'>
+                    <button type='button' onClick={() => setAmountMode('amount')} className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium ${amountMode === 'amount' ? 'bg-bg-elevated text-ink shadow-sm' : 'text-muted'}`}>{t('prepayModeAmount')}</button>
+                    <button type='button' onClick={() => setAmountMode('percent')} className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium ${amountMode === 'percent' ? 'bg-bg-elevated text-ink shadow-sm' : 'text-muted'}`}>{t('prepayModePercent')}</button>
+                  </div>
+                  {amountMode === 'percent' ? (
+                    <>
+                      <input type='number' value={payPercent} onChange={e => setPayPercent(e.target.value)} placeholder='50'
+                        className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+                      <p className='text-xs text-muted mt-1'>
+                        {t('prepayPercentOfLabel', { amount: formatMoney(payingRow.remaining) })}
+                        {' = '}{formatMoney(Math.round(payingRow.remaining * (Number(payPercent) || 0) / 100))}
+                      </p>
+                    </>
+                  ) : (
+                    <input type='number' value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                      className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+                  )}
+                </div>
+              )}
+              {payMode === 'pay' && (
+                <div>
+                  <p className='text-xs text-muted mb-1'>{t('amountLabel')}</p>
+                  <input type='number' value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                    className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+                </div>
+              )}
               <div>
                 <p className='text-xs text-muted mb-1'>{t('expenseMethodLabel')}</p>
                 <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required>
@@ -305,7 +445,8 @@ const Salary = ({ branchId }) => {
                 {detail.revenueEntries.length > 0 && (
                   <>
                     <p className='text-ink text-sm font-medium mb-2'>{t('revenueBreakdownLabel')}</p>
-                    <table className='w-full text-xs mb-4'>
+                    <div className='overflow-x-auto mb-4'>
+                    <table className='w-full text-xs'>
                       <thead>
                         <tr className='text-left text-muted border-b border-hairline'>
                           <th className='py-2 font-medium'>{t('studentCol')}</th>
@@ -319,12 +460,13 @@ const Salary = ({ branchId }) => {
                           <tr key={i} className='border-b border-hairline last:border-0'>
                             <td className='py-2 text-ink'>{e.studentName}</td>
                             <td className='py-2 text-muted'>{detail.groups.find(g => String(g.groupId) === String(e.groupId))?.language || '—'}</td>
-                            <td className='py-2 text-muted'>{new Date(e.periodStart).toLocaleDateString()} – {new Date(e.periodEnd).toLocaleDateString()}{e.pending ? ` (${t('pendingBadge')})` : ''}</td>
+                            <td className='py-2 text-muted'>{formatUTCDate(e.periodStart)} – {formatUTCDate(e.periodEnd)}{e.pending ? ` (${t('pendingBadge')})` : ''}</td>
                             <td className='py-2 font-mono text-ink'>{formatMoney(e.amount)}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </>
                 )}
 

@@ -14,10 +14,10 @@ import { ensureDefaultLeadSources } from "../services/leadSources.service.js"
 // single call backing the whole board - flat arrays, the frontend assembles the tree client-side
 export const getLeadsBoard = async (req, res) => {
     try {
-        const columns = await LeadColumn.find({ branchId: req.auth.branchId }).sort({ order: 1 })
+        const columns = await LeadColumn.find({ branchId: req.auth.branchId }).sort({ order: 1 }).lean()
         const columnIds = columns.map(c => c._id)
-        const subgroups = await LeadSubgroup.find({ columnId: { $in: columnIds } }).sort({ order: 1 })
-        const leads = await Lead.find({ columnId: { $in: columnIds } }).sort({ order: 1 })
+        const subgroups = await LeadSubgroup.find({ columnId: { $in: columnIds } }).sort({ order: 1 }).lean()
+        const leads = await Lead.find({ columnId: { $in: columnIds } }).sort({ order: 1 }).lean()
         res.json({ columns, subgroups, leads })
     } catch (error) {
         console.log(error)
@@ -30,7 +30,7 @@ export const getLeadsBoard = async (req, res) => {
 export const createColumn = async (req, res) => {
     try {
         const { name } = req.body
-        const maxOrder = await LeadColumn.findOne({ branchId: req.auth.branchId }).sort({ order: -1 })
+        const maxOrder = await LeadColumn.findOne({ branchId: req.auth.branchId }).sort({ order: -1 }).lean()
         const column = await LeadColumn.create({ branchId: req.auth.branchId, name, order: (maxOrder?.order ?? -1) + 1 })
         res.status(201).json({ column })
     } catch (error) {
@@ -73,10 +73,10 @@ export const deleteColumn = async (req, res) => {
 
 export const createSubgroup = async (req, res) => {
     try {
-        const column = await LeadColumn.findOne({ _id: req.params.columnId, branchId: req.auth.branchId })
+        const column = await LeadColumn.findOne({ _id: req.params.columnId, branchId: req.auth.branchId }).lean()
         if (!column) return res.status(404).json({ error: 'not_found' })
         const { name } = req.body
-        const maxOrder = await LeadSubgroup.findOne({ columnId: column._id }).sort({ order: -1 })
+        const maxOrder = await LeadSubgroup.findOne({ columnId: column._id }).sort({ order: -1 }).lean()
         const subgroup = await LeadSubgroup.create({ branchId: req.auth.branchId, columnId: column._id, name, order: (maxOrder?.order ?? -1) + 1 })
         res.status(201).json({ subgroup })
     } catch (error) {
@@ -121,7 +121,7 @@ export const deleteSubgroup = async (req, res) => {
 export const listLeadSources = async (req, res) => {
     try {
         await ensureDefaultLeadSources(req.auth.branchId)
-        const sources = await LeadSource.find({ branchId: req.auth.branchId }).sort({ name: 1 })
+        const sources = await LeadSource.find({ branchId: req.auth.branchId }).sort({ name: 1 }).lean()
         res.json({ sources })
     } catch (error) {
         console.log(error)
@@ -197,7 +197,7 @@ export const deleteLeadSource = async (req, res) => {
 export const createLead = async (req, res) => {
     try {
         const { name, phone, source, comment, columnId, subgroupId } = req.body
-        const column = await LeadColumn.findOne({ _id: columnId, branchId: req.auth.branchId })
+        const column = await LeadColumn.findOne({ _id: columnId, branchId: req.auth.branchId }).lean()
         if (!column) return res.status(400).json({ error: 'invalid_column' })
         if (column.locked) return res.status(400).json({ error: 'column_locked' })
 
@@ -205,11 +205,11 @@ export const createLead = async (req, res) => {
         // this source bound via its auto-intake settings (see LeadSubgroup.autoIntakeSourceNames)
         let resolvedSubgroupId = subgroupId || null
         if (!resolvedSubgroupId && source) {
-            const autoSubgroup = await LeadSubgroup.findOne({ columnId, autoIntakeSourceNames: source })
+            const autoSubgroup = await LeadSubgroup.findOne({ columnId, autoIntakeSourceNames: source }).lean()
             if (autoSubgroup) resolvedSubgroupId = autoSubgroup._id
         }
 
-        const maxOrder = await Lead.findOne({ columnId, subgroupId: resolvedSubgroupId }).sort({ order: -1 })
+        const maxOrder = await Lead.findOne({ columnId, subgroupId: resolvedSubgroupId }).sort({ order: -1 }).lean()
         const lead = await Lead.create({
             branchId: req.auth.branchId, columnId, subgroupId: resolvedSubgroupId,
             name, phone, source: source || 'Other', comment: comment || '',
@@ -233,12 +233,10 @@ export const updateLead = async (req, res) => {
         const isMoving = columnId !== undefined && String(columnId) !== String(lead.columnId)
 
         if (isMoving) {
-            const [fromColumn, toColumn] = await Promise.all([
-                LeadColumn.findOne({ _id: lead.columnId, branchId: req.auth.branchId }),
-                LeadColumn.findOne({ _id: columnId, branchId: req.auth.branchId }),
-            ])
+            // lock only restricts creating/editing leads directly IN a column (see createLead) - it
+            // never blocks moving an existing lead into/out of one by drag-and-drop
+            const toColumn = await LeadColumn.findOne({ _id: columnId, branchId: req.auth.branchId }).lean()
             if (!toColumn) return res.status(400).json({ error: 'invalid_column' })
-            if (fromColumn?.locked || toColumn.locked) return res.status(400).json({ error: 'column_locked' })
             lead.columnId = columnId
         }
 
@@ -271,7 +269,7 @@ export const deleteLead = async (req, res) => {
 
 export const listLeadForms = async (req, res) => {
     try {
-        const forms = await LeadForm.find({ branchId: req.auth.branchId }).sort({ createdAt: -1 })
+        const forms = await LeadForm.find({ branchId: req.auth.branchId }).sort({ createdAt: -1 }).lean()
         res.json({ forms })
     } catch (error) {
         console.log(error)
@@ -281,7 +279,7 @@ export const listLeadForms = async (req, res) => {
 
 export const getLeadForm = async (req, res) => {
     try {
-        const form = await LeadForm.findOne({ _id: req.params.id, branchId: req.auth.branchId })
+        const form = await LeadForm.findOne({ _id: req.params.id, branchId: req.auth.branchId }).lean()
         if (!form) return res.status(404).json({ error: 'not_found' })
         res.json({ form })
     } catch (error) {
@@ -293,7 +291,7 @@ export const getLeadForm = async (req, res) => {
 export const createLeadForm = async (req, res) => {
     try {
         const { name, columnId, subgroupId, sourceName, fields } = req.body
-        const column = await LeadColumn.findOne({ _id: columnId, branchId: req.auth.branchId })
+        const column = await LeadColumn.findOne({ _id: columnId, branchId: req.auth.branchId }).lean()
         if (!column) return res.status(400).json({ error: 'invalid_column' })
 
         const form = await LeadForm.create({

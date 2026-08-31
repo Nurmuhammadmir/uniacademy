@@ -45,18 +45,17 @@ const StudentProfile = () => {
 
         <div>
           <p className='text-ink font-medium mb-2'>{t('courses')}</p>
-          <div className='grid grid-cols-2 gap-3'>
+          <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
             {data.courses.map(c => (
               <div key={c._id} className='bg-bg-elevated border border-hairline rounded-xl p-4'>
                 <div className='flex justify-between items-start mb-1'>
                   <p className='text-ink text-sm font-medium'>{c.languageId?.name} · {c.levelId?.name}</p>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${c.isActive ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>{c.isActive ? t('active') : t('unpaid')}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${c.enrollmentStatus === 'active' ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>{c.enrollmentStatus === 'active' ? t('active') : t('unpaid')}</span>
                 </div>
                 <p className='text-muted text-xs'>
                   {t('priceBalanceLine', { price: c.price !== null ? formatMoney(c.price) : '—' })} ·{' '}
-                  <span className={c.balance > 0 ? 'text-green-600 font-medium' : ''}>{t('courseBalanceLine', { balance: formatMoney(c.balance) })}</span>
+                  <span className={c.owed > 0 ? 'text-rose-600 font-medium' : ''}>{t('courseBalanceLine', { balance: c.owed > 0 ? `-${formatMoney(c.owed)}` : formatMoney(0) })}</span>
                 </p>
-                <p className='text-muted text-xs'>{t('nextDue', { date: c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).toLocaleDateString() : '—' })}</p>
               </div>
             ))}
             {data.courses.length === 0 && <p className='text-muted text-sm col-span-2'>{t('noCoursesYetPlain')}</p>}
@@ -75,9 +74,9 @@ const StudentProfile = () => {
           <p className='text-ink font-medium mb-2'>{t('paymentHistory')}</p>
           <div className='flex flex-col gap-3'>
             {data.payments.map(p => (
-              <div key={p._id} className={`flex justify-between items-center text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2 ${p.refunded ? 'opacity-50' : ''}`}>
-                <span className='text-muted'>{t('paymentLine', { date: new Date(p.date).toLocaleDateString(), language: p.languageId?.name, admin: p.adminId?.name })}</span>
-                <span className='flex items-center gap-2'>
+              <div key={p._id} className={`flex flex-wrap justify-between items-center gap-2 text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2 ${p.refunded ? 'opacity-50' : ''}`}>
+                <span className='text-muted'>{t('paymentLine', { date: new Date(p.date).toLocaleDateString(), admin: p.adminId?.name })}</span>
+                <span className='flex flex-wrap items-center gap-2'>
                   <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t(paymentMethodLabelKey(p.method))}</span>
                   <span className='font-mono text-accent'>+{formatMoney(p.amount)}</span>
                   {p.refunded && <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t('refundedBadge')}</span>}
@@ -92,7 +91,7 @@ const StudentProfile = () => {
           <p className='text-ink font-medium mb-2'>{t('examResults')}</p>
           <div className='flex flex-col gap-3'>
             {data.examAttempts?.map(a => (
-              <div key={a._id} className='flex justify-between text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2'>
+              <div key={a._id} className='flex flex-wrap justify-between gap-2 text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2'>
                 <span className='text-muted'>{a.examId?.languageId?.name} · {a.examId?.levelId?.name} · {t('attemptHash', { n: a.attemptNumber })}</span>
                 <span className={a.passed ? 'text-accent font-mono' : 'text-red-500 font-mono'}>{a.score}%</span>
               </div>
@@ -105,7 +104,7 @@ const StudentProfile = () => {
           <p className='text-ink font-medium mb-2'>{t('groupHistory')}</p>
           <div className='flex flex-col gap-3'>
             {data.groups.map(g => (
-              <div key={g._id} className='flex justify-between text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2'>
+              <div key={g._id} className='flex flex-wrap justify-between gap-2 text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2'>
                 <span className='text-ink'>{g.languageId?.name} · {g.levelId?.name} · {g.teacherId?.name}</span>
                 <span className='text-muted'>{g.status}</span>
               </div>

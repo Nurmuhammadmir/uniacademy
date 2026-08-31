@@ -9,7 +9,7 @@ import Lead from "../models/Lead.js"
 // only exposes what a public submitter needs to render the form - never the branchId/column/etc
 export const getPublicLeadForm = async (req, res) => {
     try {
-        const form = await LeadForm.findOne({ slug: req.params.slug })
+        const form = await LeadForm.findOne({ slug: req.params.slug }).lean()
         if (!form) return res.status(404).json({ error: 'not_found' })
         res.json({ form: { name: form.name, fields: form.fields } })
     } catch (error) {
@@ -24,10 +24,10 @@ export const getPublicLeadForm = async (req, res) => {
 // createLead uses doesn't apply here since the form already has an explicit target.
 export const submitPublicLeadForm = async (req, res) => {
     try {
-        const form = await LeadForm.findOne({ slug: req.params.slug })
+        const form = await LeadForm.findOne({ slug: req.params.slug }).lean()
         if (!form) return res.status(404).json({ error: 'not_found' })
 
-        const column = await LeadColumn.findById(form.columnId)
+        const column = await LeadColumn.findById(form.columnId).lean()
         if (!column) return res.status(400).json({ error: 'form_misconfigured' })
 
         const answers = { ...(req.body.answers || {}) }
@@ -43,11 +43,11 @@ export const submitPublicLeadForm = async (req, res) => {
 
         let subgroupId = form.subgroupId
         if (!subgroupId) {
-            const autoSubgroup = await LeadSubgroup.findOne({ columnId: form.columnId, autoIntakeSourceNames: form.sourceName })
+            const autoSubgroup = await LeadSubgroup.findOne({ columnId: form.columnId, autoIntakeSourceNames: form.sourceName }).lean()
             if (autoSubgroup) subgroupId = autoSubgroup._id
         }
 
-        const maxOrder = await Lead.findOne({ columnId: form.columnId, subgroupId: subgroupId || null }).sort({ order: -1 })
+        const maxOrder = await Lead.findOne({ columnId: form.columnId, subgroupId: subgroupId || null }).sort({ order: -1 }).lean()
         await Lead.create({
             branchId: form.branchId, columnId: form.columnId, subgroupId: subgroupId || null,
             name, phone, comment, source: form.sourceName, formId: form._id, answers,

@@ -1,19 +1,20 @@
 import express from "express"
 import requireRole from "../middleware/auth.js"
 import {
-    createStudent, listStudents, updateStudent, deleteStudent, permanentlyDeleteStudent, unarchiveStudent, getStudentProfile, addStudentCourse, updateStudentCourse, linkParent,
-    createPayment, listPayments, refundPayment, deletePayment, updatePayment, getFinanceOverview, getPaymentPreview, getPaymentDetail,
+    createStudent, listStudents, updateStudent, deleteStudent, permanentlyDeleteStudent, unarchiveStudent, getStudentProfile, linkParent,
+    createPayment, refundPayment, deletePayment, updatePayment, getFinanceOverview, getPaymentDetail,
     createGroup, listGroups, getGroupProfile, updateGroup, deleteGroup, permanentlyDeleteGroup, unarchiveGroup, suggestGroup, addStudentToGroup, removeStudentFromGroup,
-    retakeExam, listBranchTeachers, getTeacherProfile, getTeacherAttendanceGrid, getStudentAttendanceGrid, getLessonDetail, setLessonTeacherStatus,
+    retakeExam, listBranchTeachers, createTeacher, updateTeacher, getTeacherProfile, getTeacherAttendanceGrid, getStudentAttendanceGrid, getLessonDetail, setLessonTeacherStatus,
     getMe, createTeacherAttendanceQR, listTeacherAttendanceQRs, getAttendanceOverview,
-    listPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, prepaySalary, getSalaryDetail,
-    getStudentStatement, getReconciliation, getBusinessLedger, setStudentDiscount,
+    calculateSalary, paySalary, prepaySalary, getSalaryDetail,
+    getStudentStatement, getReconciliation, getBusinessLedger, applyDiscount, deleteDiscount, setStudentFreeze,
+    listPricingForAdmin,
     listMyNotes, createMyNote, deleteMyNote,
 } from "../controllers/adminController.js"
 import { listLanguages, listLevels, getSettings } from "../controllers/catalogController.js"
 import {
     listRooms, createRoom, updateRoom, deleteRoom,
-    getGroupDetails, updateGroupDiscount, getGroupAttendanceGrid,
+    getGroupDetails, getGroupAttendanceGrid,
     listGroupMaterials, addGroupMaterial, deleteGroupMaterial,
     listGroupComments, addGroupComment, deleteGroupComment,
     listExtraLessons, createExtraLesson, deleteExtraLesson,
@@ -42,7 +43,10 @@ adminRouter.get('/settings', getSettings)
 adminRouter.get('/languages', listLanguages)
 adminRouter.get('/levels', listLevels)
 adminRouter.get('/teachers', listBranchTeachers)
+adminRouter.post('/teachers', createTeacher)
 adminRouter.get('/teachers/:id', getTeacherProfile)
+adminRouter.put('/teachers/:id', updateTeacher)
+// deliberately no DELETE /teachers/:id here - removing a teacher is director-only (confirmed spec)
 adminRouter.get('/teachers/:id/attendance-grid', getTeacherAttendanceGrid)
 adminRouter.get('/lessons/:id', getLessonDetail)
 adminRouter.put('/lessons/:id/teacher-status', setLessonTeacherStatus)
@@ -60,9 +64,10 @@ adminRouter.delete('/students/:id', deleteStudent)
 adminRouter.delete('/students/:id/permanent', permanentlyDeleteStudent)
 adminRouter.post('/students/:id/unarchive', unarchiveStudent)
 adminRouter.post('/students/:id/parent', linkParent)
-adminRouter.post('/students/:id/courses', addStudentCourse)
-adminRouter.put('/students/:id/courses/:courseId', updateStudentCourse)
-adminRouter.post('/students/:id/discounts', setStudentDiscount)
+adminRouter.put('/students/:id/freeze', setStudentFreeze)
+adminRouter.post('/discounts', applyDiscount)
+adminRouter.delete('/discounts/:id', deleteDiscount)
+adminRouter.get('/pricing', listPricingForAdmin)
 
 adminRouter.get('/groups', listGroups)
 adminRouter.post('/groups', createGroup)
@@ -75,8 +80,6 @@ adminRouter.post('/groups/:id/unarchive', unarchiveGroup)
 adminRouter.post('/groups/:id/students', addStudentToGroup)
 adminRouter.delete('/groups/:id/students/:studentId', removeStudentFromGroup)
 
-adminRouter.get('/payments', listPayments)
-adminRouter.get('/payments/preview', getPaymentPreview)
 adminRouter.get('/payments/:id', getPaymentDetail)
 adminRouter.get('/finance', getFinanceOverview)
 adminRouter.get('/reconciliation', getReconciliation)
@@ -88,9 +91,6 @@ adminRouter.delete('/payments/:id', deletePayment)
 
 adminRouter.post('/exams/:id/retake/:studentId', retakeExam)
 
-adminRouter.get('/pay-rates', listPayRates)
-adminRouter.post('/pay-rates', setPayRate)
-adminRouter.delete('/pay-rates/:id', deletePayRate)
 adminRouter.get('/salary/calculate', calculateSalary)
 adminRouter.get('/salary/detail/:teacherId', getSalaryDetail)
 adminRouter.post('/salary/pay', paySalary)
@@ -103,7 +103,6 @@ adminRouter.delete('/rooms/:id', deleteRoom)
 adminRouter.get('/timetable', getTodayTimetable)
 
 adminRouter.get('/groups/:id/details', getGroupDetails)
-adminRouter.put('/groups/:id/discount', updateGroupDiscount)
 adminRouter.get('/groups/:id/attendance-grid', getGroupAttendanceGrid)
 adminRouter.get('/groups/:id/materials', listGroupMaterials)
 adminRouter.post('/groups/:id/materials', addGroupMaterial)

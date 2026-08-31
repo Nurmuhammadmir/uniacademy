@@ -6,6 +6,33 @@ html, body, #root { height: 100%; }
 body { @apply bg-bg text-ink font-body; -webkit-tap-highlight-color: transparent; }
 button, a, [role="button"] { touch-action: manipulation; }
 
+/* Light-mode values for the base surface/text tokens (bg/bg-elevated/bg-card/ink/muted/hairline -
+   tailwind.config.js points those classes at these variables instead of static hex). Matches the
+   shared preset's own static values exactly, and the admin/director apps' "Pure Cupertino" palette -
+   only .dark below actually repaints anything. */
+:root {
+  --color-bg: #F5F5F7;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-card: #FFFFFF;
+  --color-ink: #1D1D1F;
+  --color-muted: #6E6E73;
+  --color-hairline: #D2D2D7;
+}
+
+/* Dark Mode - midnight blue-gray canvas with a velvety graphite surface for cards/content, one step
+   lighter than the page so everything still visibly pops off the canvas. Toggled by adding/removing
+   this class on <html> - see ThemeContext.jsx (state) and index.html's inline script (applies it
+   before first paint, defaulting to light unless the user has explicitly switched before). Same
+   values as the admin/director apps so dark mode reads identically everywhere. */
+.dark {
+  --color-bg: #0B0F19;
+  --color-bg-elevated: #161F30;
+  --color-bg-card: #161F30;
+  --color-ink: #F8FAFC;
+  --color-muted: #94A3B8;
+  --color-hairline: rgba(148, 163, 184, 0.2);
+}
+
 /* subtle "raised" 3D depth for buttons and cards across the whole app - buttons lift off the page
    and press down on tap, cards/panels get a soft ambient shadow instead of sitting flat. Every
    button is also pill-shaped (rounded-full) with a gentle scale-up + brightness lift on hover - the
@@ -51,7 +78,7 @@ table {
   border-spacing: 0 2px;
 }
 table td, table th {
-  border-bottom: 1px solid #E9E1D4;
+  border-bottom: 1px solid #e2e8f0;
 }
 table tbody tr:last-child td {
   border-bottom: none;

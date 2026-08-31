@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { todayISO } from '../lib/date.js'
+import DatePicker from '../components/DatePicker.jsx'
 
 const Attendance = () => {
   const { getAttendanceOverview, branches } = useContext(DirectorContext)
@@ -17,7 +18,10 @@ const Attendance = () => {
 
   const teachersByBranch = {}
   data.teachers.forEach(tc => {
-    const key = String(tc.branchId)
+    // branchId comes back populated (director controller populates it to the branch's name) - keying
+    // by the raw object stringified to "[object Object]" would silently bucket every teacher under
+    // one identical key regardless of branch
+    const key = String(tc.branchId?._id || tc.branchId)
     if (!teachersByBranch[key]) teachersByBranch[key] = []
     teachersByBranch[key].push(tc)
   })
@@ -26,13 +30,13 @@ const Attendance = () => {
 
   return (
     <div>
-      <div className='flex justify-between items-center mb-6'>
+      <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6'>
         <p className='font-display text-2xl text-ink'>{t('attendanceTitle')}</p>
-        <input type='date' value={date} onChange={e => setDate(e.target.value)} className='px-3 py-2 rounded-xl bg-bg-elevated border border-hairline text-sm' />
+        <DatePicker className='w-40' value={date} onChange={setDate} />
       </div>
 
       <p className='text-ink font-medium mb-3'>{t('teacherCheckIns')}</p>
-      <div className='grid grid-cols-2 gap-4 mb-8'>
+      <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8'>
         {Object.entries(teachersByBranch).map(([branchId, list]) => (
           <div key={branchId} className='bg-bg-elevated border border-hairline rounded-2xl p-5'>
             <div className='flex justify-between items-center mb-3'>
@@ -55,7 +59,7 @@ const Attendance = () => {
       </div>
 
       <p className='text-ink font-medium mb-3'>{t('studentAttendanceByBranch')}</p>
-      <div className='grid grid-cols-4 gap-4 mb-8'>
+      <div className='grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8'>
         {branches.map(b => {
           const stat = studentStatsByBranch[b._id]
           return (
@@ -72,7 +76,7 @@ const Attendance = () => {
       </div>
 
       <p className='text-ink font-medium mb-3'>{t('byGroup')}</p>
-      <div className='bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
+      <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden overflow-x-auto'>
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
@@ -96,6 +100,21 @@ const Attendance = () => {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className='block md:hidden flex flex-col gap-2.5'>
+        {data.groups.length === 0 && <p className='text-muted text-sm text-center py-8'>{t('noCheckInsForDate')}</p>}
+        {data.groups.map(g => (
+          <div key={g.groupId} className='bg-bg-elevated border border-hairline rounded-2xl p-4'>
+            <div className='flex justify-between items-start gap-2'>
+              <div className='min-w-0'>
+                <p className='text-ink font-medium text-sm truncate'>{g.language} · {g.level}</p>
+                <p className='text-muted text-xs mt-0.5'>{g.branch} · {g.teacher}</p>
+              </div>
+              <span className='font-mono text-accent text-sm flex-shrink-0'>{g.presentCount}/{g.totalCount}</span>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

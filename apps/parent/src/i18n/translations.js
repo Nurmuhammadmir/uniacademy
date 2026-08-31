@@ -21,6 +21,7 @@ export const TRANSLATIONS = {
     noExtraLessonsYet: 'No extra lessons scheduled.', notesLabel: 'Notes',
     notificationsLabel: 'Notifications', notificationsHint: 'Get notified about attendance and payments, even when the app is closed.',
     turnOnBtn: 'Turn on', turnOffBtn: 'Turn off',
+    darkModeBtn: 'Dark mode', lightModeBtn: 'Light mode',
   },
   ru: {
     signIn: 'Войти', signingIn: 'Вход…', phone: 'Номер телефона', password: 'Пароль',
@@ -42,6 +43,7 @@ export const TRANSLATIONS = {
     noExtraLessonsYet: 'Дополнительных занятий пока нет.', notesLabel: 'Заметки',
     notificationsLabel: 'Уведомления', notificationsHint: 'Получайте уведомления о посещаемости и оплате, даже когда приложение закрыто.',
     turnOnBtn: 'Включить', turnOffBtn: 'Выключить',
+    darkModeBtn: 'Тёмная тема', lightModeBtn: 'Светлая тема',
   },
   uz: {
     signIn: 'Kirish', signingIn: 'Kirilmoqda…', phone: 'Telefon raqami', password: 'Parol',
@@ -63,6 +65,7 @@ export const TRANSLATIONS = {
     noExtraLessonsYet: "Hozircha qo'shimcha darslar yo'q.", notesLabel: 'Izohlar',
     notificationsLabel: 'Bildirishnomalar', notificationsHint: "Ilova yopiq bo'lsa ham davomat va to'lovlar haqida xabar oling.",
     turnOnBtn: 'Yoqish', turnOffBtn: "O'chirish",
+    darkModeBtn: 'Tungi rejim', lightModeBtn: 'Kunduzgi rejim',
   },
   kaa: {
     signIn: 'Kiriw', signingIn: 'Kirilmekte…', phone: 'Telefon nomeri', password: 'Parol',
@@ -84,5 +87,6 @@ export const TRANSLATIONS = {
     noExtraLessonsYet: "Ele qosımsha sabaqlar joq.", notesLabel: 'Eskertpeler',
     notificationsLabel: 'Bildirmeler', notificationsHint: "Qollanba jabıq bolsa da qatnasıw hám tólemler haqqında xabar alıń.",
     turnOnBtn: 'Qosıw', turnOffBtn: "Óshiriw",
+    darkModeBtn: 'Qarańǵı rejim', lightModeBtn: 'Jarıq rejim',
   },
 }

@@ -14,17 +14,21 @@ export const requireActiveSubscription = async (req, res, next) => {
         const student = await User.findById(req.auth.userId)
         if (!student) return res.status(403).json({ error: 'subscription_expired' })
 
+        // levelCompletedAt:null - a group whose cohort already graduated away keeps its old
+        // studentIds/status (never auto-changed, see Group.js), so without this a student could
+        // still match it here even though their course entry has already moved on to the new
+        // group's level, wrongly failing the levelId match below
         const groupId = req.query.groupId || req.body.groupId
         const group = groupId
-            ? await Group.findOne({ _id: groupId, studentIds: student._id, status: 'active' })
-            : await Group.findOne({ studentIds: student._id, status: 'active' })
+            ? await Group.findOne({ _id: groupId, studentIds: student._id, status: 'active', levelCompletedAt: null })
+            : await Group.findOne({ studentIds: student._id, status: 'active', levelCompletedAt: null })
         if (!group) return res.status(403).json({ error: 'subscription_expired' })
 
         const course = student.courses.find(c =>
             String(c.languageId) === String(group.languageId) && String(c.levelId) === String(group.levelId)
         )
 
-        if (!course || !course.isActive || !course.subscriptionExpiresAt || Date.now() > course.subscriptionExpiresAt.getTime()) {
+        if (!course || course.enrollmentStatus !== 'active') {
             return res.status(403).json({ error: 'subscription_expired' })
         }
 

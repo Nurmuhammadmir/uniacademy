@@ -5,6 +5,7 @@ import compression from 'compression'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import cron from 'node-cron'
+import mongoose from 'mongoose'
 import 'dotenv/config'
 import connectDB from './config/mongodb.js'
 import authRouter from './routes/authRoute.js'
@@ -15,6 +16,7 @@ import studentRouter from './routes/studentRoute.js'
 import parentRouter from './routes/parentRoute.js'
 import publicRouter from './routes/publicRoute.js'
 import { sendDailyParentDigest } from './services/parentNotifications.service.js'
+import { runDailyBillingCycle } from './services/billingCycle.service.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -39,15 +41,15 @@ const allowedOrigins = (process.env.CLIENT_ORIGINS || '')
 
 app.use(cors({
     origin: (origin, callback) => {
-        // Logs incoming requests to Render console so you can see exactly what is being evaluated
-        console.log("Incoming Origin:", origin);
-        console.log("Allowed Origins List:", allowedOrigins);
-
         // Allow requests with no origin (like mobile apps, Postman, or server-to-server requests)
         if (!origin || allowedOrigins.includes(origin)) {
             return callback(null, true);
         }
-        
+
+        // only log the rejection path, not every single request - with hundreds of concurrent
+        // users across 6 apps this callback fires on every API call, and logging both lines on
+        // every one of them was pure CPU/stdout overhead for no benefit once CORS is actually
+        // configured correctly
         console.warn(`Blocked by CORS: ${origin}`);
         callback(new Error('not_allowed_by_cors'));
     },
@@ -73,12 +75,37 @@ app.use('/api/public', publicRouter)
 
 app.get('/', (req, res) => res.send('uniacademy api working'))
 
+// point this at whatever monitoring you use, or just open it in a browser after deploying - lets
+// you watch the process's ACTUAL memory footprint on your real server/traffic instead of trusting
+// an estimate. rss is the number that matters for sizing a server (it's everything the OS has
+// handed this process); heapUsed/heapTotal are just the V8 JS-object portion of that.
+app.get('/health', (req, res) => {
+    const mem = process.memoryUsage()
+    const toMB = (bytes) => Math.round(bytes / 1024 / 1024)
+    res.json({
+        uptimeSeconds: Math.round(process.uptime()),
+        memoryMB: { rss: toMB(mem.rss), heapUsed: toMB(mem.heapUsed), heapTotal: toMB(mem.heapTotal) },
+        mongoConnected: mongoose.connection.readyState === 1,
+    })
+})
+
 // once a day, at a sensible local morning hour - "your child didn't attend yesterday" plus any
 // still-unpaid course reminders (see parentNotifications.service.js for exactly what this checks).
 // Fixed to Asia/Tashkent regardless of whatever timezone the host server itself runs in, so this
 // always fires at 8am for the branch's actual users, not 8am UTC.
 cron.schedule('0 8 * * *', () => {
     sendDailyParentDigest().catch(error => console.log('sendDailyParentDigest failed', error))
+}, { timezone: 'Asia/Tashkent' })
+
+// once a day, early morning - gives every enrolled course a chance to recognize its next billing
+// period (see billingCycle.service.js). Each call is self-guarded/idempotent (only posts a chunk
+// once its own due date has actually arrived), so this is safe to run daily with zero special-casing
+// for "did this already run today" - running it twice, or missing a day and catching up the next,
+// both just work.
+cron.schedule('0 3 * * *', () => {
+    runDailyBillingCycle()
+        .then(result => console.log('runDailyBillingCycle:', result))
+        .catch(error => console.log('runDailyBillingCycle failed', error))
 }, { timezone: 'Asia/Tashkent' })
 
 app.listen(port, () => console.log('server started on port', port))

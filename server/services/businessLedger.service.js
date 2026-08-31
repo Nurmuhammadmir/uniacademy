@@ -3,84 +3,83 @@
 // Expense rather than netted against the original payment, matching the gross-revenue accounting
 // model the rest of Finance already uses) merged into one chronological "where did every unit of
 // money in this business's account come from and go to" timeline, with a running balance.
-import User from "../models/User.js"
+//
+// Unlike the old version of this file (two live Payment/Expense aggregates on every call), this now
+// just reads the branch Account's own stored LedgerEntry history - openingBalance/closingBalance are
+// direct reads of a `balanceAfter` snapshot, not summed from scratch each time.
+import Account from "../models/Account.js"
+import LedgerEntry from "../models/LedgerEntry.js"
 import Payment from "../models/Payment.js"
 import Expense from "../models/Expense.js"
 
-// every payment method treated as its own mini cash-drawer/account - Payme/Apelsin only ever show
-// up on the expense side today (Payment's own method enum doesn't include them yet), which is fine:
-// that just means nothing has ever come IN through those methods, only gone OUT (e.g. a salary paid
-// via Payme)
 const METHODS = ['cash', 'card', 'click', 'bank_transfer', 'payme', 'apelsin']
 
 export const computeBusinessLedger = async (branchId, dateFrom, dateTo) => {
-    const branchStudents = await User.find({ branchId, role: 'student' }).select('_id')
-    const studentIds = branchStudents.map(s => s._id)
+    const account = await Account.findOne({ ownerType: 'branch', ownerId: branchId })
+    if (!account) return { openingBalance: 0, entries: [], closingBalance: 0, totalIn: 0, totalOut: 0, byMethod: METHODS.map(m => ({ method: m, in: 0, out: 0, balance: 0 })), dateFrom, dateTo }
 
-    const [paymentsBeforeAgg, expensesBeforeAgg] = await Promise.all([
-        Payment.aggregate([
-            { $match: { studentId: { $in: studentIds }, date: { $lt: dateFrom } } },
-            { $group: { _id: null, total: { $sum: '$amount' } } },
-        ]),
-        Expense.aggregate([
-            { $match: { branchId, date: { $lt: dateFrom } } },
-            { $group: { _id: null, total: { $sum: '$amount' } } },
-        ]),
-    ])
-    const openingBalance = (paymentsBeforeAgg[0]?.total || 0) - (expensesBeforeAgg[0]?.total || 0)
+    // the balanceAfter on the last entry strictly before dateFrom already IS the opening balance -
+    // no summing needed, that's the entire point of a stored running balance
+    const lastBefore = await LedgerEntry.findOne({ accountId: account._id, date: { $lt: dateFrom } }).sort({ date: -1, _id: -1 }).lean()
+    const openingBalance = lastBefore?.balanceAfter || 0
 
+    const rows = await LedgerEntry.find({ accountId: account._id, date: { $gte: dateFrom, $lte: dateTo } })
+        .sort({ date: 1, _id: 1 })
+        .populate('teacherId', 'name')
+        .populate('createdBy', 'name')
+        .lean()
+
+    // pull the source Payment/Expense docs this range's entries point back to, for display fields
+    // (category, recipient, refund status) this schema deliberately doesn't duplicate
+    const paymentIds = rows.filter(r => r.sourceType === 'payment').map(r => r.sourceId)
+    const expenseIds = rows.filter(r => r.sourceType === 'expense').map(r => r.sourceId)
     const [payments, expenses] = await Promise.all([
-        Payment.find({ studentId: { $in: studentIds }, date: { $gte: dateFrom, $lte: dateTo } })
-            .populate('studentId', 'name').sort({ date: 1 }),
-        Expense.find({ branchId, date: { $gte: dateFrom, $lte: dateTo } })
-            .populate('teacherId', 'name').populate('createdBy', 'name').sort({ date: 1 }),
+        Payment.find({ _id: { $in: paymentIds } }).populate('studentId', 'name').lean(),
+        Expense.find({ _id: { $in: expenseIds } }).lean(),
     ])
+    const paymentById = new Map(payments.map(p => [String(p._id), p]))
+    const expenseById = new Map(expenses.map(e => [String(e._id), e]))
 
-    const entries = []
-    payments.forEach(p => entries.push({
-        date: p.date, type: 'credit', amount: p.amount, category: 'Payment',
-        description: p.studentId?.name || '—', method: p.method,
-        refunded: p.refunded, refundedAmount: p.refundedAmount || 0,
-        sourceType: 'payment', sourceId: p._id,
-    }))
-    expenses.forEach(e => entries.push({
-        date: e.date, type: 'debit', amount: e.amount, category: e.category,
-        description: e.name || e.recipient || e.category, method: e.method,
-        teacherName: e.teacherId?.name || null, recordedBy: e.createdBy?.name || null,
-        sourceType: 'expense', sourceId: e._id,
-    }))
-    entries.sort((a, b) => new Date(a.date) - new Date(b.date))
-
-    let balance = openingBalance
-    entries.forEach(e => {
-        balance += e.type === 'credit' ? e.amount : -e.amount
-        e.balanceAfter = balance
+    const entries = rows.map(r => {
+        const type = r.direction === 'increase' ? 'credit' : 'debit'
+        if (r.sourceType === 'payment') {
+            const p = paymentById.get(String(r.sourceId))
+            return {
+                date: r.date, type, amount: r.amount, category: 'Payment',
+                description: p?.studentId?.name || '—', method: r.method,
+                refunded: p?.refunded, refundedAmount: p?.refundedAmount || 0,
+                sourceType: 'payment', sourceId: r.sourceId,
+            }
+        }
+        if (r.sourceType === 'expense') {
+            const e = expenseById.get(String(r.sourceId))
+            return {
+                date: r.date, type, amount: r.amount, category: e?.category || r.kind,
+                description: e?.name || e?.recipient || e?.category || r.description, method: r.method,
+                teacherName: r.teacherId?.name || null, recordedBy: r.createdBy?.name || null,
+                sourceType: 'expense', sourceId: r.sourceId,
+            }
+        }
+        return { date: r.date, type, amount: r.amount, category: r.kind, description: r.description, method: r.method, balanceAfter: r.balanceAfter }
     })
+    entries.forEach((e, i) => { e.balanceAfter = rows[i].balanceAfter })
 
+    const closingBalance = entries.length ? entries[entries.length - 1].balanceAfter : openingBalance
     const totalIn = entries.filter(e => e.type === 'credit').reduce((s, e) => s + e.amount, 0)
     const totalOut = entries.filter(e => e.type === 'debit').reduce((s, e) => s + e.amount, 0)
 
     // per-method balance is a LIFETIME figure (like a real cash-drawer/bank-account balance is never
     // "for the dates you happen to be looking at right now") - deliberately NOT scoped to
-    // dateFrom/dateTo the way `entries` above is. Drilling into one method on the frontend just
-    // filters the already-fetched `entries` for the CURRENT date range, so "balance" and "history"
-    // intentionally answer two different questions (all-time total vs. this period's activity).
-    const [paymentsByMethodAgg, expensesByMethodAgg] = await Promise.all([
-        Payment.aggregate([
-            { $match: { studentId: { $in: studentIds } } },
-            { $group: { _id: '$method', total: { $sum: '$amount' } } },
-        ]),
-        Expense.aggregate([
-            { $match: { branchId } },
-            { $group: { _id: '$method', total: { $sum: '$amount' } } },
-        ]),
+    // dateFrom/dateTo. This is also what backs the Finance page's "Net Profit" breakdown popover.
+    const byMethodAgg = await LedgerEntry.aggregate([
+        { $match: { accountId: account._id, method: { $ne: null } } },
+        { $group: { _id: { method: '$method', direction: '$direction' }, total: { $sum: '$amount' } } },
     ])
-    const inByMethod = Object.fromEntries(paymentsByMethodAgg.map(r => [r._id, r.total]))
-    const outByMethod = Object.fromEntries(expensesByMethodAgg.map(r => [r._id, r.total]))
-    const byMethod = METHODS.map(method => ({
-        method, in: inByMethod[method] || 0, out: outByMethod[method] || 0,
-        balance: (inByMethod[method] || 0) - (outByMethod[method] || 0),
-    }))
+    const byMethod = METHODS.map(method => {
+        const inTotal = byMethodAgg.find(r => r._id.method === method && r._id.direction === 'increase')?.total || 0
+        const outTotal = byMethodAgg.find(r => r._id.method === method && r._id.direction === 'decrease')?.total || 0
+        return { method, in: inTotal, out: outTotal, balance: inTotal - outTotal }
+    })
 
-    return { openingBalance, entries, closingBalance: balance, totalIn, totalOut, byMethod, dateFrom, dateTo }
+    return { openingBalance, entries, closingBalance, totalIn, totalOut, byMethod, dateFrom, dateTo }
 }

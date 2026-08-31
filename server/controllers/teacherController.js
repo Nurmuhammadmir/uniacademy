@@ -27,16 +27,17 @@ import { pickReviewExercises } from "../services/reviewHomework.service.js"
 
 export const getMyGroups = async (req, res) => {
     try {
-        // active only - a completed/archived group still exists for historical reporting (its
-        // roster is deliberately kept, see groupPromotion.service.js), but a teacher's own "my
-        // groups" list is for classes they're actually running today, not a history browser
-        const groups = await Group.find({ teacherId: req.auth.userId, status: 'active' })
+        // active + levelCompletedAt:null - a graduated/archived group still exists for historical
+        // reporting (its roster is deliberately kept, see groupPromotion.service.js), but a
+        // teacher's own "my groups" list is for classes they're actually running today, not a
+        // history browser
+        const groups = await Group.find({ teacherId: req.auth.userId, status: 'active', levelCompletedAt: null })
             .populate('languageId', 'name code')
             .populate('levelId', 'name order durationDays')
             .populate('roomId', 'name')
 
         const groupIds = groups.map(g => g._id)
-        const doneRows = await StudentProgress.find({ groupId: { $in: groupIds }, status: 'done' })
+        const doneRows = await StudentProgress.find({ groupId: { $in: groupIds }, status: 'done' }).lean()
 
         const withFreshDay = groups.map(g => {
             const rowsForGroup = doneRows.filter(r => String(r.groupId) === String(g._id))
@@ -79,11 +80,11 @@ export const getMyTimetable = async (req, res) => {
         const startOfDay = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate()))
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
-        const myGroups = await Group.find({ teacherId: req.auth.userId, status: 'active' })
-            .populate('languageId', 'name').populate('levelId', 'name').populate('roomId', 'name')
+        const myGroups = await Group.find({ teacherId: req.auth.userId, status: 'active', levelCompletedAt: null })
+            .populate('languageId', 'name').populate('levelId', 'name').populate('roomId', 'name').lean()
         const groupIds = myGroups.map(g => g._id)
 
-        const lessons = await Lesson.find({ groupId: { $in: groupIds }, date: { $gte: startOfDay, $lt: endOfDay } }).sort({ startTime: 1 })
+        const lessons = await Lesson.find({ groupId: { $in: groupIds }, date: { $gte: startOfDay, $lt: endOfDay } }).sort({ startTime: 1 }).lean()
         const rows = lessons.map(l => {
             const group = myGroups.find(g => String(g._id) === String(l.groupId))
             return {
@@ -103,10 +104,10 @@ export const getMyTimetable = async (req, res) => {
 // api to list one group's students with their completion percentage so far (auto-graded, teacher never scores)
 export const getGroupStudents = async (req, res) => {
     try {
-        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId }).populate('studentIds', 'name phone')
+        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId }).populate('studentIds', 'name phone').lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
-        const progressRows = await StudentProgress.find({ groupId: group._id })
+        const progressRows = await StudentProgress.find({ groupId: group._id }).lean()
 
         const students = group.studentIds.map(student => {
             const rows = progressRows.filter(p => String(p.studentId) === String(student._id))
@@ -125,7 +126,7 @@ export const getGroupStudents = async (req, res) => {
         // the curriculum (a day can legitimately be missing one, e.g. no reading text yet), so the
         // teacher sees the same shape of homework her students see on their own Today page, without
         // having to go check a student's phone
-        const level = await Level.findById(group.levelId).select('durationDays hasReading')
+        const level = await Level.findById(group.levelId).select('durationDays hasReading').lean()
         const durationDays = level?.durationDays || 30
         const hasReading = level?.hasReading !== false
         const dayCounter = computeDayCounter(group, durationDays)
@@ -162,10 +163,10 @@ export const getGroupStudents = async (req, res) => {
 // day-locked/expired gating or progress-row bookkeeping a real student submission needs.
 export const getTodayHomework = async (req, res) => {
     try {
-        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId, status: 'active' })
+        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId, status: 'active', levelCompletedAt: null }).lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
-        const level = await Level.findById(group.levelId).select('durationDays')
+        const level = await Level.findById(group.levelId).select('durationDays').lean()
         const durationDays = level?.durationDays || 30
         const dayCounter = computeDayCounter(group, durationDays)
 
@@ -180,12 +181,12 @@ export const getTodayHomework = async (req, res) => {
             readingText = null
             readingExercises = []
         } else {
-            curriculum = await Curriculum.findOne({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }).populate('conceptIds')
+            curriculum = await Curriculum.findOne({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }).populate('conceptIds').lean()
             vocab = await VocabExercise.find({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
                 .populate('conceptId').populate('options').populate('correct')
-            grammar = await GrammarExercise.find({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
-            readingText = await ReadingText.findOne({ languageId: group.languageId, levelId: group.levelId, day: dayCounter })
-            readingExercises = readingText ? await ReadingExercise.find({ readingTextId: readingText._id }) : []
+            grammar = await GrammarExercise.find({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }).lean()
+            readingText = await ReadingText.findOne({ languageId: group.languageId, levelId: group.levelId, day: dayCounter }).lean()
+            readingExercises = readingText ? await ReadingExercise.find({ readingTextId: readingText._id }).lean() : []
         }
 
         // same word/translation enrichment studentController.getHomeworkForDay does, so a vocab
@@ -197,9 +198,9 @@ export const getTodayHomework = async (req, res) => {
             ;(v.options || []).forEach(o => conceptIds.add(String(o._id)))
             if (v.correct) conceptIds.add(String(v.correct._id))
         })
-        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: group.languageId })
+        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: group.languageId }).lean()
         const wordFormByConceptId = Object.fromEntries(wordForms.map(w => [String(w.conceptId), w]))
-        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } })
+        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } }).lean()
         const translationsByConceptId = {}
         translations.forEach(t => {
             const key = String(t.conceptId)
@@ -234,20 +235,20 @@ export const getTodayHomework = async (req, res) => {
 export const getStudentDayDetail = async (req, res) => {
     try {
         const { id: groupId, studentId } = req.params
-        const group = await Group.findOne({ _id: groupId, teacherId: req.auth.userId })
+        const group = await Group.findOne({ _id: groupId, teacherId: req.auth.userId }).lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
-        const student = await User.findOne({ _id: studentId, role: 'student' }).select('name phone')
+        const student = await User.findOne({ _id: studentId, role: 'student' }).select('name phone').lean()
         if (!student) return res.status(404).json({ error: 'not_found' })
 
         // a full day-by-day table for every day the group has actually reached so far (1..dayCounter),
         // not just whichever days happen to already have a StudentProgress row - a day the student
         // hasn't opened/submitted yet has no row at all, which was silently dropping it from this
         // view entirely instead of showing it as "not started yet". Same day-count math getMyGroups uses.
-        const level = await Level.findById(group.levelId).select('durationDays')
+        const level = await Level.findById(group.levelId).select('durationDays').lean()
         const dayCounter = computeDayCounter(group, level?.durationDays || 30)
 
-        const existingRows = await StudentProgress.find({ groupId, studentId })
+        const existingRows = await StudentProgress.find({ groupId, studentId }).lean()
         const rowByDay = Object.fromEntries(existingRows.map(r => [r.day, r]))
         const days = Array.from({ length: dayCounter }, (_, i) => i + 1).map(day => {
             const row = rowByDay[day]
@@ -262,7 +263,7 @@ export const getStudentDayDetail = async (req, res) => {
         })
 
         const examAttempts = await ExamAttempt.find({ studentId }).sort({ date: -1 })
-            .populate({ path: 'examId', populate: [{ path: 'languageId', select: 'name' }, { path: 'levelId', select: 'name' }] })
+            .populate({ path: 'examId', populate: [{ path: 'languageId', select: 'name' }, { path: 'levelId', select: 'name' }] }).lean()
 
         // real-calendar attendance history - every lesson that has actually happened so far (up to
         // today, or the group's end date if it already finished), with this student's marked status.
@@ -271,7 +272,7 @@ export const getStudentDayDetail = async (req, res) => {
         const today = new Date()
         const rangeEnd = group.endDate && group.endDate < today ? group.endDate : today
         const lessons = await ensureLessonsGenerated(group, group.startDate, rangeEnd)
-        const records = await LessonAttendance.find({ lessonId: { $in: lessons.map(l => l._id) }, studentId })
+        const records = await LessonAttendance.find({ lessonId: { $in: lessons.map(l => l._id) }, studentId }).lean()
         const statusByLesson = Object.fromEntries(records.map(r => [String(r.lessonId), r.status]))
         const attendance = lessons.map(l => ({ lessonId: l._id, date: l.date, status: statusByLesson[String(l._id)] || 'unmarked' }))
 
@@ -287,13 +288,14 @@ export const getStudentDayDetail = async (req, res) => {
 // issues a new one; the old one silently stops working.
 export const createAttendanceSession = async (req, res) => {
     try {
-        // status:'active' matters now that a completed group's studentIds are kept (not cleared)
-        // for historical reporting - without this filter a teacher could still open a live
-        // attendance QR for a group that finished and already promoted its students onward
-        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId, status: 'active' })
+        // levelCompletedAt:null matters since a graduated group's studentIds are kept (not cleared)
+        // for historical reporting, and its status is never auto-changed (an admin's own manual
+        // call, always) - without this filter a teacher could still open a live attendance QR for
+        // a group whose cohort already promoted onward to a new one
+        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId, status: 'active', levelCompletedAt: null }).lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
-        const level = await Level.findById(group.levelId).select('durationDays')
+        const level = await Level.findById(group.levelId).select('durationDays').lean()
         const day = computeDayCounter(group, level?.durationDays || 30)
         const token = crypto.randomBytes(16).toString('hex')
         const expiresAt = new Date(Date.now() + 2 * 60 * 1000)
@@ -309,11 +311,11 @@ export const createAttendanceSession = async (req, res) => {
 // api to see who has scanned in for a given day - roster with present/absent per student
 export const getAttendanceForDay = async (req, res) => {
     try {
-        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId }).populate('studentIds', 'name phone')
+        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId }).populate('studentIds', 'name phone').lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         const day = Number(req.params.day)
-        const records = await Attendance.find({ groupId: group._id, day })
+        const records = await Attendance.find({ groupId: group._id, day }).lean()
         const presentIds = new Set(records.map(r => String(r.studentId)))
 
         const roster = group.studentIds.map(s => ({
@@ -333,11 +335,11 @@ export const getAttendanceForDay = async (req, res) => {
 // api for the teacher's own profile screen
 export const getMe = async (req, res) => {
     try {
-        const teacher = await User.findById(req.auth.userId).select('-passwordHash').populate('branchId', 'name')
+        const teacher = await User.findById(req.auth.userId).select('-passwordHash').populate('branchId', 'name').lean()
         if (!teacher) return res.status(404).json({ error: 'not_found' })
 
-        const groups = await Group.find({ teacherId: teacher._id })
-        const activeGroups = groups.filter(g => g.status === 'active')
+        const groups = await Group.find({ teacherId: teacher._id }).lean()
+        const activeGroups = groups.filter(g => g.status === 'active' && !g.levelCompletedAt)
         const uniqueStudentIds = new Set()
         activeGroups.forEach(g => g.studentIds.forEach(id => uniqueStudentIds.add(String(id))))
 
@@ -345,7 +347,7 @@ export const getMe = async (req, res) => {
         // today - same judgment admin/director see, just from the teacher's own side
         const startOfDay = new Date(); startOfDay.setUTCHours(0, 0, 0, 0)
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
-        const todayCheckIn = await TeacherAttendance.findOne({ teacherId: teacher._id, date: { $gte: startOfDay, $lt: endOfDay } })
+        const todayCheckIn = await TeacherAttendance.findOne({ teacherId: teacher._id, date: { $gte: startOfDay, $lt: endOfDay } }).lean()
         const firstLessonTime = earliestLessonTimeOnDate(activeGroups, startOfDay)
 
         res.json({
@@ -371,7 +373,7 @@ export const getMe = async (req, res) => {
 export const scanOwnAttendance = async (req, res) => {
     try {
         const { token } = req.body
-        const qr = await TeacherAttendanceQR.findOne({ token })
+        const qr = await TeacherAttendanceQR.findOne({ token }).lean()
         if (!qr || qr.expiresAt < new Date()) {
             return res.status(400).json({ error: qr ? 'qr_expired' : 'invalid_qr' })
         }
@@ -381,7 +383,7 @@ export const scanOwnAttendance = async (req, res) => {
         // would silently disagree with that read-side calculation on any non-UTC server timezone,
         // making a real check-in invisible to the director's attendance overview
         const today = new Date(); today.setUTCHours(0, 0, 0, 0)
-        const existing = await TeacherAttendance.findOne({ teacherId: req.auth.userId, date: today })
+        const existing = await TeacherAttendance.findOne({ teacherId: req.auth.userId, date: today }).lean()
         if (existing) return res.json({ alreadyMarked: true })
 
         try {
@@ -409,8 +411,8 @@ export const getMyAttendanceGrid = async (req, res) => {
         const rangeStart = new Date(Date.UTC(year, mo - 1, 1))
         const rangeEnd = new Date(Date.UTC(year, mo, 0))
 
-        const groupDocs = await Group.find({ teacherId: req.auth.userId, status: 'active' })
-            .populate('languageId', 'name').populate('levelId', 'name')
+        const groupDocs = await Group.find({ teacherId: req.auth.userId, status: 'active', levelCompletedAt: null })
+            .populate('languageId', 'name').populate('levelId', 'name').lean()
 
         let conducted = 0, total = 0
         const groups = []
@@ -445,8 +447,8 @@ export const markStudentAttendance = async (req, res) => {
         const { id: groupId, studentId, day } = req.params
         const { present } = req.body
 
-        // status:'active' - see createAttendanceSession's comment above
-        const group = await Group.findOne({ _id: groupId, teacherId: req.auth.userId, status: 'active' })
+        // status:'active', levelCompletedAt:null - see createAttendanceSession's comment above
+        const group = await Group.findOne({ _id: groupId, teacherId: req.auth.userId, status: 'active', levelCompletedAt: null }).lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         if (present) {

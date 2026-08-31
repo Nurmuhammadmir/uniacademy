@@ -18,7 +18,7 @@ const ConfirmHost = () => {
   }
 
   return (
-    <div className='fixed inset-0 bg-black/40 flex items-center justify-center z-[100] px-4'>
+    <div className='fixed inset-0 z-[100] bg-slate-900/20 backdrop-blur-md dark:bg-[#0B0F19]/60 dark:backdrop-blur-lg transition-all duration-300 flex items-center justify-center px-4'>
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 w-full max-w-sm'>
         <p className='text-ink font-medium mb-2'>Are you sure?</p>
         <p className='text-muted text-sm mb-5'>{request.message}</p>

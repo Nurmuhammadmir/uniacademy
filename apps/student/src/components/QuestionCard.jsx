@@ -34,7 +34,7 @@ const QuestionCard = ({ index, question, image, options, value, onChange, type }
               key={v}
               type='button'
               onClick={() => onChange(v)}
-              className={`rounded-xl border px-4 py-3 capitalize ${value === v ? 'border-accent bg-accent-soft' : 'border-hairline bg-bg-elevated'}`}
+              className={`rounded-xl border px-4 py-3 capitalize ${value === v ? 'border-accent bg-accent-soft dark:bg-white/10' : 'border-hairline bg-bg-elevated'}`}
             >
               {v}
             </button>
@@ -51,7 +51,7 @@ const QuestionCard = ({ index, question, image, options, value, onChange, type }
                 key={i}
                 type='button'
                 onClick={() => onChange(optionValue)}
-                className={`rounded-xl border text-left px-4 py-3 ${selected ? 'border-accent bg-accent-soft' : 'border-hairline bg-bg-elevated'}`}
+                className={`rounded-xl border text-left px-4 py-3 ${selected ? 'border-accent bg-accent-soft dark:bg-white/10' : 'border-hairline bg-bg-elevated'}`}
               >
                 {label}
               </button>

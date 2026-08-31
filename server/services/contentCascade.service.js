@@ -1,5 +1,7 @@
-// removes every piece of homework content (+ pricing + exam) tied to one level - used when a
-// director deletes a level, or a whole language (which deletes each of its levels this way first)
+// removes every piece of homework content (+ exam) tied to one level - used when a director deletes
+// a level, or a whole language (which deletes each of its levels this way first). Pricing is NOT
+// touched here - price is set per-COURSE (per-language), not per-level, so deleting a level never
+// affects it. directorController.deleteLanguage cleans up the language's own Pricing row directly.
 import Concept from "../models/Concept.js"
 import WordForm from "../models/WordForm.js"
 import Translation from "../models/Translation.js"
@@ -8,7 +10,6 @@ import VocabExercise from "../models/VocabExercise.js"
 import GrammarExercise from "../models/GrammarExercise.js"
 import ReadingText from "../models/ReadingText.js"
 import ReadingExercise from "../models/ReadingExercise.js"
-import Pricing from "../models/Pricing.js"
 import Exam from "../models/Exam.js"
 
 export const deleteLevelContent = async (languageId, levelId) => {
@@ -26,7 +27,6 @@ export const deleteLevelContent = async (languageId, levelId) => {
     await ReadingExercise.deleteMany({ readingTextId: { $in: readingTexts.map(r => r._id) } })
     await ReadingText.deleteMany({ languageId, levelId })
 
-    await Pricing.deleteMany({ languageId, levelId })
     await Exam.deleteMany({ languageId, levelId })
 }
 

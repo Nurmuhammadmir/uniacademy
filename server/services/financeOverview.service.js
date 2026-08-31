@@ -98,10 +98,15 @@ export const getFinanceOverview = async (branchIdRaw, query) => {
         .populate('adminId', 'name')
 
     const studentIdsOnPage = [...new Set(payments.map(p => String(p.studentId?._id || p.studentId)))]
-    const languageIdsOnPage = [...new Set(payments.map(p => String(p.languageId?._id || p.languageId)))]
-    const currentGroups = await Group.find({
-        studentIds: { $in: studentIdsOnPage }, languageId: { $in: languageIdsOnPage }, status: 'active',
-    }).select('studentIds languageId teacherId').populate('teacherId', 'name')
+    // a payment is never tied to a course anymore (confirmed spec: one shared wallet), so
+    // p.languageId is genuinely null on any new row - filter those out before building the $in
+    // array, or Mongoose tries to cast the literal string "null" to an ObjectId and 500s
+    const languageIdsOnPage = [...new Set(payments.map(p => p.languageId?._id || p.languageId).filter(Boolean).map(String))]
+    const currentGroups = languageIdsOnPage.length
+        ? await Group.find({
+            studentIds: { $in: studentIdsOnPage }, languageId: { $in: languageIdsOnPage }, status: 'active', levelCompletedAt: null,
+        }).select('studentIds languageId teacherId').populate('teacherId', 'name')
+        : []
     const currentTeacherFor = (studentId, languageId) => {
         const group = currentGroups.find(g => String(g.languageId) === String(languageId)
             && g.studentIds.some(id => String(id) === String(studentId)))
@@ -111,6 +116,17 @@ export const getFinanceOverview = async (branchIdRaw, query) => {
         ...p.toObject(), currentTeacherId: currentTeacherFor(p.studentId?._id, p.languageId?._id),
     }))
 
+    // revenue is cash-basis (confirmed, final answer): counted the moment a real payment happens,
+    // dated when it was paid. Never deferred to whichever future month's debt a prepayment happens
+    // to eventually settle: a student who pays 300,000 against a 100,000/mo course has genuinely
+    // handed over 300,000 THIS month - that's this month's revenue in full. The extra two months'
+    // worth just sits as credit and silently cancels out each future month's debt with no new
+    // revenue event then, since no new payment actually happened that month.
+    // A discount counts as revenue too, with no special-casing needed here at all: applying one
+    // creates a real Payment (discountApplication.service.js posts it exactly like a cash payment,
+    // since as far as "did this debt get settled" is concerned, it did) alongside its own real
+    // Chegirma Expense - so it's already included once in the payment sum below (as if received)
+    // and once in totalExpenses (as its real cost), netting to exactly the discount's own size.
     const totalAgg = await Payment.aggregate([{ $match: match }, { $group: { _id: null, total: { $sum: '$amount' } } }])
     const totalAmount = totalAgg[0]?.total || 0
 
@@ -123,6 +139,8 @@ export const getFinanceOverview = async (branchIdRaw, query) => {
     const expenseAgg = await Expense.aggregate([{ $match: expenseMatch }, { $group: { _id: null, total: { $sum: '$amount' } } }])
     const totalExpenses = expenseAgg[0]?.total || 0
 
+    // same cash-basis as the summary card above, so the chart doesn't quietly disagree with the
+    // number sitting right next to it
     const { periods, rangeStart, dateFormat } = buildTrailingPeriods(groupBy)
     const seriesAgg = await Payment.aggregate([
         { $match: { $and: [

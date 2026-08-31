@@ -23,7 +23,11 @@ const FinancePayments = ({ branchId }) => {
   const [data, setData] = useState(false)
 
   const branchGroups = allGroups.filter(g => String(g.branchId?._id || g.branchId) === String(branchId))
-  const branchTeachers = teachers.filter(tc => String(tc.branchId) === String(branchId) || (tc.additionalBranchIds || []).some(id => String(id) === String(branchId)))
+  // branchId/additionalBranchIds come back populated (directorController.listTeachers populates
+  // both to the branch's name) - String() on the raw object always produced "[object Object]",
+  // never matching a real branchId, so this teacher filter dropdown was always empty
+  const branchTeachers = teachers.filter(tc => String(tc.branchId?._id || tc.branchId) === String(branchId)
+    || (tc.additionalBranchIds || []).some(b => String(b?._id || b) === String(branchId)))
 
   const load = () => {
     getFinanceOverview(branchId, { ...appliedFilters, page, limit: 25, sortBy, sortOrder, groupBy: chartPeriod }).then(d => { if (d) setData(d) })
@@ -47,8 +51,8 @@ const FinancePayments = ({ branchId }) => {
 
   return (
     <div>
-      <div className='grid grid-cols-3 gap-6 mb-6'>
-        <div className='col-span-1 flex flex-col gap-4'>
+      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6'>
+        <div className='lg:col-span-1 flex flex-col gap-4'>
           <div className='bg-bg-elevated border-l-4 border-accent rounded-2xl p-5 flex items-center justify-between'>
             <div>
               <p className='text-muted text-xs mb-1'>{t('totalPaymentsAmount')}</p>
@@ -67,7 +71,7 @@ const FinancePayments = ({ branchId }) => {
           </div>
         </div>
 
-        <div className='col-span-2 bg-bg-elevated border border-hairline rounded-2xl p-5'>
+        <div className='lg:col-span-2 bg-bg-elevated border border-hairline rounded-2xl p-5'>
           <div className='flex justify-end gap-2 mb-2'>
             <button onClick={() => setChartPeriod('week')} className={`px-3 py-1 rounded-lg text-xs font-medium ${chartPeriod === 'week' ? 'bg-accent text-white' : 'bg-bg border border-hairline text-muted'}`}>{t('weeklyToggle')}</button>
             <button onClick={() => setChartPeriod('month')} className={`px-3 py-1 rounded-lg text-xs font-medium ${chartPeriod === 'month' ? 'bg-accent text-white' : 'bg-bg border border-hairline text-muted'}`}>{t('monthlyToggle')}</button>
@@ -130,7 +134,7 @@ const FinancePayments = ({ branchId }) => {
         <button type='submit' className='px-5 py-2 rounded-lg bg-[#F2542D] text-white text-sm font-medium'>{t('filterBtn')}</button>
       </form>
 
-      <div className='bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
+      <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden overflow-x-auto'>
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
@@ -172,6 +176,31 @@ const FinancePayments = ({ branchId }) => {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className='block md:hidden flex flex-col gap-2.5'>
+        {data && data.payments.length === 0 && <p className='text-muted text-sm text-center py-8'>{t('noPaymentsRecorded')}</p>}
+        {!data && <p className='text-muted text-sm text-center py-8'>{t('loading')}</p>}
+        {(data?.payments || []).map(p => (
+          <button key={p._id} onClick={() => navigate('/finance/payments/' + p._id)}
+            className='plain bg-bg-elevated border border-hairline rounded-2xl p-4 text-left w-full'>
+            <div className='flex justify-between items-start gap-2'>
+              <div className='min-w-0'>
+                <p className='text-ink font-medium text-sm truncate'>{p.studentId?.name || '—'}</p>
+                <p className='text-muted text-xs mt-0.5'>{new Date(p.date).toLocaleDateString()}</p>
+              </div>
+              <div className='text-right flex-shrink-0'>
+                <p className='font-mono text-accent text-sm'>+{formatMoney(p.amount)}</p>
+                {p.refundedAmount > 0 && <p className='text-[11px] text-muted'>{t('refundedAmountHint', { amount: formatMoney(p.refundedAmount) })}</p>}
+              </div>
+            </div>
+            <div className='flex flex-wrap items-center gap-1.5 mt-2'>
+              <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t(paymentMethodLabelKey(p.method))}</span>
+              {p.groupId && <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent'>{p.languageId?.name}{p.levelId?.name ? ` · ${p.levelId.name}` : ''}</span>}
+            </div>
+            <p className='text-muted text-xs mt-2'>{p.currentTeacherId?.name || p.teacherId?.name || '—'} · {p.adminId?.name} · {new Date(p.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+          </button>
+        ))}
       </div>
 
       {data && data.totalCount > data.pageSize && (

@@ -31,7 +31,7 @@ const Timetable = () => {
                   <p className='text-muted text-sm'>{l.room}</p>
                 </div>
                 <div className='flex flex-col items-end gap-1'>
-                  <span className='font-mono text-xs text-accent bg-accent-soft px-2 py-1 rounded-full'>{l.startTime}–{l.endTime}</span>
+                  <span className='font-mono text-xs text-accent bg-accent-soft dark:bg-white/10 px-2 py-1 rounded-full'>{l.startTime}–{l.endTime}</span>
                   <span className='font-mono text-xs text-muted'>{l.studentCount} students</span>
                 </div>
               </div>

@@ -1,13 +1,16 @@
 import React, { useContext, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Sun, Moon } from 'lucide-react'
 import { TeacherContext } from '../context/TeacherContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import { useTheme } from '../context/ThemeContext.jsx'
 import SelfAttendanceScanner from '../components/SelfAttendanceScanner.jsx'
 import InstallAppCard from '../components/InstallAppCard.jsx'
 
 const Profile = () => {
   const { me, logout } = useContext(TeacherContext)
   const { t, lang, setLang, availableLanguages } = useLanguage()
+  const { isDark, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const [showScanner, setShowScanner] = useState(false)
 
@@ -21,7 +24,7 @@ const Profile = () => {
       ) : (
         <>
           <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-4'>
-            <div className='w-14 h-14 rounded-full bg-accent-soft text-accent flex items-center justify-center font-display text-xl mb-4'>
+            <div className='w-14 h-14 rounded-full bg-accent-soft dark:bg-white/10 text-accent flex items-center justify-center font-display text-xl mb-4'>
               {me.teacher.name?.[0]?.toUpperCase()}
             </div>
             <p className='text-ink font-medium text-lg mb-1'>{me.teacher.name}</p>
@@ -43,8 +46,8 @@ const Profile = () => {
           <p className='text-muted text-sm mb-6'>Working here since {new Date(me.employedSince).toLocaleDateString()}</p>
 
           {me.todayAttendance?.checkedIn && (
-            <div className={`rounded-2xl p-4 mb-4 ${me.todayAttendance.late ? 'bg-red-50 border border-red-200' : 'bg-accent-soft'}`}>
-              <p className={`text-sm font-medium ${me.todayAttendance.late ? 'text-red-500' : 'text-accent'}`}>
+            <div className={`rounded-2xl p-4 mb-4 ${me.todayAttendance.late ? 'bg-red-50 border border-red-200 dark:bg-red-500/10 dark:border-red-500/30' : 'bg-accent-soft dark:bg-white/10'}`}>
+              <p className={`text-sm font-medium ${me.todayAttendance.late ? 'text-red-500 dark:text-rose-400' : 'text-accent'}`}>
                 {me.todayAttendance.late ? '⚠️ Checked in late today' : '✓ Checked in on time today'}
               </p>
               <p className='text-muted text-xs mt-1'>
@@ -73,6 +76,11 @@ const Profile = () => {
       </div>
 
       <InstallAppCard />
+
+      <button onClick={toggleTheme} className='w-full py-4 rounded-2xl bg-bg-card border border-hairline text-ink font-medium mb-3 flex items-center justify-center gap-2'>
+        {isDark ? <Sun size={18} strokeWidth={1.75} /> : <Moon size={18} strokeWidth={1.75} />}
+        {isDark ? t('lightModeBtn') : t('darkModeBtn')}
+      </button>
 
       <button onClick={logout} className='w-full py-4 rounded-2xl border border-hairline text-muted font-medium'>
         {t('signOut')}

@@ -94,7 +94,7 @@ const Exam = () => {
       <div className='flex items-center justify-between mb-3'>
         <p className='font-display text-2xl text-ink'>{t('levelExam')}</p>
         {secondsLeft !== null && (
-          <span className={`font-mono text-lg px-3 py-1 rounded-full ${lowTime ? 'bg-red-100 text-red-500' : 'bg-accent-soft text-accent'}`}>
+          <span className={`font-mono text-lg px-3 py-1 rounded-full ${lowTime ? 'bg-red-100 text-red-500 dark:bg-red-500/10 dark:text-red-400' : 'bg-accent-soft dark:bg-white/10 text-accent'}`}>
             {formatClock(Math.max(0, secondsLeft))}
           </span>
         )}

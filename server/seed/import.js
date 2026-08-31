@@ -54,11 +54,12 @@ const run = async () => {
     const levelIdByKey = Object.fromEntries(levels.map(l => [`${l.languageId}:${l.name}`, l._id]))
     const levelId = (languageCode, levelName) => levelIdByKey[`${languageIdByCode[languageCode]}:${levelName}`]
 
-    // pricing per course - referenced when a payment is recorded against a student's course
+    // pricing per COURSE (language) - not per level, referenced when a payment is recorded against
+    // a student's course
     for (const item of readJson('pricing.json')) {
         await Pricing.findOneAndUpdate(
-            { languageId: languageIdByCode[item.languageCode], levelId: levelId(item.languageCode, item.levelName) },
-            { languageId: languageIdByCode[item.languageCode], levelId: levelId(item.languageCode, item.levelName), monthlyPrice: item.monthlyPrice },
+            { languageId: languageIdByCode[item.languageCode] },
+            { languageId: languageIdByCode[item.languageCode], monthlyPrice: item.monthlyPrice },
             { upsert: true }
         )
     }
@@ -74,7 +75,7 @@ const run = async () => {
         { name: 'Teacher (26 Mkr)', phone: '+998900000003', role: 'teacher', branchId: firstBranch?._id },
         {
             name: 'Student (26 Mkr)', phone: '+998900000004', role: 'student', branchId: firstBranch?._id,
-            courses: [{ languageId: languageIdByCode['en'], levelId: beginnerEnglishLevelId, isActive: false, balance: 0, subscriptionExpiresAt: null }],
+            courses: [{ languageId: languageIdByCode['en'], levelId: beginnerEnglishLevelId, groupId: null, enrollmentStatus: 'inactive' }],
             address: 'Tashkent, Chilanzar', geo: { lat: 41.2856, lng: 69.2034 },
         },
     ]

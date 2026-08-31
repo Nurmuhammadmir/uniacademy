@@ -15,7 +15,7 @@ const Profile = () => {
       <p className='font-display text-2xl text-ink mb-6'>{t('profileTitle')}</p>
 
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 mb-4 max-w-md'>
-        <div className='w-14 h-14 rounded-full bg-accent-soft text-accent flex items-center justify-center font-display text-xl mb-4'>
+        <div className='w-14 h-14 rounded-full bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8] flex items-center justify-center font-display text-xl mb-4'>
           {me.admin.name?.[0]?.toUpperCase()}
         </div>
         <p className='text-ink font-medium text-lg mb-1'>{me.admin.name}</p>
@@ -39,7 +39,7 @@ const Profile = () => {
         <div className='flex flex-wrap gap-2'>
           {availableLanguages.map(l => (
             <button key={l.code} onClick={() => setLang(l.code)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${lang === l.code ? 'bg-accent text-white' : 'bg-bg border border-hairline text-ink'}`}>
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${lang === l.code ? 'bg-accent text-white dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10' : 'bg-bg border border-hairline text-ink'}`}>
               {l.label}
             </button>
           ))}

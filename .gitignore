@@ -5,6 +5,7 @@ node_modules/
 # build output
 dist/
 build/
+*.timestamp-*.mjs
 
 # env
 .env

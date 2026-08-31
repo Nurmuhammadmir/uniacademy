@@ -20,13 +20,13 @@ const ConfirmHost = () => {
   }
 
   return (
-    <div className='fixed inset-0 bg-black/40 flex items-center justify-center z-[100] px-4'>
+    <div className='fixed inset-0 z-[100] bg-slate-900/20 backdrop-blur-md dark:bg-[#0B0F19]/60 dark:backdrop-blur-lg transition-all duration-300 flex items-center justify-center p-4'>
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 w-full max-w-sm'>
         <p className='text-ink font-medium mb-2'>{t('areYouSure')}</p>
         <p className='text-muted text-sm mb-5'>{request.message}</p>
         <div className='flex gap-3'>
           <button onClick={() => handle(false)} className='flex-1 py-3 rounded-xl border border-hairline text-muted font-medium'>{t('cancel')}</button>
-          <button onClick={() => handle(true)} className='flex-1 py-3 rounded-xl bg-accent text-white font-medium'>{t('confirm')}</button>
+          <button onClick={() => handle(true)} className='flex-1 py-3 rounded-xl bg-accent dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-white font-medium'>{t('confirm')}</button>
         </div>
       </div>
     </div>

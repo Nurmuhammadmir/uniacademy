@@ -6,7 +6,11 @@ import Branch from "../models/Branch.js"
 import Payment from "../models/Payment.js"
 import Group from "../models/Group.js"
 import Pricing from "../models/Pricing.js"
+import { getOrCreateAccount, postEntry } from "../services/ledger.service.js"
+import Account from "../models/Account.js"
+import { computeCourseOwed } from "../services/billingCycle.service.js"
 import Language from "../models/Language.js"
+import CourseCategory from "../models/CourseCategory.js"
 import Level from "../models/Level.js"
 import Settings from "../models/Settings.js"
 import ExamAttempt from "../models/ExamAttempt.js"
@@ -23,9 +27,10 @@ import { deleteLevelContent, deleteDayContent } from "../services/contentCascade
 import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
 import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
-import { ensureDefaultCategories, ensureCategoryExists } from "../services/expenseCategories.service.js"
+import { ensureDefaultCategories, ensureCategoryExists, SALARY_CATEGORY, PREPAYMENT_CATEGORY } from "../services/expenseCategories.service.js"
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
 import { hardDeleteStudent } from "../services/studentCascade.service.js"
+import { hardDeleteTeacher } from "../services/teacherCascade.service.js"
 
 const startOfThisMonth = () => {
     const d = new Date()
@@ -70,14 +75,14 @@ export const getStats = async (req, res) => {
 
         // top 3 teachers by current unique active-group student count
         const topTeachersRaw = await Group.aggregate([
-            { $match: { status: 'active' } },
+            { $match: { status: 'active', levelCompletedAt: null } },
             { $unwind: '$studentIds' },
             { $group: { _id: '$teacherId', students: { $addToSet: '$studentIds' } } },
             { $project: { teacherId: '$_id', count: { $size: '$students' } } },
             { $sort: { count: -1 } },
             { $limit: 3 },
         ])
-        const teacherDocs = await User.find({ _id: { $in: topTeachersRaw.map(t => t.teacherId) } }).select('name branchId').populate('branchId', 'name')
+        const teacherDocs = await User.find({ _id: { $in: topTeachersRaw.map(t => t.teacherId) } }).select('name branchId').populate('branchId', 'name').lean()
         const topTeachers = topTeachersRaw.map(t => ({
             teacherId: t.teacherId,
             count: t.count,
@@ -114,7 +119,7 @@ export const getStats = async (req, res) => {
             { $group: { _id: { teacherId: '$group.teacherId', groupId: '$groupId', day: '$day' }, present: { $sum: 1 }, rosterSize: { $first: { $size: '$group.studentIds' } } } },
             { $group: { _id: '$_id.teacherId', totalPresent: { $sum: '$present' }, totalPossible: { $sum: '$rosterSize' }, sessionCount: { $sum: 1 } } },
         ])
-        const allTeacherDocs = await User.find({ role: 'teacher' }).select('name branchId').populate('branchId', 'name')
+        const allTeacherDocs = await User.find({ role: 'teacher' }).select('name branchId').populate('branchId', 'name').lean()
         const attendanceRateByTeacherId = Object.fromEntries(attendanceByTeacherSession.map(r => [String(r._id), r]))
         const teacherAttendanceRates = allTeacherDocs.map(t => {
             const stat = attendanceRateByTeacherId[String(t._id)]
@@ -161,6 +166,16 @@ export const getAllStudents = async (req, res) => {
             .populate('branchId', 'name')
             .populate('courses.languageId', 'name')
             .populate('courses.levelId', 'name')
+            .lean()
+
+        // real stored balance (see server/models/Account.js) - positive means the student owes
+        // that much, negative means they're in credit. Same one bulk query pattern as
+        // adminController.listStudents so this list's "Total balance" column isn't dead-reckoned
+        // off the retired per-course balance field.
+        const accounts = await Account.find({ ownerType: 'student', ownerId: { $in: students.map(s => s._id) } }).select('ownerId balance').lean()
+        const balanceByStudentId = new Map(accounts.map(a => [String(a.ownerId), a.balance]))
+        for (const student of students) student.owed = balanceByStudentId.get(String(student._id)) || 0
+
         res.json({ students })
     } catch (error) {
         console.log(error)
@@ -177,23 +192,28 @@ export const getStudentProfile = async (req, res) => {
             .populate('courses.levelId', 'name order')
         if (!student) return res.status(404).json({ error: 'not_found' })
 
+        const account = await getOrCreateAccount('student', student._id)
         const coursesWithPrice = await Promise.all(student.courses.map(async (c) => {
-            const pricing = c.levelId ? await Pricing.findOne({ languageId: c.languageId._id, levelId: c.levelId._id }) : null
-            return { ...c.toObject(), price: pricing?.monthlyPrice ?? null }
+            const group = c.groupId ? await Group.findById(c.groupId).select('price').lean() : null
+            const owed = await computeCourseOwed(account._id, c.languageId._id)
+            return { ...c.toObject(), price: group?.price ?? null, owed: Math.max(0, owed) }
         }))
 
-        const payments = await Payment.find({ studentId: student._id }).sort({ date: -1 }).populate('adminId', 'name').populate('languageId', 'name')
+        const payments = await Payment.find({ studentId: student._id }).sort({ date: -1 }).populate('adminId', 'name').populate('languageId', 'name').lean()
         const groups = await Group.find({ studentIds: student._id })
             .populate('languageId', 'name')
             .populate('levelId', 'name')
             .populate('teacherId', 'name')
+            .lean()
         const examAttempts = await ExamAttempt.find({ studentId: student._id }).sort({ date: -1 })
             .populate({ path: 'examId', populate: [{ path: 'languageId', select: 'name' }, { path: 'levelId', select: 'name' }] })
+            .lean()
 
         res.json({
             student,
             courses: coursesWithPrice,
             payments,
+            accountBalance: account.balance,
             // net of refunds - refunded:true always means 0, even for legacy rows recorded before
             // refundedAmount existed (theirs stayed 0 and was never backfilled)
             totalPaid: payments.reduce((sum, p) => sum + (p.refunded ? 0 : p.amount - (p.refundedAmount || 0)), 0),
@@ -213,7 +233,7 @@ export const getStudentProfile = async (req, res) => {
 // director has no such restriction.
 export const permanentlyDeleteStudent = async (req, res) => {
     try {
-        const student = await User.findOne({ _id: req.params.id, role: 'student', ...branchOnlyFilter(req) })
+        const student = await User.findOne({ _id: req.params.id, role: 'student', ...branchOnlyFilter(req) }).lean()
         if (!student) return res.status(404).json({ error: 'not_found' })
         await hardDeleteStudent(student._id)
         res.json({ deleted: true })
@@ -226,17 +246,17 @@ export const permanentlyDeleteStudent = async (req, res) => {
 // api for the branch detail modal - who works there, how many students, how much revenue
 export const getBranchProfile = async (req, res) => {
     try {
-        const branch = await Branch.findById(req.params.id)
+        const branch = await Branch.findById(req.params.id).lean()
         if (!branch) return res.status(404).json({ error: 'not_found' })
 
-        const admins = await User.find({ role: 'admin', branchId: branch._id }).select('name phone')
+        const admins = await User.find({ role: 'admin', branchId: branch._id }).select('name phone').lean()
         // a teacher may also teach here via additionalBranchIds even if this isn't their home branch
         const teachers = await User.find({
             role: 'teacher',
             $or: [{ branchId: branch._id }, { additionalBranchIds: branch._id }],
-        }).select('name phone')
-        const students = await User.find({ role: 'student', branchId: branch._id }).select('name phone courses')
-        const groups = await Group.find({ branchId: branch._id, status: 'active' }).populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name')
+        }).select('name phone').lean()
+        const students = await User.find({ role: 'student', branchId: branch._id }).select('name phone courses').lean()
+        const groups = await Group.find({ branchId: branch._id, status: 'active' }).populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name').lean()
 
         const revenueAgg = await Payment.aggregate([
             { $lookup: { from: 'users', localField: 'studentId', foreignField: '_id', as: 'student' } },
@@ -289,7 +309,7 @@ export const listAdmins = async (req, res) => {
         const filter = isSubDirector(req)
             ? { role: 'admin', branchId: req.auth.branchId }
             : { role: { $in: MANAGEABLE_ROLES } }
-        const admins = await User.find(filter).select('-passwordHash').populate('branchId', 'name')
+        const admins = await User.find(filter).select('-passwordHash').populate('branchId', 'name').lean()
         res.json({ admins })
     } catch (error) {
         console.log(error)
@@ -299,7 +319,7 @@ export const listAdmins = async (req, res) => {
 
 export const updateAdmin = async (req, res) => {
     try {
-        const existing = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } })
+        const existing = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } }).lean()
         if (!existing) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && (existing.role !== 'admin' || String(existing.branchId) !== String(req.auth.branchId))) {
             return res.status(404).json({ error: 'not_found' })
@@ -328,7 +348,7 @@ export const updateAdmin = async (req, res) => {
 // special-casing needed.
 export const getAdminProfile = async (req, res) => {
     try {
-        const admin = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } }).select('-passwordHash').populate('branchId', 'name')
+        const admin = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } }).select('-passwordHash').populate('branchId', 'name').lean()
         if (!admin) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && (admin.role !== 'admin' || String(admin.branchId?._id || admin.branchId) !== String(req.auth.branchId))) {
             return res.status(404).json({ error: 'not_found' })
@@ -347,7 +367,7 @@ export const getAdminProfile = async (req, res) => {
 
 export const deleteAdmin = async (req, res) => {
     try {
-        const existing = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } })
+        const existing = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } }).lean()
         if (!existing) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && (existing.role !== 'admin' || String(existing.branchId) !== String(req.auth.branchId))) {
             return res.status(404).json({ error: 'not_found' })
@@ -382,7 +402,7 @@ export const createTeacher = async (req, res) => {
 export const listTeachers = async (req, res) => {
     try {
         const teachers = await User.find({ role: 'teacher', ...teacherBranchMembershipFilter(req) }).select('-passwordHash').populate('branchId', 'name').populate('additionalBranchIds', 'name')
-        const activeGroups = await Group.find({ status: 'active' }).select('teacherId studentIds')
+        const activeGroups = await Group.find({ status: 'active', levelCompletedAt: null }).select('teacherId studentIds').lean()
 
         const withStudentCounts = teachers.map(t => {
             const groupsForTeacher = activeGroups.filter(g => String(g.teacherId) === String(t._id))
@@ -400,15 +420,16 @@ export const listTeachers = async (req, res) => {
 
 export const getTeacherProfile = async (req, res) => {
     try {
-        const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' }).select('-passwordHash').populate('branchId', 'name')
+        const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' }).select('-passwordHash').populate('branchId', 'name').lean()
         if (!teacher) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && !teacherBelongsToBranch(teacher, req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
 
         const groups = await Group.find({ teacherId: teacher._id })
             .populate('languageId', 'name')
             .populate('levelId', 'name')
+            .lean()
 
-        const activeGroups = groups.filter(g => g.status === 'active')
+        const activeGroups = groups.filter(g => g.status === 'active' && !g.levelCompletedAt)
         const uniqueStudentIds = new Set()
         activeGroups.forEach(g => g.studentIds.forEach(id => uniqueStudentIds.add(String(id))))
 
@@ -427,7 +448,7 @@ export const getTeacherProfile = async (req, res) => {
 
 export const updateTeacher = async (req, res) => {
     try {
-        const existing = await User.findOne({ _id: req.params.id, role: 'teacher' })
+        const existing = await User.findOne({ _id: req.params.id, role: 'teacher' }).lean()
         if (!existing) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && !teacherBelongsToBranch(existing, req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
 
@@ -452,10 +473,10 @@ export const updateTeacher = async (req, res) => {
 
 export const deleteTeacher = async (req, res) => {
     try {
-        const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' })
+        const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' }).lean()
         if (!teacher) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && !teacherBelongsToBranch(teacher, req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
-        await User.deleteOne({ _id: teacher._id })
+        await hardDeleteTeacher(teacher._id)
         res.json({ deleted: true })
     } catch (error) {
         console.log(error)
@@ -463,10 +484,13 @@ export const deleteTeacher = async (req, res) => {
     }
 }
 
+// one price per COURSE (language), not per level - a course can have zero levels at all and still
+// needs a price, and even a course WITH levels charges the same price regardless of which level a
+// given group is running
 export const upsertPricing = async (req, res) => {
     try {
-        const { languageId, levelId, monthlyPrice } = req.body
-        const pricing = await Pricing.findOneAndUpdate({ languageId, levelId }, { monthlyPrice }, { upsert: true, new: true })
+        const { languageId, monthlyPrice } = req.body
+        const pricing = await Pricing.findOneAndUpdate({ languageId }, { monthlyPrice }, { upsert: true, new: true })
         res.json({ pricing })
     } catch (error) {
         console.log(error)
@@ -476,7 +500,7 @@ export const upsertPricing = async (req, res) => {
 
 export const listPricing = async (req, res) => {
     try {
-        const pricing = await Pricing.find({}).populate('languageId', 'name code').populate('levelId', 'name order')
+        const pricing = await Pricing.find({}).populate('languageId', 'name code').lean()
         res.json({ pricing })
     } catch (error) {
         console.log(error)
@@ -509,15 +533,15 @@ export const getAttendanceOverview = async (req, res) => {
         const startOfDay = new Date(requestedDate); startOfDay.setUTCHours(0, 0, 0, 0)
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
-        const teachers = await User.find({ role: 'teacher', ...teacherBranchMembershipFilter(req) }).select('name branchId').populate('branchId', 'name')
-        const teacherCheckIns = await TeacherAttendance.find({ date: { $gte: startOfDay, $lt: endOfDay } })
+        const teachers = await User.find({ role: 'teacher', ...teacherBranchMembershipFilter(req) }).select('name branchId').populate('branchId', 'name').lean()
+        const teacherCheckIns = await TeacherAttendance.find({ date: { $gte: startOfDay, $lt: endOfDay } }).lean()
         const checkInByTeacher = Object.fromEntries(teacherCheckIns.map(t => [String(t.teacherId), t.scannedAt]))
-        const allGroups = await Group.find({ teacherId: { $in: teachers.map(t => t._id) } })
+        const allGroups = await Group.find({ teacherId: { $in: teachers.map(t => t._id) } }).lean()
 
         // a sub_director's teacher list is already branch-scoped above, but a teacher can also
         // teach a group OUTSIDE this branch via additionalBranchIds - narrow the student-side
         // aggregates below to this branch's own groups specifically, not just "this branch's teachers'" groups
-        const branchGroupIds = isSubDirector(req) ? (await Group.find({ branchId: req.auth.branchId }).select('_id')).map(g => g._id) : null
+        const branchGroupIds = isSubDirector(req) ? (await Group.find({ branchId: req.auth.branchId }).select('_id').lean()).map(g => g._id) : null
 
         const teacherRows = teachers.map(t => {
             const scannedAt = checkInByTeacher[String(t._id)] || null
@@ -566,6 +590,7 @@ export const getAttendanceOverview = async (req, res) => {
             .populate('levelId', 'name')
             .populate('teacherId', 'name')
             .populate('branchId', 'name')
+            .lean()
         const groupRows = groupAttendanceRaw.map(g => {
             const group = groupDocs.find(doc => String(doc._id) === String(g._id))
             return {
@@ -619,7 +644,7 @@ export const updateBranch = async (req, res) => {
 // groups still assigned to it) so deleting one can never silently orphan real people or classes
 export const deleteBranch = async (req, res) => {
     try {
-        const branch = await Branch.findById(req.params.id)
+        const branch = await Branch.findById(req.params.id).lean()
         if (!branch) return res.status(404).json({ error: 'not_found' })
 
         const [peopleCount, activeGroupCount] = await Promise.all([
@@ -643,8 +668,8 @@ export const deleteBranch = async (req, res) => {
 // api to add a new course language (e.g. Spanish)
 export const createLanguage = async (req, res) => {
     try {
-        const { code, name } = req.body
-        const language = await Language.create({ code, name })
+        const { code, name, categoryIds } = req.body
+        const language = await Language.create({ code, name, categoryIds: categoryIds || [] })
         res.status(201).json({ language })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'language_code_taken' })
@@ -655,8 +680,8 @@ export const createLanguage = async (req, res) => {
 
 export const updateLanguage = async (req, res) => {
     try {
-        const { code, name } = req.body
-        const language = await Language.findByIdAndUpdate(req.params.id, { code, name }, { new: true, runValidators: true })
+        const { code, name, categoryIds } = req.body
+        const language = await Language.findByIdAndUpdate(req.params.id, { code, name, categoryIds: categoryIds || [] }, { new: true, runValidators: true })
         if (!language) return res.status(404).json({ error: 'not_found' })
         res.json({ language })
     } catch (error) {
@@ -666,18 +691,75 @@ export const updateLanguage = async (req, res) => {
     }
 }
 
+// ==== Course tags (categories) - global managed list, see CourseCategory.js ====
+
+export const listCourseCategories = async (req, res) => {
+    try {
+        const categories = await CourseCategory.find({}).sort({ name: 1 }).lean()
+        res.json({ categories })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const createCourseCategory = async (req, res) => {
+    try {
+        const { name } = req.body
+        if (!name?.trim()) return res.status(400).json({ error: 'name_required' })
+        const category = await CourseCategory.create({ name: name.trim() })
+        res.status(201).json({ category })
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ error: 'category_already_exists' })
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const updateCourseCategory = async (req, res) => {
+    try {
+        const { name } = req.body
+        if (!name?.trim()) return res.status(400).json({ error: 'name_required' })
+        const category = await CourseCategory.findByIdAndUpdate(req.params.id, { name: name.trim() }, { new: true, runValidators: true })
+        if (!category) return res.status(404).json({ error: 'not_found' })
+        res.json({ category })
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ error: 'category_already_exists' })
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// courses reference the tag by id, so deleting it just needs to pull that id out of any course that
+// had it attached - no name-cascade needed (see the model comment)
+export const deleteCourseCategory = async (req, res) => {
+    try {
+        const category = await CourseCategory.findById(req.params.id)
+        if (!category) return res.status(404).json({ error: 'not_found' })
+        await Language.updateMany({ categoryIds: category._id }, { $pull: { categoryIds: category._id } })
+        await category.deleteOne()
+        res.json({ deleted: true })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 // api to remove a course entirely - deletes every level under it (and each level's homework
 // content, pricing, exam) then the language itself. Meant for undoing a wrong "add language".
 export const deleteLanguage = async (req, res) => {
     try {
-        const language = await Language.findById(req.params.id)
+        const language = await Language.findById(req.params.id).lean()
         if (!language) return res.status(404).json({ error: 'not_found' })
 
-        const levelsToRemove = await Level.find({ languageId: language._id })
+        const levelsToRemove = await Level.find({ languageId: language._id }).lean()
         for (const level of levelsToRemove) {
             await deleteLevelContent(language._id, level._id)
         }
         await Level.deleteMany({ languageId: language._id })
+        // Pricing is per-course now (not routed through deleteLevelContent, which is level-scoped) -
+        // a language with zero levels would otherwise leave its price row permanently orphaned
+        await Pricing.deleteMany({ languageId: language._id })
         await Language.findByIdAndDelete(language._id)
 
         res.json({ deleted: true })
@@ -741,7 +823,7 @@ export const deleteLastLesson = async (req, res) => {
 // undoing a wrong "add level" while setting up a course.
 export const deleteLevel = async (req, res) => {
     try {
-        const level = await Level.findById(req.params.id)
+        const level = await Level.findById(req.params.id).lean()
         if (!level) return res.status(404).json({ error: 'not_found' })
 
         await deleteLevelContent(level.languageId, level._id)
@@ -840,11 +922,12 @@ export const getTodayTimetable = async (req, res) => {
         const startOfDay = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate()))
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
-        const branchGroups = await Group.find({ branchId: req.query.branchId, status: 'active' })
+        const branchGroups = await Group.find({ branchId: req.query.branchId, status: 'active', levelCompletedAt: null })
             .populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name').populate('roomId', 'name')
+            .lean()
         const groupIds = branchGroups.map(g => g._id)
 
-        const lessons = await Lesson.find({ groupId: { $in: groupIds }, date: { $gte: startOfDay, $lt: endOfDay } }).sort({ startTime: 1 })
+        const lessons = await Lesson.find({ groupId: { $in: groupIds }, date: { $gte: startOfDay, $lt: endOfDay } }).sort({ startTime: 1 }).lean()
         const rows = lessons.map(l => {
             const group = branchGroups.find(g => String(g._id) === String(l.groupId))
             return {
@@ -855,7 +938,7 @@ export const getTodayTimetable = async (req, res) => {
             }
         })
 
-        const rooms = await Room.find({ branchId: req.query.branchId }).sort({ name: 1 })
+        const rooms = await Room.find({ branchId: req.query.branchId }).sort({ name: 1 }).lean()
 
         res.json({ date: startOfDay, rooms, lessons: rows })
     } catch (error) {
@@ -904,6 +987,7 @@ export const getPaymentDetail = async (req, res) => {
             .populate('teacherId', 'name')
             .populate('adminId', 'name')
             .populate('refundedBy', 'name')
+            .lean()
         if (!payment) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && String(payment.branchId) !== String(req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
         res.json({ payment })
@@ -919,6 +1003,8 @@ export const listPayRates = async (req, res) => {
         const rates = await TeacherPayRate.find({ branchId: req.query.branchId })
             .populate('teacherId', 'name')
             .populate('groupId', 'name languageId levelId')
+            .populate('languageId', 'name')
+            .lean()
         res.json({ rates })
     } catch (error) {
         console.log(error)
@@ -928,13 +1014,17 @@ export const listPayRates = async (req, res) => {
 
 export const setPayRate = async (req, res) => {
     try {
-        const { branchId, teacherId, groupId, rateType, rateValue } = req.body
+        const { branchId, teacherId, groupId, languageId, rateType, rateValue } = req.body
         if (!branchId) return res.status(400).json({ error: 'branch_required' })
         if (!PAY_RATE_TYPES.includes(rateType)) return res.status(400).json({ error: 'invalid_rate_type' })
         if (groupId && !teacherId) return res.status(400).json({ error: 'teacher_required_for_group_rate' })
+        // three independent override axes (by teacher / by course / by group) - a course-wide rate
+        // is never combined with a specific teacher or group, and vice versa (confirmed spec: these
+        // don't compose into a 5th "this teacher, but only for this course" case)
+        if (languageId && (teacherId || groupId)) return res.status(400).json({ error: 'course_rate_cannot_combine' })
 
         const rate = await TeacherPayRate.findOneAndUpdate(
-            { branchId, teacherId: teacherId || null, groupId: groupId || null },
+            { branchId, teacherId: teacherId || null, groupId: groupId || null, languageId: languageId || null },
             { rateType, rateValue },
             { upsert: true, new: true, runValidators: true }
         )
@@ -956,13 +1046,18 @@ export const deletePayRate = async (req, res) => {
     }
 }
 
+// runs the calculation fresh every time (nothing persisted until "Pay"/"Prepay" is clicked) - see
+// salaryCalculation.service.js for exactly how each rate type is applied, and for how paidAmount/
+// remaining are derived from real Salary+Prepayment expenses already recorded for this exact
+// period. No lock-in step, matching adminController.calculateSalary's simplified model - since
+// `total` is always a live recalculation, a director just pays whatever `remaining` currently shows.
 export const calculateSalary = async (req, res) => {
     try {
         const { branchId, dateFrom, dateTo } = req.query
         if (!branchId) return res.status(400).json({ error: 'branch_required' })
         if (!dateFrom || !dateTo) return res.status(400).json({ error: 'date_range_required' })
 
-        const rates = await TeacherPayRate.find({ branchId })
+        const rates = await TeacherPayRate.find({ branchId }).lean()
         const from = startOfLocalDay(dateFrom)
         const to = endOfLocalDay(dateTo)
 
@@ -980,7 +1075,7 @@ export const getSalaryDetail = async (req, res) => {
         if (!branchId) return res.status(400).json({ error: 'branch_required' })
         if (!dateFrom || !dateTo) return res.status(400).json({ error: 'date_range_required' })
 
-        const rates = await TeacherPayRate.find({ branchId })
+        const rates = await TeacherPayRate.find({ branchId }).lean()
         const from = startOfLocalDay(dateFrom)
         const to = endOfLocalDay(dateTo)
 
@@ -1000,16 +1095,36 @@ export const paySalary = async (req, res) => {
         if (!teacherId || !amount) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
-        const teacher = await User.findById(teacherId).select('name')
+        const teacher = await User.findById(teacherId).select('name').lean()
         await ensureDefaultCategories(branchId)
+        await ensureCategoryExists(branchId, SALARY_CATEGORY, '#3E7CB1')
+        const expenseDate = new Date()
         const expense = await Expense.create({
-            branchId, category: 'Salary', amount, teacherId,
+            branchId, category: SALARY_CATEGORY, amount, teacherId,
             name: dateFrom && dateTo ? `Salary for ${dateFrom} — ${dateTo}` : 'Salary payout',
             recipient: teacher?.name || '', method,
-            date: new Date(),
+            date: expenseDate,
             note: dateFrom && dateTo ? `Salary for ${dateFrom} — ${dateTo}` : 'Salary payout',
             createdBy: req.auth.userId,
         })
+
+        // branch account decreases (cash out) and the teacher's own account decreases too (less
+        // owed to them - an advance given before it's earned naturally pushes it negative) - same
+        // ledger posting adminController.paySalary does, this was missing here entirely before
+        const branchAccount = await getOrCreateAccount('branch', branchId)
+        const branchEntry = await postEntry({
+            accountId: branchAccount._id, direction: 'decrease', amount, kind: 'salary_payout', method,
+            meta: { teacherId, sourceType: 'expense', sourceId: expense._id },
+            description: expense.name, createdBy: req.auth.userId, date: expenseDate,
+        })
+        if (branchEntry) { expense.ledgerTransactionId = branchEntry.transactionId; await expense.save({ validateModifiedOnly: true }) }
+        const teacherAccount = await getOrCreateAccount('teacher', teacherId)
+        await postEntry({
+            accountId: teacherAccount._id, direction: 'decrease', amount, kind: 'salary_payout', method,
+            meta: { teacherId, sourceType: 'expense', sourceId: expense._id },
+            description: expense.name, createdBy: req.auth.userId, date: expenseDate,
+        })
+
         res.status(201).json({ expense })
     } catch (error) {
         console.log(error)
@@ -1026,24 +1141,32 @@ export const prepaySalary = async (req, res) => {
         if (!teacherId || !amount) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
-        if (dateFrom && dateTo) {
-            const alreadyPaid = await Expense.exists({
-                branchId, category: 'Salary', teacherId,
-                date: { $gte: new Date(dateFrom), $lte: new Date(dateTo) },
-            })
-            if (alreadyPaid) return res.status(409).json({ error: 'salary_already_paid' })
-        }
-
-        const teacher = await User.findById(teacherId).select('name')
-        await ensureCategoryExists(branchId, 'Prepayment', '#E67E22')
+        const teacher = await User.findById(teacherId).select('name').lean()
+        await ensureCategoryExists(branchId, PREPAYMENT_CATEGORY, '#E67E22')
+        const expenseDate = new Date()
         const expense = await Expense.create({
-            branchId, category: 'Prepayment', amount, teacherId,
+            branchId, category: PREPAYMENT_CATEGORY, amount, teacherId,
             name: dateFrom && dateTo ? `Prepayment for ${dateFrom} — ${dateTo}` : 'Salary prepayment',
             recipient: teacher?.name || '', method,
-            date: new Date(),
+            date: expenseDate,
             note: dateFrom && dateTo ? `Prepayment for ${dateFrom} — ${dateTo}` : 'Salary prepayment',
             createdBy: req.auth.userId,
         })
+
+        const branchAccount = await getOrCreateAccount('branch', branchId)
+        const branchEntry = await postEntry({
+            accountId: branchAccount._id, direction: 'decrease', amount, kind: 'salary_payout', method,
+            meta: { teacherId, sourceType: 'expense', sourceId: expense._id },
+            description: expense.name, createdBy: req.auth.userId, date: expenseDate,
+        })
+        if (branchEntry) { expense.ledgerTransactionId = branchEntry.transactionId; await expense.save({ validateModifiedOnly: true }) }
+        const teacherAccount = await getOrCreateAccount('teacher', teacherId)
+        await postEntry({
+            accountId: teacherAccount._id, direction: 'decrease', amount, kind: 'salary_payout', method,
+            meta: { teacherId, sourceType: 'expense', sourceId: expense._id },
+            description: expense.name, createdBy: req.auth.userId, date: expenseDate,
+        })
+
         res.status(201).json({ expense })
     } catch (error) {
         console.log(error)

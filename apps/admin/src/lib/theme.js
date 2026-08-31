@@ -10,7 +10,7 @@
 const KEY = 'uniacademy_admin_theme'
 
 export const THEMES = {
-    blue: { label: 'Blue', accent: '#2F6FED', soft: '#E4ECFD' },
+    blue: { label: 'Blue', accent: '#0066CC', soft: '#E5F1FB' },
     green: { label: 'Green', accent: '#1F9D55', soft: '#DFF5E6' },
     violet: { label: 'Violet', accent: '#7C3AED', soft: '#EDE4FD' },
     red: { label: 'Red', accent: '#DC2626', soft: '#FBE0E0' },

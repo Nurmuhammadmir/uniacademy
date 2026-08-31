@@ -15,3 +15,10 @@ export const lastDayOfMonthISO = (monthStr) => {
     const last = new Date(Date.UTC(year, month, 0)).getUTCDate()
     return `${monthStr}-${String(last).padStart(2, '0')}`
 }
+
+// a billing period's periodStart/periodEnd are UTC calendar-date markers (e.g. "the last day of
+// August"), but the server stores periodEnd at 23:59:59.999 UTC - plain `.toLocaleDateString()`
+// renders that in the BROWSER's own timezone, so anyone west of UTC (Tashkent is UTC+5) sees it
+// silently roll over to the 1st of the next month. This forces the same Intl formatter to read the
+// date's UTC calendar fields instead of converting to local time first.
+export const formatUTCDate = (date) => new Intl.DateTimeFormat(undefined, { timeZone: 'UTC' }).format(new Date(date))

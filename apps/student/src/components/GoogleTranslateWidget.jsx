@@ -94,7 +94,7 @@ const GoogleTranslateWidget = () => {
             className='w-full px-3 py-2 rounded-xl bg-bg border border-hairline text-sm mb-2 resize-none'
           />
 
-          <div className='w-full px-3 py-2 rounded-xl bg-accent-soft text-ink text-sm min-h-[4.5rem]'>
+          <div className='w-full px-3 py-2 rounded-xl bg-accent-soft dark:bg-white/10 text-ink text-sm min-h-[4.5rem]'>
             {loading ? <span className='text-muted'>Translating…</span> : (output || <span className='text-muted'>Translation</span>)}
           </div>
         </div>

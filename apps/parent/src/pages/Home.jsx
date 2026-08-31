@@ -5,7 +5,11 @@ import { formatMoney } from '../lib/format.js'
 
 const STATUS_KEY = { present: 'presentStatus', absent: 'absentStatus', late: 'lateStatus', excused: 'excusedStatus', unmarked: 'unmarkedStatus' }
 const STATUS_COLOR = {
-  present: 'bg-accent-soft text-accent', absent: 'bg-red-100 text-red-500', late: 'bg-yellow-100 text-yellow-700',
+  // bg-accent-soft is a static pastel hex (parent's pink/rose accent isn't swapped for dark mode -
+  // see tailwind.config.js), so a translucent white wash stands in for it on the dark canvas instead
+  // while text-accent itself is left alone - it already reads fine against a dark background.
+  present: 'bg-accent-soft text-accent dark:bg-white/10', absent: 'bg-red-100 text-red-500 dark:bg-red-500/10 dark:text-red-400',
+  late: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400',
   excused: 'bg-hairline text-muted', unmarked: 'bg-hairline text-muted',
 }
 
@@ -85,7 +89,7 @@ const Home = () => {
               <div key={el._id} className='bg-bg-card border border-hairline rounded-2xl p-4'>
                 <div className='flex justify-between items-start mb-1'>
                   <p className='text-ink text-sm font-medium'>{el.groupId?.languageId?.name}{el.groupId?.levelId?.name ? ` · ${el.groupId.levelId.name}` : ''}</p>
-                  <span className='text-xs font-mono text-accent bg-accent-soft px-2 py-1 rounded-full'>{new Date(el.date).toLocaleDateString()}</span>
+                  <span className='text-xs font-mono text-accent bg-accent-soft dark:bg-white/10 px-2 py-1 rounded-full'>{new Date(el.date).toLocaleDateString()}</span>
                 </div>
                 <p className='text-muted text-sm'>{el.startTime}–{el.endTime} · {el.teacherId?.name}</p>
                 {el.notes && <p className='text-muted text-xs mt-1'>{t('notesLabel')}: {el.notes}</p>}
@@ -121,14 +125,13 @@ const Home = () => {
           <div key={c._id} className='bg-bg-card border border-hairline rounded-2xl p-4'>
             <div className='flex justify-between items-start mb-2'>
               <p className='text-ink text-sm font-medium'>{c.languageId?.name}{c.levelId?.name ? ` · ${c.levelId.name}` : ''}</p>
-              <span className={`text-xs font-medium px-2 py-1 rounded-full ${c.isActive ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>
-                {c.isActive ? t('active') : t('unpaid')}
+              <span className={`text-xs font-medium px-2 py-1 rounded-full ${c.enrollmentStatus === 'active' ? 'bg-accent-soft text-accent dark:bg-white/10' : 'bg-hairline text-muted'}`}>
+                {c.enrollmentStatus === 'active' ? t('active') : t('unpaid')}
               </span>
             </div>
             <div className='grid grid-cols-2 gap-2 text-sm'>
               <div><p className='text-muted text-xs'>{t('monthlyPriceLabel')}</p><p className='font-mono text-ink'>{c.price !== null ? formatMoney(c.price) : '—'}</p></div>
-              <div><p className='text-muted text-xs'>{t('balanceLabel')}</p><p className={`font-mono ${c.balance > 0 ? 'text-green-600' : 'text-ink'}`}>{formatMoney(c.balance)}</p></div>
-              <div><p className='text-muted text-xs'>{t('nextDueLabel')}</p><p className='font-mono text-ink'>{c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).toLocaleDateString() : '—'}</p></div>
+              <div><p className='text-muted text-xs'>{t('balanceLabel')}</p><p className={`font-mono ${c.owed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-ink'}`}>{c.owed > 0 ? `-${formatMoney(c.owed)}` : formatMoney(0)}</p></div>
             </div>
           </div>
         ))}

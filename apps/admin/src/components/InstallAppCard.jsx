@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { toast } from 'react-toastify'
+import { toast } from 'sonner'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { isInstallAvailable, onInstallAvailabilityChange, promptInstall, isStandalone, isIOS } from '../lib/installPrompt.js'
 
@@ -30,7 +30,7 @@ const InstallAppCard = () => {
         <>
           <p className='text-muted text-sm mb-3'>{t('installAppDesc')}</p>
           <button onClick={install} disabled={installing}
-            className='px-4 py-2.5 rounded-xl bg-accent text-white text-sm font-medium disabled:opacity-50'>
+            className='px-4 py-2.5 rounded-xl bg-accent dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-white text-sm font-medium disabled:opacity-50'>
             {installing ? t('installing') : t('installNow')}
           </button>
         </>

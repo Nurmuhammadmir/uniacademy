@@ -10,9 +10,24 @@ import { fileURLToPath } from "url"
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const PUBLIC_ROOT = path.join(__dirname, "..", "public", "images")
 
-// keep the whole file in memory, then write it ourselves once we know the intended name
+// stream straight to disk instead of buffering the whole file in RAM (multer.memoryStorage()
+// would hold every concurrent upload's full bytes - up to fileSize each - in the Node heap until
+// the handler below finishes writing it out; diskStorage lets the OS do that copy instead, so RAM
+// use per upload stays tiny regardless of how many directors are uploading photos at once). Written
+// under a throwaway name first since the real, slugified filename isn't known until uploadImage
+// below reads req.query.name - it renames this temp file into place once it does.
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const kind = req.params.kind === 'reading' ? 'reading' : 'vocab'
+        const dir = path.join(PUBLIC_ROOT, kind)
+        fs.mkdirSync(dir, { recursive: true })
+        cb(null, dir)
+    },
+    filename: (req, file, cb) => cb(null, `__tmp-${Date.now()}-${Math.round(Math.random() * 1e9)}`),
+})
+
 export const uploadMiddleware = multer({
-    storage: multer.memoryStorage(),
+    storage,
     limits: { fileSize: 5 * 1024 * 1024 }, // 5MB is plenty for a vocab picture
     fileFilter: (req, file, cb) => {
         if (/^image\//.test(file.mimetype)) cb(null, true)
@@ -106,22 +121,25 @@ export const uploadImage = async (req, res) => {
     try {
         const kind = req.params.kind === 'reading' ? 'reading' : 'vocab'
         const name = slugify(req.query.name || req.body?.name)
-        if (!name) return res.status(400).json({ error: 'missing_name' })
+        if (!name) {
+            if (req.file) fs.unlink(req.file.path, () => {}) // clean up the temp file multer already wrote
+            return res.status(400).json({ error: 'missing_name' })
+        }
         if (!req.file) return res.status(400).json({ error: 'no_file' })
 
         const dir = path.join(PUBLIC_ROOT, kind)
-        fs.mkdirSync(dir, { recursive: true })
 
         // remove any existing file(s) for this same word FIRST, regardless of their extension -
         // otherwise "changing the photo" to a different format (e.g. replacing a .jpg with a .png)
         // leaves the old file sitting on disk too, and findImageByName's directory scan can end up
-        // resolving back to whichever one it lists first, silently undoing the change
-        const existing = fs.readdirSync(dir).filter(f => slugify(path.parse(f).name) === name)
+        // resolving back to whichever one it lists first, silently undoing the change. Excludes the
+        // just-uploaded temp file itself, which also lives in this same directory.
+        const existing = fs.readdirSync(dir).filter(f => f !== path.basename(req.file.path) && slugify(path.parse(f).name) === name)
         existing.forEach(f => fs.unlinkSync(path.join(dir, f)))
 
         const ext = extFor(req.file.mimetype, req.file.originalname)
         const filename = `${name}.${ext}`
-        fs.writeFileSync(path.join(dir, filename), req.file.buffer)
+        fs.renameSync(req.file.path, path.join(dir, filename))
 
         // static assets are served with a 7-day cache (server.js), so re-uploading a REPLACEMENT
         // photo under the exact same filename would otherwise keep showing the old cached bytes in

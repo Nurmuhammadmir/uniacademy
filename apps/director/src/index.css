@@ -4,31 +4,87 @@
 html, body, #root { height: 100%; }
 body { @apply bg-bg text-ink font-body; }
 
-/* subtle "raised" 3D depth for buttons and cards across the whole app - buttons lift off the page
-   and press down on tap, cards/panels get a soft ambient shadow instead of sitting flat. Every
-   button is also pill-shaped (rounded-full) with a gentle scale-up + brightness lift on hover - the
-   `button.rounded-*` selectors below beat a plain Tailwind rounding utility on specificity
-   (element+class always outranks class-alone) so this wins regardless of which rounded-* class a
-   given button already carries in its className, no !important needed. */
-button, [role="button"] {
-  border-radius: 9999px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+/* Light-mode values for the base surface/text tokens (bg/bg-elevated/bg-card/ink/muted/hairline -
+   tailwind.config.js points those classes at these variables instead of static hex). Matches the
+   shared preset's own static values exactly, and the admin app's "Pure Cupertino" palette - only
+   .dark below actually repaints anything. */
+:root {
+  --color-bg: #F5F5F7;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-card: #FFFFFF;
+  --color-ink: #1D1D1F;
+  --color-muted: #6E6E73;
+  --color-hairline: #D2D2D7;
+}
+
+/* Dark Mode - midnight blue-gray canvas with a velvety graphite surface for cards/sidebar/content,
+   one step lighter than the page so everything still visibly pops off the canvas. Toggled by
+   adding/removing this class on <html> - see ThemeContext.jsx (state) and index.html's inline
+   script (applies it before first paint, defaulting to light unless the user has explicitly
+   switched before). Same values as the admin app so dark mode reads identically everywhere. */
+.dark {
+  --color-bg: #0B0F19;
+  --color-bg-elevated: #161F30;
+  --color-bg-card: #161F30;
+  --color-ink: #F8FAFC;
+  --color-muted: #94A3B8;
+  --color-hairline: rgba(148, 163, 184, 0.2);
+}
+
+/* subtle "raised" depth is reserved for real call-to-action buttons - ones that carry their own
+   background color utility (bg-accent, bg-hairline, bg-red-500, etc) as an actual class token, not
+   merely a hover:/focus: variant of one. [class^="bg-"] / [class*=" bg-"] (start-of-string or
+   preceded by a space) requires "bg-" to start its own class TOKEN - a plain [class*="bg-"]
+   substring match also matched "hover:bg-accent-soft/40" and similar hover-only variants, since
+   "bg-" is a substring of that token too, even though the button has no background at rest at all.
+   Deliberately does NOT touch border-radius - every real button in this codebase already carries its
+   own rounded-lg/rounded-xl/etc utility, so it stays exactly as rounded as its own className says.
+   Forcing every one of them into a full rounded-full pill (the original version of this rule) made
+   every button read like a candy capsule instead of a normal, calm dashboard control; a soft shadow
+   plus a small hover lift is the "raised" cue on its own, no shape override needed. Also toned down
+   from the original (smaller scale delta, no extra active-state scale on top of the press-down) - a
+   subtle lift reads as polished, a big bounce reads as a toy. */
+button[class^="bg-"], button[class*=" bg-"], [role="button"][class^="bg-"], [role="button"][class*=" bg-"] {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10), 0 1px 2px rgba(0, 0, 0, 0.06);
   transition: box-shadow 0.15s ease, transform 0.15s ease, filter 0.15s ease;
 }
-button.rounded-none, button.rounded-sm, button.rounded, button.rounded-md, button.rounded-lg, button.rounded-xl, button.rounded-2xl, button.rounded-3xl,
-[role="button"].rounded-none, [role="button"].rounded-sm, [role="button"].rounded, [role="button"].rounded-md, [role="button"].rounded-lg, [role="button"].rounded-xl, [role="button"].rounded-2xl, [role="button"].rounded-3xl {
-  border-radius: 9999px;
+button[class^="bg-"]:hover:not(:disabled), button[class*=" bg-"]:hover:not(:disabled),
+[role="button"][class^="bg-"]:hover:not(:disabled), [role="button"][class*=" bg-"]:hover:not(:disabled) {
+  transform: scale(1.02);
+  filter: brightness(1.05);
 }
-button:hover:not(:disabled), [role="button"]:hover:not(:disabled) {
-  transform: scale(1.05);
-  filter: brightness(1.08);
-}
-button:active, [role="button"]:active {
+button[class^="bg-"]:active, button[class*=" bg-"]:active,
+[role="button"][class^="bg-"]:active, [role="button"][class*=" bg-"]:active {
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
-  transform: translateY(1px) scale(1.03);
+  transform: translateY(1px);
 }
-button:disabled {
+button[class^="bg-"]:disabled, button[class*=" bg-"]:disabled,
+[role="button"][class^="bg-"]:disabled, [role="button"][class*=" bg-"]:disabled {
   box-shadow: none;
+}
+button.plain, [role="button"].plain {
+  border-radius: 0;
+  box-shadow: none;
+}
+button.plain:hover, [role="button"].plain:hover {
+  transform: none;
+  filter: none;
+}
+button.plain:active, [role="button"].plain:active {
+  box-shadow: none;
+  transform: none;
+}
+
+/* everything else (edit/delete/archive text links, bare icon buttons) - no forced shape, no shadow,
+   just a calm opacity fade so hover still reads as interactive without any layout-shifting motion */
+button:not([class^="bg-"]):not([class*=" bg-"]), [role="button"]:not([class^="bg-"]):not([class*=" bg-"]) {
+  transition: opacity 0.15s ease;
+}
+button:not([class^="bg-"]):not([class*=" bg-"]):hover:not(:disabled), [role="button"]:not([class^="bg-"]):not([class*=" bg-"]):hover:not(:disabled) {
+  opacity: 0.7;
+}
+button:not([class^="bg-"]):not([class*=" bg-"]):disabled, [role="button"]:not([class^="bg-"]):not([class*=" bg-"]):disabled {
+  opacity: 0.4;
 }
 .bg-bg-elevated, .bg-bg-card {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.06);
@@ -49,8 +105,57 @@ table {
   border-spacing: 0 2px;
 }
 table td, table th {
-  border-bottom: 1px solid #E9E1D4;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+/* fully hides the scrollbar (used for horizontal chip rows / touch-swipe carousels) while keeping
+   the element scrollable by touch/trackpad/mouse-drag - not a Tailwind utility without a plugin */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 table tbody tr:last-child td {
   border-bottom: none;
+}
+
+/* react-day-picker (DatePicker.jsx) - re-point its accent color at this app's own runtime-switchable
+   --accent/--accent-soft custom properties instead of its default blue, and fill the selected day
+   with a solid accent circle instead of just the default's thin outline ring. */
+.rdp-root {
+  --rdp-accent-color: var(--accent);
+  --rdp-accent-background-color: var(--accent-soft);
+  /* compact, "glanced at for a second" size instead of react-day-picker's roomy desktop default -
+     see DatePicker.jsx's popover, which is capped at max-w-[280px] to match */
+  --rdp-day-width: 32px;
+  --rdp-day-height: 32px;
+  --rdp-day_button-width: 28px;
+  --rdp-day_button-height: 28px;
+  --rdp-nav-height: 2rem;
+  --rdp-nav_button-width: 1.75rem;
+  --rdp-nav_button-height: 1.75rem;
+  --rdp-weekday-padding: 0.25rem 0rem;
+}
+.rdp-month_caption {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+.rdp-weekday {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: none;
+}
+.rdp-day_button {
+  font-size: 12px;
+}
+.rdp-selected .rdp-day_button {
+  background-color: var(--accent);
+  color: white;
+  border: none;
+  font-weight: 500;
+}
+.rdp-today:not(.rdp-selected) .rdp-day_button {
+  border: 1.5px solid #94a3b8;
 }

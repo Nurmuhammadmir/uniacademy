@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import Modal from './Modal.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import { scheduleDaysLabel } from '../lib/format.js'
 
 const TeacherProfileModal = ({ teacherId, getTeacherProfile, onClose }) => {
   const [data, setData] = useState(false)
@@ -36,7 +37,7 @@ const TeacherProfileModal = ({ teacherId, getTeacherProfile, onClose }) => {
             <div className='flex flex-col gap-3'>
               {data.groups.map(g => (
                 <div key={g._id} className='flex justify-between text-sm bg-bg border border-hairline rounded-lg px-3 py-2'>
-                  <span className='text-ink'>{g.languageId?.name} · {g.levelId?.name} · {g.schedulePattern.replaceAll('_', '/')} {g.time}</span>
+                  <span className='text-ink'>{g.languageId?.name} · {g.levelId?.name} · {scheduleDaysLabel(g, t)} {g.time}</span>
                   <span className='text-muted'>{g.status}</span>
                 </div>
               ))}

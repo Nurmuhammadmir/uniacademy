@@ -17,7 +17,7 @@ import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
 
 export const listRooms = async (req, res) => {
     try {
-        const rooms = await Room.find({ branchId: req.auth.branchId }).sort({ name: 1 })
+        const rooms = await Room.find({ branchId: req.auth.branchId }).sort({ name: 1 }).lean()
         res.json({ rooms })
     } catch (error) {
         console.log(error)
@@ -66,24 +66,14 @@ export const getGroupDetails = async (req, res) => {
         const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId })
             .populate('languageId', 'name').populate('levelId', 'name durationDays')
             .populate('teacherId', 'name phone').populate('roomId', 'name capacity')
-            .populate('studentIds', 'name phone')
+            .populate('studentIds', 'name phone').lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
-        res.json({ group })
-    } catch (error) {
-        console.log(error)
-        res.status(500).json({ error: 'server_error' })
-    }
-}
 
-export const updateGroupDiscount = async (req, res) => {
-    try {
-        const { discountPercent } = req.body
-        const group = await Group.findOneAndUpdate(
-            { _id: req.params.id, branchId: req.auth.branchId },
-            { discountPercent: Math.max(0, Math.min(100, Number(discountPercent) || 0)) },
-            { new: true }
-        )
-        if (!group) return res.status(404).json({ error: 'not_found' })
+        // group.price is already the real, immutable creation-time snapshot (see Group.js) - it used
+        // to be overwritten here with a live Pricing re-lookup, which both defeated the whole point
+        // of snapshotting (a later director price change silently repriced this one page) and would
+        // break entirely once Pricing dropped levelId (price is per-course now, not per-level)
+
         res.json({ group })
     } catch (error) {
         console.log(error)
@@ -97,7 +87,7 @@ export const updateGroupDiscount = async (req, res) => {
 // active window) then returns the lessons + every student's status per lesson (unmarked if no row exists)
 export const getGroupAttendanceGrid = async (req, res) => {
     try {
-        const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId }).populate('studentIds', 'name phone')
+        const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId }).populate('studentIds', 'name phone').lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         const month = req.query.month || new Date().toISOString().slice(0, 7)
@@ -107,7 +97,7 @@ export const getGroupAttendanceGrid = async (req, res) => {
 
         const lessons = await ensureLessonsGenerated(group, rangeStart, rangeEnd)
         const lessonIds = lessons.map(l => l._id)
-        const records = await LessonAttendance.find({ lessonId: { $in: lessonIds } })
+        const records = await LessonAttendance.find({ lessonId: { $in: lessonIds } }).lean()
         const statusByKey = Object.fromEntries(records.map(r => [`${r.lessonId}_${r.studentId}`, r.status]))
 
         const students = group.studentIds.map(s => ({
@@ -131,7 +121,7 @@ export const getGroupAttendanceGrid = async (req, res) => {
 
 export const listGroupMaterials = async (req, res) => {
     try {
-        const materials = await GroupMaterial.find({ groupId: req.params.id }).sort({ createdAt: -1 })
+        const materials = await GroupMaterial.find({ groupId: req.params.id }).sort({ createdAt: -1 }).lean()
         res.json({ materials })
     } catch (error) {
         console.log(error)
@@ -167,7 +157,7 @@ export const deleteGroupMaterial = async (req, res) => {
 export const listExtraLessons = async (req, res) => {
     try {
         const extraLessons = await ExtraLesson.find({ groupId: req.params.id })
-            .populate('studentIds', 'name').populate('teacherId', 'name').sort({ date: -1 })
+            .populate('studentIds', 'name').populate('teacherId', 'name').sort({ date: -1 }).lean()
         res.json({ extraLessons })
     } catch (error) {
         console.log(error)
@@ -181,7 +171,7 @@ export const createExtraLesson = async (req, res) => {
         if (!teacherId || !date || !startTime || !endTime) return res.status(400).json({ error: 'missing_fields' })
         if (!studentIds || studentIds.length === 0) return res.status(400).json({ error: 'students_required' })
 
-        const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId })
+        const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId }).lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         const extraLesson = await ExtraLesson.create({
@@ -209,7 +199,7 @@ export const deleteExtraLesson = async (req, res) => {
 
 export const listGroupComments = async (req, res) => {
     try {
-        const comments = await GroupComment.find({ groupId: req.params.id }).sort({ createdAt: -1 }).populate('authorId', 'name')
+        const comments = await GroupComment.find({ groupId: req.params.id }).sort({ createdAt: -1 }).populate('authorId', 'name').lean()
         res.json({ comments })
     } catch (error) {
         console.log(error)
@@ -244,12 +234,12 @@ export const deleteGroupComment = async (req, res) => {
 
 export const getGroupExamsTab = async (req, res) => {
     try {
-        const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId })
+        const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId }).lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
-        const exam = await Exam.findOne({ levelId: group.levelId })
+        const exam = await Exam.findOne({ levelId: group.levelId }).lean()
         const attempts = exam
-            ? await ExamAttempt.find({ examId: exam._id, studentId: { $in: group.studentIds } }).sort({ date: -1 }).populate('studentId', 'name')
+            ? await ExamAttempt.find({ examId: exam._id, studentId: { $in: group.studentIds } }).sort({ date: -1 }).populate('studentId', 'name').lean()
             : []
 
         res.json({ exam, attempts })
@@ -267,11 +257,11 @@ export const getTodayTimetable = async (req, res) => {
         const startOfDay = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate()))
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
-        const branchGroups = await Group.find({ branchId: req.auth.branchId, status: 'active' })
-            .populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name').populate('roomId', 'name')
+        const branchGroups = await Group.find({ branchId: req.auth.branchId, status: 'active', levelCompletedAt: null })
+            .populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name').populate('roomId', 'name').lean()
         const groupIds = branchGroups.map(g => g._id)
 
-        const lessons = await Lesson.find({ groupId: { $in: groupIds }, date: { $gte: startOfDay, $lt: endOfDay } }).sort({ startTime: 1 })
+        const lessons = await Lesson.find({ groupId: { $in: groupIds }, date: { $gte: startOfDay, $lt: endOfDay } }).sort({ startTime: 1 }).lean()
         const rows = lessons.map(l => {
             const group = branchGroups.find(g => String(g._id) === String(l.groupId))
             return {
@@ -282,7 +272,7 @@ export const getTodayTimetable = async (req, res) => {
             }
         })
 
-        const rooms = await Room.find({ branchId: req.auth.branchId }).sort({ name: 1 })
+        const rooms = await Room.find({ branchId: req.auth.branchId }).sort({ name: 1 }).lean()
 
         res.json({ date: startOfDay, rooms, lessons: rows })
     } catch (error) {

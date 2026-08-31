@@ -3,11 +3,11 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { TeacherContext } from '../context/TeacherContext.jsx'
 
 const statusLabel = { done: 'Done', open: 'In progress', expired: 'Missed', locked: 'Not yet' }
-const statusColor = { done: 'text-accent bg-accent-soft', open: 'text-ink bg-hairline', expired: 'text-red-500 bg-red-50', locked: 'text-muted bg-hairline' }
+const statusColor = { done: 'text-accent bg-accent-soft dark:bg-white/10', open: 'text-ink bg-hairline', expired: 'text-red-500 bg-red-50 dark:text-rose-400 dark:bg-red-500/10', locked: 'text-muted bg-hairline' }
 
 const attendanceLabel = { present: 'Present', absent: 'Absent', late: 'Late', excused: 'Excused', unmarked: 'Not marked' }
 const attendanceColor = {
-  present: 'bg-accent-soft text-accent', absent: 'bg-red-100 text-red-500', late: 'bg-yellow-100 text-yellow-700',
+  present: 'bg-accent-soft text-accent dark:bg-white/10', absent: 'bg-red-100 text-red-500 dark:bg-red-500/10 dark:text-rose-400', late: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/10 dark:text-yellow-400',
   excused: 'bg-hairline text-muted', unmarked: 'bg-hairline text-muted',
 }
 
@@ -67,7 +67,7 @@ const StudentDetail = () => {
                   <p className='text-ink text-sm'>{a.examId?.languageId?.name} · {a.examId?.levelId?.name}</p>
                   <p className='text-muted text-xs'>{new Date(a.date).toLocaleDateString()} · attempt #{a.attemptNumber}</p>
                 </div>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${a.passed ? 'bg-accent-soft text-accent' : 'bg-red-100 text-red-500'}`}>
+                <span className={`text-xs font-medium px-2 py-1 rounded-full ${a.passed ? 'bg-accent-soft text-accent dark:bg-white/10' : 'bg-red-100 text-red-500 dark:bg-red-500/10 dark:text-rose-400'}`}>
                   {a.score}% · {a.passed ? 'Passed' : 'Failed'}
                 </span>
               </div>

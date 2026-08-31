@@ -1,8 +1,12 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Sliders } from 'lucide-react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
+import Select from '../components/Select.jsx'
+import TimePicker from '../components/TimePicker.jsx'
+import DatePicker from '../components/DatePicker.jsx'
 import { todayISO } from '../lib/date.js'
 
 const DAY_START_MIN = 8 * 60
@@ -11,6 +15,7 @@ const SLOT_MIN = 30
 const TOTAL_SLOTS = (DAY_END_MIN - DAY_START_MIN) / SLOT_MIN
 const CELL_PX = 40
 const ROOM_SIZE_PX = 210
+const ROOM_COL_PX = 320
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 const CARD_COLORS = ['#F2542D', '#3E7CB1', '#2E8B57', '#8E44AD', '#D6497A', '#B7950B', '#16A085', '#C0392B']
 
@@ -52,6 +57,9 @@ const BookingModal = ({ draft, groups, rooms, t, onSave, onUnassign, onClose, on
 
   const submit = async (e) => {
     e.preventDefault()
+    // Select/TimePicker/DatePicker below replace native <select>/<input required> fields, which lets
+    // a required-but-empty value slip past HTML5's own validation - guard here instead
+    if (!groupId || !roomId) return
     const durationMinutes = timeToMinutes(endTime) - timeToMinutes(startTime)
     if (durationMinutes <= 0) return
     await onSave({
@@ -74,28 +82,25 @@ const BookingModal = ({ draft, groups, rooms, t, onSave, onUnassign, onClose, on
             {groupLabel(groups.find(g => g._id === groupId) || {})}
           </div>
         ) : (
-          <select value={groupId} onChange={e => setGroupId(e.target.value)} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required>
-            <option value=''>{t('selectGroupLabel')}</option>
-            {availableGroups.map(g => <option key={g._id} value={g._id}>{groupLabel(g)}</option>)}
-          </select>
+          <Select value={groupId} onChange={setGroupId} placeholder={t('selectGroupLabel')}
+            options={availableGroups.map(g => ({ value: g._id, label: groupLabel(g) }))} />
         )}
 
-        <select value={roomId} onChange={e => setRoomId(e.target.value)} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required>
-          <option value=''>{t('roomLabel')}</option>
-          {rooms.map(r => <option key={r._id} value={r._id}>{r.name}</option>)}
-        </select>
+        <Select value={roomId} onChange={setRoomId} placeholder={t('roomLabel')}
+          options={rooms.map(r => ({ value: r._id, label: r.name }))} />
 
-        <select value={schedulePattern} onChange={e => setSchedulePattern(e.target.value)} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm'>
-          <option value='MON_WED_FRI'>{t('oddDaysTab')}</option>
-          <option value='TUE_THU_SAT'>{t('evenDaysTab')}</option>
-          <option value='CUSTOM'>{t('otherDaysTab')}</option>
-        </select>
+        <Select value={schedulePattern} onChange={setSchedulePattern}
+          options={[
+            { value: 'MON_WED_FRI', label: t('oddDaysTab') },
+            { value: 'TUE_THU_SAT', label: t('evenDaysTab') },
+            { value: 'CUSTOM', label: t('otherDaysTab') },
+          ]} />
 
         {schedulePattern === 'CUSTOM' && (
           <div className='flex gap-1 flex-wrap'>
             {WEEKDAY_KEYS.map((key, idx) => (
               <button type='button' key={key} onClick={() => toggleCustomDay(idx)}
-                className={`px-2 py-1 rounded-lg text-xs font-medium ${customDays.includes(idx) ? 'bg-accent text-white' : 'bg-bg border border-hairline text-muted'}`}>
+                className={`px-2 py-1 rounded-lg text-xs font-medium ${customDays.includes(idx) ? 'bg-accent text-white dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10' : 'bg-bg border border-hairline text-muted'}`}>
                 {t('weekday_' + key)}
               </button>
             ))}
@@ -105,26 +110,26 @@ const BookingModal = ({ draft, groups, rooms, t, onSave, onUnassign, onClose, on
         <div className='flex gap-2'>
           <div className='flex-1'>
             <p className='text-muted text-xs mb-1'>{t('startTimeLabel')}</p>
-            <input type='time' step='1800' value={startTime} onChange={e => setStartTime(e.target.value)} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+            <TimePicker value={startTime} onChange={setStartTime} />
           </div>
           <div className='flex-1'>
             <p className='text-muted text-xs mb-1'>{t('endTimeLabel')}</p>
-            <input type='time' step='1800' value={endTime} onChange={e => setEndTime(e.target.value)} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+            <TimePicker value={endTime} onChange={setEndTime} />
           </div>
         </div>
 
         <div className='flex gap-2'>
           <div className='flex-1'>
             <p className='text-muted text-xs mb-1'>{t('courseStartDateLabel')}</p>
-            <input type='date' value={startDate} onChange={e => setStartDate(e.target.value)} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+            <DatePicker value={startDate} onChange={setStartDate} />
           </div>
           <div className='flex-1'>
             <p className='text-muted text-xs mb-1'>{t('courseEndDateLabel')}</p>
-            <input type='date' value={endDate} onChange={e => setEndDate(e.target.value)} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+            <DatePicker value={endDate} onChange={setEndDate} />
           </div>
         </div>
 
-        <button type='submit' className='py-2 rounded-lg bg-accent text-white text-sm font-medium'>{t('save')}</button>
+        <button type='submit' className='py-2 rounded-lg bg-accent text-white text-sm font-medium dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10'>{t('save')}</button>
         {isEditing && (
           <div className='flex gap-2'>
             <button type='button' onClick={() => onGoToGroup(groupId)} className='flex-1 py-2 rounded-lg bg-bg-elevated border border-hairline text-ink text-sm'>{t('goToGroupBtn')}</button>
@@ -245,11 +250,10 @@ const Timetable = () => {
   return (
     <div>
       <div className='flex justify-between items-center mb-4 flex-wrap gap-2'>
-        <div className='flex gap-2'>
+        <div className='flex gap-1 bg-bg-elevated border border-hairline rounded-lg p-1'>
           {[['MON_WED_FRI', 'oddDaysTab'], ['TUE_THU_SAT', 'evenDaysTab'], ['CUSTOM', 'otherDaysTab']].map(([value, key]) => (
             <button key={value} onClick={() => setDayFilter(value)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-1.5 ${dayFilter === value ? 'bg-accent-soft text-accent' : 'bg-bg-elevated border border-hairline text-muted'}`}>
-              {dayFilter === value && <span className='w-1.5 h-1.5 rounded-full bg-green-500' />}
+              className={`plain px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${dayFilter === value ? 'bg-slate-100 dark:bg-slate-800/40 text-[#1D1D1F] dark:text-[#F8FAFC] font-semibold' : 'text-slate-500 dark:text-[#94A3B8] hover:text-[#1D1D1F] dark:hover:text-[#F8FAFC]'}`}>
               {t(key)}
             </button>
           ))}
@@ -258,10 +262,12 @@ const Timetable = () => {
         <p className='font-display text-xl text-ink'>{t('navTimetable')}</p>
 
         <div className='flex gap-2 items-center'>
-          <button onClick={() => setShowRooms(true)} className='px-3 py-1.5 rounded-lg bg-bg-elevated border border-hairline text-muted text-sm font-medium'>{t('manageRoomsBtn')}</button>
-          <button onClick={() => setVertical(v => !v)} className='flex items-center gap-2 px-3 py-1.5 rounded-lg bg-bg-elevated border border-hairline text-sm font-medium text-ink'>
+          <button onClick={() => setShowRooms(true)} className='px-3 py-1.5 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-sm font-medium flex items-center gap-2 transition-colors dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200 dark:border-none'>
+            <Sliders size={14} /> {t('manageRoomsBtn')}
+          </button>
+          <button onClick={() => setVertical(v => !v)} className='flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-sm font-medium transition-colors dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200 dark:border-none'>
             {t('verticalToggleLabel')}
-            <span className={`w-8 h-4 rounded-full relative transition-colors ${vertical ? 'bg-green-500' : 'bg-red-400'}`}>
+            <span className={`w-8 h-4 rounded-full relative transition-colors ${vertical ? 'bg-accent dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10' : 'bg-slate-300'}`}>
               <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${vertical ? 'left-4' : 'left-0.5'}`} />
             </span>
           </button>
@@ -271,29 +277,29 @@ const Timetable = () => {
       {rooms.length === 0 ? (
         <p className='text-muted'>{t('noRoomsYet')}</p>
       ) : (
-        <div ref={scrollRef} className='bg-bg-elevated border border-hairline rounded-2xl overflow-auto' style={{ maxHeight: '75vh' }}>
+        <div ref={scrollRef} className='slim-scrollbar w-full bg-white dark:bg-[#161F30] border border-slate-100 dark:border-slate-800/80 rounded-xl shadow-sm overflow-auto' style={{ maxHeight: '75vh' }}>
           {vertical ? (
-            <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${rooms.length}, ${ROOM_SIZE_PX}px)` }}>
-              <div className='sticky top-0 left-0 z-30 bg-bg-elevated border-b border-r border-hairline' />
+            <div style={{ display: 'grid', gridTemplateColumns: `60px repeat(${rooms.length}, ${ROOM_COL_PX}px)`, width: `${60 + rooms.length * ROOM_COL_PX}px` }}>
+              <div className='sticky top-0 left-0 z-30 bg-slate-50/50 dark:bg-slate-800/40 border-b border-r border-slate-100 dark:border-slate-800/80' />
               {rooms.map(room => (
-                <div key={room._id} className='sticky top-0 z-20 bg-bg-elevated border-b border-hairline px-2 py-2 text-sm font-medium text-ink text-center'>
+                <div key={room._id} className='sticky top-0 z-20 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800/80 px-2 py-2.5 text-sm font-semibold text-slate-700 dark:text-slate-300 text-center'>
                   {room.name}
                 </div>
               ))}
 
-              <div className='sticky left-0 z-20 bg-bg-elevated border-r border-hairline'>
+              <div className='sticky left-0 z-20 bg-white dark:bg-[#161F30] border-r border-slate-100 dark:border-slate-800/80'>
                 {TIME_LABELS.map(time => (
-                  <div key={time} style={{ height: CELL_PX }} className='text-[10px] text-muted font-mono flex items-start justify-end pr-1 border-b border-hairline/50'>{time}</div>
+                  <div key={time} style={{ height: CELL_PX }} className='text-xs text-slate-500 dark:text-[#94A3B8] font-medium flex items-start justify-end pr-2 pt-0.5 border-b border-slate-100 dark:border-slate-800/80'>{time}</div>
                 ))}
               </div>
 
               {rooms.map(room => (
                 <div key={room._id} onDragOver={e => e.preventDefault()} onDrop={e => handleDrop(e, room._id)}
-                  style={{ position: 'relative', height: trackSizePx }} className='border-r border-hairline'>
+                  style={{ position: 'relative', height: trackSizePx }} className='border-r border-slate-100 dark:border-slate-800/80'>
                   {TIME_LABELS.map((time, i) => (
                     <button key={time} onClick={() => openCreate(room._id, time)}
                       style={{ position: 'absolute', top: i * CELL_PX, left: 0, right: 0, height: CELL_PX, zIndex: 0 }}
-                      className='border-b border-hairline/50 hover:bg-accent-soft/40' />
+                      className='plain border-b border-slate-100 dark:border-slate-800/80 hover:bg-blue-50/40 dark:hover:bg-blue-500/10' />
                   ))}
                   {visibleGroups.filter(g => String(g.roomId?._id || g.roomId) === String(room._id)).map(g => (
                     <GroupCard key={g._id} group={g} vertical={vertical} onClick={openEdit}
@@ -304,22 +310,22 @@ const Timetable = () => {
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateRows: `40px repeat(${rooms.length}, ${ROOM_SIZE_PX}px)`, gridTemplateColumns: `120px ${trackSizePx}px` }}>
-              <div className='sticky top-0 left-0 z-30 bg-bg-elevated border-b border-r border-hairline' />
-              <div className='sticky top-0 z-20 bg-bg-elevated border-b border-hairline flex' style={{ width: trackSizePx }}>
+              <div className='sticky top-0 left-0 z-30 bg-slate-50/50 dark:bg-slate-800/40 border-b border-r border-slate-100 dark:border-slate-800/80' />
+              <div className='sticky top-0 z-20 bg-slate-50/50 dark:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800/80 flex' style={{ width: trackSizePx }}>
                 {TIME_LABELS.map(time => (
-                  <div key={time} style={{ width: CELL_PX }} className='text-[10px] text-muted font-mono text-center border-r border-hairline/50 py-1'>{time}</div>
+                  <div key={time} style={{ width: CELL_PX }} className='text-xs text-slate-500 dark:text-[#94A3B8] font-medium text-center border-r border-slate-100 dark:border-slate-800/80 py-1'>{time}</div>
                 ))}
               </div>
 
               {rooms.map(room => (
                 <React.Fragment key={room._id}>
-                  <div className='sticky left-0 z-20 bg-bg-elevated border-r border-hairline px-2 py-2 text-sm font-medium text-ink flex items-center'>{room.name}</div>
+                  <div className='sticky left-0 z-20 bg-slate-50/50 dark:bg-slate-800/40 border-r border-slate-100 dark:border-slate-800/80 px-2 py-2 text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center'>{room.name}</div>
                   <div onDragOver={e => e.preventDefault()} onDrop={e => handleDrop(e, room._id)}
-                    style={{ position: 'relative', width: trackSizePx }} className='border-b border-hairline'>
+                    style={{ position: 'relative', width: trackSizePx }} className='border-b border-slate-100 dark:border-slate-800/80'>
                     {TIME_LABELS.map((time, i) => (
                       <button key={time} onClick={() => openCreate(room._id, time)}
                         style={{ position: 'absolute', left: i * CELL_PX, top: 0, bottom: 0, width: CELL_PX, zIndex: 0 }}
-                        className='border-r border-hairline/50 hover:bg-accent-soft/40' />
+                        className='plain border-r border-slate-100 dark:border-slate-800/80 hover:bg-blue-50/40 dark:hover:bg-blue-500/10' />
                     ))}
                     {visibleGroups.filter(g => String(g.roomId?._id || g.roomId) === String(room._id)).map(g => (
                       <GroupCard key={g._id} group={g} vertical={vertical} onClick={openEdit}

@@ -1,8 +1,10 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import Select from '../components/Select.jsx'
+import DatePicker from '../components/DatePicker.jsx'
 import { formatMoney, paymentMethodLabelKey, groupLabel } from '../lib/format.js'
-import { firstOfMonthISO, todayISO } from '../lib/date.js'
+import { firstOfMonthISO, todayISO, formatUTCDate, formatDateTime } from '../lib/date.js'
 
 const EXPENSE_METHOD_LABEL = { cash: 'expenseMethod_cash', card: 'expenseMethod_card', click: 'expenseMethod_click', bank_transfer: 'expenseMethod_bank_transfer', payme: 'expenseMethod_payme', apelsin: 'expenseMethod_apelsin' }
 
@@ -28,28 +30,28 @@ const BusinessLedger = ({ t }) => {
       <div className='flex flex-wrap gap-3 items-end mb-4'>
         <div>
           <p className='text-xs text-muted mb-1'>{t('dateFromLabel')}</p>
-          <input type='date' value={dateFrom} onChange={e => setDateFrom(e.target.value)} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+          <DatePicker value={dateFrom} onChange={setDateFrom} />
         </div>
         <div>
           <p className='text-xs text-muted mb-1'>{t('dateToLabel')}</p>
-          <input type='date' value={dateTo} onChange={e => setDateTo(e.target.value)} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+          <DatePicker value={dateTo} onChange={setDateTo} />
         </div>
       </div>
 
       {!data ? <p className='text-muted text-sm'>{t('loading')}</p> : (
         <>
-          <div className='grid grid-cols-4 gap-4 mb-4'>
+          <div className='grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4'>
             <div className='bg-bg rounded-xl p-3'>
               <p className='text-muted text-xs mb-1'>{t('openingBalanceLabel')}</p>
               <p className='font-mono text-ink'>{formatMoney(data.openingBalance)}</p>
             </div>
             <div className='bg-bg rounded-xl p-3'>
               <p className='text-muted text-xs mb-1'>{t('totalInLabel')}</p>
-              <p className='font-mono text-accent'>+{formatMoney(data.totalIn)}</p>
+              <p className='font-mono text-accent dark:text-[#818CF8]'>+{formatMoney(data.totalIn)}</p>
             </div>
             <div className='bg-bg rounded-xl p-3'>
               <p className='text-muted text-xs mb-1'>{t('totalOutLabel')}</p>
-              <p className='font-mono text-red-500'>-{formatMoney(data.totalOut)}</p>
+              <p className='font-mono text-red-500 dark:text-rose-400'>-{formatMoney(data.totalOut)}</p>
             </div>
             <div className='bg-bg rounded-xl p-3'>
               <p className='text-muted text-xs mb-1'>{t('closingBalanceLabel')}</p>
@@ -58,10 +60,10 @@ const BusinessLedger = ({ t }) => {
           </div>
 
           <p className='text-ink font-medium mb-2'>{t('paymentMethodAccountsTitle')}</p>
-          <div className='grid grid-cols-3 md:grid-cols-6 gap-3 mb-4'>
+          <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4'>
             {data.byMethod.map(m => (
               <button key={m.method} onClick={() => toggleMethodFilter(m.method)}
-                className={`text-left rounded-xl p-3 ${methodFilter === m.method ? 'bg-accent text-white' : 'bg-bg text-ink'}`}>
+                className={`text-left rounded-xl p-3 ${methodFilter === m.method ? 'bg-accent text-white dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10' : 'bg-bg text-ink'}`}>
                 <p className={`text-xs mb-1 ${methodFilter === m.method ? 'text-white/80' : 'text-muted'}`}>{methodLabel(m.method)}</p>
                 <p className='font-mono text-sm'>{formatMoney(m.balance)}</p>
               </button>
@@ -69,7 +71,7 @@ const BusinessLedger = ({ t }) => {
           </div>
 
           {methodFilter && (
-            <p className='text-muted text-xs mb-2'>{t('methodHistoryHint', { method: methodLabel(methodFilter) })} <button onClick={() => setMethodFilter(null)} className='text-accent'>{t('clearFilters')}</button></p>
+            <p className='text-muted text-xs mb-2'>{t('methodHistoryHint', { method: methodLabel(methodFilter) })} <button onClick={() => setMethodFilter(null)} className='text-accent dark:text-[#818CF8]'>{t('clearFilters')}</button></p>
           )}
 
           <div className='overflow-x-auto'>
@@ -87,9 +89,9 @@ const BusinessLedger = ({ t }) => {
               <tbody>
                 {visibleEntries.map((e, i) => (
                   <tr key={i} className='border-b border-hairline last:border-0'>
-                    <td className='px-3 py-2.5 text-muted whitespace-nowrap'>{new Date(e.date).toLocaleDateString()}</td>
+                    <td className='px-3 py-2.5 text-muted whitespace-nowrap'>{formatDateTime(e.date)}</td>
                     <td className='px-3 py-2.5'>
-                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${e.type === 'credit' ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>
+                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${e.type === 'credit' ? 'bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]' : 'bg-hairline text-muted'}`}>
                         {e.type === 'credit' ? t('creditType') : t('debitType')}
                       </span>
                     </td>
@@ -100,7 +102,7 @@ const BusinessLedger = ({ t }) => {
                       {e.type === 'debit' && e.teacherName && ` · ${e.teacherName}`}
                       {e.method && ` · ${t(e.type === 'credit' ? paymentMethodLabelKey(e.method) : (EXPENSE_METHOD_LABEL[e.method] || e.method))}`}
                     </td>
-                    <td className={`px-3 py-2.5 text-right font-mono ${e.type === 'credit' ? 'text-accent' : 'text-red-500'}`}>
+                    <td className={`px-3 py-2.5 text-right font-mono ${e.type === 'credit' ? 'text-accent dark:text-[#818CF8]' : 'text-red-500 dark:text-rose-400'}`}>
                       {e.type === 'credit' ? '+' : '-'}{formatMoney(e.amount)}
                     </td>
                     <td className='px-3 py-2.5 text-right font-mono text-ink'>{formatMoney(e.balanceAfter)}</td>
@@ -119,8 +121,8 @@ const BusinessLedger = ({ t }) => {
 }
 
 const STATUS_STYLE = {
-  owes: 'bg-red-500/10 text-red-600',
-  credit: 'bg-accent-soft text-accent',
+  owes: 'bg-red-500/10 text-red-600 dark:bg-red-500/10 dark:text-red-400',
+  credit: 'bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]',
   settled: 'bg-hairline text-muted',
 }
 
@@ -156,25 +158,30 @@ const CourseStatement = ({ course, onDeletePayment, t }) => (
           </tr>
         </thead>
         <tbody>
-          {course.entries.map((e, i) => (
+          {/* a discount is deliberately invisible everywhere outside the student's own profile
+              (confirmed spec) - it still settles the balance the entries below already reflect
+              (balanceAfter accounts for it), it just never appears as its own row here */}
+          {course.entries.filter(e => e.kind !== 'discount').map((e, i) => (
             <tr key={i} className='border-b border-hairline last:border-0'>
-              <td className='px-3 py-2.5 text-muted'>{new Date(e.date).toLocaleDateString()}</td>
+              <td className='px-3 py-2.5 text-muted whitespace-nowrap'>{formatDateTime(e.date)}</td>
               <td className='px-3 py-2.5'>
-                <span className={`text-xs font-medium px-2 py-1 rounded-full ${e.type === 'credit' ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>
+                <span className={`text-xs font-medium px-2 py-1 rounded-full ${e.type === 'credit' ? 'bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]' : 'bg-hairline text-muted'}`}>
                   {e.type === 'credit' ? t('creditType') : t('debitType')}
                 </span>
               </td>
               <td className='px-3 py-2.5 text-ink text-xs'>
-                {e.type === 'credit'
-                  ? `${t(paymentMethodLabelKey(e.method))}${e.refunded ? ` · ${t('refundedBadge')}` : e.refundedAmount > 0 ? ` · ${t('refundedAmountHint', { amount: formatMoney(e.refundedAmount) })}` : ''}`
-                  : `${new Date(e.periodStart).toLocaleDateString()}–${new Date(e.periodEnd).toLocaleDateString()}`}
+                {e.kind === 'debt_reversal'
+                  ? t('unusedDaysReturnedBasis', { period: `${formatUTCDate(e.periodStart)}–${formatUTCDate(e.periodEnd)}` })
+                  : e.type === 'credit'
+                    ? `${t(paymentMethodLabelKey(e.method))}${e.refunded ? ` · ${t('refundedBadge')}` : e.refundedAmount > 0 ? ` · ${t('refundedAmountHint', { amount: formatMoney(e.refundedAmount) })}` : ''}`
+                    : `${formatUTCDate(e.periodStart)}–${formatUTCDate(e.periodEnd)}`}
               </td>
-              <td className={`px-3 py-2.5 text-right font-mono ${e.type === 'credit' ? 'text-accent' : 'text-red-500'}`}>
+              <td className={`px-3 py-2.5 text-right font-mono ${e.type === 'credit' ? 'text-accent dark:text-[#818CF8]' : 'text-red-500 dark:text-rose-400'}`}>
                 {e.type === 'credit' ? '+' : '-'}{formatMoney(e.amount)}
               </td>
               <td className='px-3 py-2.5 text-right font-mono text-ink'>{formatMoney(e.balanceAfter)}</td>
               <td className='px-3 py-2.5 text-right no-print'>
-                {e.type === 'credit' && (
+                {e.paymentId && (
                   <button onClick={() => onDeletePayment(e.paymentId)} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>
                     {t('deleteBtn')}
                   </button>
@@ -182,21 +189,8 @@ const CourseStatement = ({ course, onDeletePayment, t }) => (
               </td>
             </tr>
           ))}
-          {course.entries.length === 0 && (
+          {course.entries.filter(e => e.kind !== 'discount').length === 0 && (
             <tr><td colSpan={6} className='px-3 py-6 text-center text-muted'>{t('noLedgerEntriesYet')}</td></tr>
-          )}
-          {course.pendingCharge && (
-            <tr className='bg-red-500/5'>
-              <td className='px-3 py-2.5 text-muted'>{new Date(course.pendingCharge.periodStart).toLocaleDateString()}</td>
-              <td className='px-3 py-2.5'><span className='text-xs font-medium px-2 py-1 rounded-full bg-red-500/10 text-red-600'>{t('pendingType')}</span></td>
-              <td className='px-3 py-2.5 text-ink text-xs'>
-                {new Date(course.pendingCharge.periodStart).toLocaleDateString()}–{new Date(course.pendingCharge.periodEnd).toLocaleDateString()}
-                {' '}{t('daysOfLabel', { days: course.pendingCharge.daysRemaining, total: course.pendingCharge.daysInMonth })}
-              </td>
-              <td className='px-3 py-2.5 text-right font-mono text-red-500'>-{formatMoney(course.pendingCharge.amount)}</td>
-              <td className='px-3 py-2.5 text-right font-mono text-red-500'>{course.pendingCharge.amountStillNeeded > 0 ? `-${formatMoney(course.pendingCharge.amountStillNeeded)}` : formatMoney(0)}</td>
-              <td className='px-3 py-2.5'></td>
-            </tr>
           )}
         </tbody>
       </table>
@@ -259,15 +253,15 @@ const Ledger = () => {
       <BusinessLedger t={t} />
 
       {/* ==== Student Statement (лицевой счёт) ==== */}
-      <div className='grid grid-cols-3 gap-6 mb-8'>
-        <div className='col-span-1 bg-bg-elevated border border-hairline rounded-2xl p-4 max-h-[60vh] overflow-y-auto'>
+      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8'>
+        <div className='lg:col-span-1 bg-bg-elevated border border-hairline rounded-2xl p-4 max-h-[60vh] overflow-y-auto'>
           <p className='text-ink font-medium mb-2'>{t('statementSectionTitle')}</p>
           <input value={studentSearch} onChange={e => setStudentSearch(e.target.value)} placeholder={t('searchByNameOrPhone')}
             className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm mb-3' />
           <div className='flex flex-col gap-2'>
             {filteredStudents.map(s => (
               <button key={s._id} onClick={() => openStatement(s._id)}
-                className={`text-left px-3 py-2.5 rounded-lg text-sm font-medium ${statementStudentId === s._id ? 'bg-accent-soft text-accent' : 'bg-bg border border-hairline text-ink'}`}>
+                className={`text-left px-3 py-2.5 rounded-lg text-sm font-medium ${statementStudentId === s._id ? 'bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]' : 'bg-bg border border-hairline text-ink'}`}>
                 {s.name}
               </button>
             ))}
@@ -275,7 +269,7 @@ const Ledger = () => {
           </div>
         </div>
 
-        <div className='col-span-2'>
+        <div className='lg:col-span-2'>
           {!statementStudentId ? (
             <p className='text-muted text-sm'>{t('selectPersonHint')}</p>
           ) : loadingStatement || !statement ? (
@@ -297,32 +291,28 @@ const Ledger = () => {
           <div className='flex gap-2'>
             {[['student', 'scopeStudent'], ['group', 'scopeGroup'], ['branch', 'scopeBranch']].map(([key, labelKey]) => (
               <button key={key} onClick={() => setScope(key)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${scope === key ? 'bg-accent text-white' : 'bg-bg border border-hairline text-muted'}`}>
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${scope === key ? 'bg-accent text-white dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10' : 'bg-bg border border-hairline text-muted'}`}>
                 {t(labelKey)}
               </button>
             ))}
           </div>
           {scope === 'student' && (
-            <select value={reconStudentId} onChange={e => setReconStudentId(e.target.value)} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm'>
-              <option value=''>{t('selectStudent')}</option>
-              {students.map(s => <option key={s._id} value={s._id}>{s.name}</option>)}
-            </select>
+            <Select className='w-48' value={reconStudentId} onChange={setReconStudentId} placeholder={t('selectStudent')}
+              options={[{ value: '', label: t('selectStudent') }, ...students.map(s => ({ value: s._id, label: s.name }))]} />
           )}
           {scope === 'group' && (
-            <select value={reconGroupId} onChange={e => setReconGroupId(e.target.value)} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm'>
-              <option value=''>{t('selectGroupLabel')}</option>
-              {groups.map(g => <option key={g._id} value={g._id}>{groupLabel(g)}{g.name ? ` (${g.languageId?.name} · ${g.levelId?.name} · ${g.teacherId?.name})` : ` · ${g.teacherId?.name}`}</option>)}
-            </select>
+            <Select className='w-48' value={reconGroupId} onChange={setReconGroupId} placeholder={t('selectGroupLabel')}
+              options={[{ value: '', label: t('selectGroupLabel') }, ...groups.map(g => ({ value: g._id, label: `${groupLabel(g)}${g.name ? ` (${g.languageId?.name} · ${g.levelId?.name} · ${g.teacherId?.name})` : ` · ${g.teacherId?.name}` }` }))]} />
           )}
           <div>
             <p className='text-xs text-muted mb-1'>{t('dateFromLabel')}</p>
-            <input type='date' value={dateFrom} onChange={e => setDateFrom(e.target.value)} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+            <DatePicker value={dateFrom} onChange={setDateFrom} />
           </div>
           <div>
             <p className='text-xs text-muted mb-1'>{t('dateToLabel')}</p>
-            <input type='date' value={dateTo} onChange={e => setDateTo(e.target.value)} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+            <DatePicker value={dateTo} onChange={setDateTo} />
           </div>
-          <button onClick={runReconciliation} className='px-5 py-2 rounded-lg bg-[#F2542D] text-white text-sm font-medium'>{t('runReconciliationBtn')}</button>
+          <button onClick={runReconciliation} className='px-5 py-2 rounded-lg bg-accent text-white dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-sm font-medium transition-colors'>{t('runReconciliationBtn')}</button>
           {reconciliation && (
             <button onClick={() => window.print()} className='px-4 py-2 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('printBtn')}</button>
           )}
@@ -334,18 +324,18 @@ const Ledger = () => {
           <div className='print-area'>
             <p className='text-muted text-xs mb-3'>{t('reconciliationPeriodLabel', { from: dateFrom, to: dateTo })}</p>
 
-            <div className='grid grid-cols-4 gap-4 mb-4'>
+            <div className='grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4'>
               <div className='bg-bg rounded-xl p-3'>
                 <p className='text-muted text-xs mb-1'>{t('openingBalanceLabel')}</p>
                 <p className='font-mono text-ink'>{formatMoney(reconciliation.totals.openingBalance)}</p>
               </div>
               <div className='bg-bg rounded-xl p-3'>
                 <p className='text-muted text-xs mb-1'>{t('totalChargesLabel')}</p>
-                <p className='font-mono text-red-500'>-{formatMoney(reconciliation.totals.charges)}</p>
+                <p className='font-mono text-red-500 dark:text-rose-400'>-{formatMoney(reconciliation.totals.charges)}</p>
               </div>
               <div className='bg-bg rounded-xl p-3'>
                 <p className='text-muted text-xs mb-1'>{t('totalPaymentsAmount')}</p>
-                <p className='font-mono text-accent'>+{formatMoney(reconciliation.totals.payments)}</p>
+                <p className='font-mono text-accent dark:text-[#818CF8]'>+{formatMoney(reconciliation.totals.payments)}</p>
               </div>
               <div className='bg-bg rounded-xl p-3'>
                 <p className='text-muted text-xs mb-1'>{t('closingBalanceLabel')}</p>
@@ -354,7 +344,7 @@ const Ledger = () => {
             </div>
 
             {reconciliation.totals.owed > 0 && (
-              <p className='text-red-600 text-sm font-medium mb-3'>{t('discrepancyWarning', { amount: formatMoney(reconciliation.totals.owed) })}</p>
+              <p className='text-red-600 dark:text-red-400 text-sm font-medium mb-3'>{t('discrepancyWarning', { amount: formatMoney(reconciliation.totals.owed) })}</p>
             )}
 
             {reconciliation.groupRevenue && (
@@ -362,12 +352,12 @@ const Ledger = () => {
                 <p className='text-ink font-medium mb-2'>{t('groupRevenueTitle')}</p>
                 <div className='flex justify-between text-sm mb-1'>
                   <span className='text-muted'>{t('collectedFromStudentsLabel')}</span>
-                  <span className='font-mono text-accent'>+{formatMoney(reconciliation.groupRevenue.totalRevenue)}</span>
+                  <span className='font-mono text-accent dark:text-[#818CF8]'>+{formatMoney(reconciliation.groupRevenue.totalRevenue)}</span>
                 </div>
                 {reconciliation.groupRevenue.teacherSalary && (
                   <div className='flex justify-between text-sm'>
                     <span className='text-muted'>{t('teacherSalaryLabel', { name: reconciliation.groupRevenue.teacherName })}</span>
-                    <span className='font-mono text-ink'>{formatMoney(reconciliation.groupRevenue.teacherSalary.total)}{reconciliation.groupRevenue.teacherSalary.paid ? ` · ${t('paidBadge')}` : ''}</span>
+                    <span className='font-mono text-ink'>{formatMoney(reconciliation.groupRevenue.teacherSalary.total)}{reconciliation.groupRevenue.teacherSalary.remaining <= 0 ? ` · ${t('paidBadge')}` : ''}</span>
                   </div>
                 )}
                 <p className='text-muted text-[11px] mt-2'>{t('groupRevenueNote')}</p>
@@ -393,11 +383,11 @@ const Ledger = () => {
                       <td className='px-3 py-2.5 text-ink'>{r.studentName}</td>
                       <td className='px-3 py-2.5 text-muted text-xs'>{r.levelId ? t('courseWithLevel') : t('noLevelYet')}</td>
                       <td className='px-3 py-2.5 text-right font-mono'>{formatMoney(r.openingBalance)}</td>
-                      <td className='px-3 py-2.5 text-right font-mono text-red-500'>-{formatMoney(r.charges)}</td>
-                      <td className='px-3 py-2.5 text-right font-mono text-accent'>+{formatMoney(r.payments)}</td>
+                      <td className='px-3 py-2.5 text-right font-mono text-red-500 dark:text-rose-400'>-{formatMoney(r.charges)}</td>
+                      <td className='px-3 py-2.5 text-right font-mono text-accent dark:text-[#818CF8]'>+{formatMoney(r.payments)}</td>
                       <td className='px-3 py-2.5 text-right font-mono'>{formatMoney(r.closingBalance)}</td>
                       <td className='px-3 py-2.5'>
-                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${r.discrepancy ? 'bg-red-500/10 text-red-600' : 'bg-accent-soft text-accent'}`}>
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full ${r.discrepancy ? 'bg-red-500/10 text-red-600 dark:bg-red-500/10 dark:text-red-400' : 'bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]'}`}>
                           {r.discrepancy ? t('discrepancyBadge', { amount: formatMoney(r.owed) }) : t('reconciledBadge')}
                         </span>
                       </td>

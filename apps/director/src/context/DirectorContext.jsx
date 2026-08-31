@@ -17,6 +17,7 @@ const DirectorContextProvider = (props) => {
     const [pricing, setPricing] = useState([])
     const [branches, setBranches] = useState([])
     const [languages, setLanguages] = useState([])
+    const [courseCategories, setCourseCategories] = useState([])
     const [levels, setLevels] = useState([])
     const [allGroups, setAllGroups] = useState([])
     const [settings, setSettings] = useState(false)
@@ -388,8 +389,7 @@ const DirectorContextProvider = (props) => {
             return true
         } catch (error) {
             const code = error.response?.data?.error
-            if (code === 'salary_already_paid') toast.error(t('salaryAlreadyPaidError'))
-            else toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError') : (code || t('couldNotPrepaySalary')))
+            toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError') : (code || t('couldNotPrepaySalary')))
             return false
         }
     }
@@ -511,6 +511,57 @@ const DirectorContextProvider = (props) => {
             return true
         } catch (error) {
             toast.error(error.response?.data?.error || t('couldNotDeleteCourse'))
+            return false
+        }
+    }
+
+    // ==== course tags (categories) - global managed list, attached to courses like tags ====
+    const getCourseCategories = async () => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/director/course-categories', authHeader)
+            setCourseCategories(data.categories)
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadTags'))
+        }
+    }
+
+    const createCourseCategory = async (name) => {
+        try {
+            await axios.post(backendUrl + '/api/director/course-categories', { name }, authHeader)
+            toast.success(t('tagAdded'))
+            getCourseCategories()
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'category_already_exists' ? t('tagAlreadyExists') : (code || t('couldNotAddTag')))
+            return false
+        }
+    }
+
+    const updateCourseCategory = async (id, name) => {
+        try {
+            await axios.put(backendUrl + '/api/director/course-categories/' + id, { name }, authHeader)
+            toast.success(t('tagUpdated'))
+            getCourseCategories()
+            getLanguages()
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'category_already_exists' ? t('tagAlreadyExists') : (code || t('couldNotUpdateTag')))
+            return false
+        }
+    }
+
+    const deleteCourseCategory = async (id) => {
+        if (!(await confirm(t('confirmDeleteTag')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/course-categories/' + id, authHeader)
+            toast.success(t('tagDeleted'))
+            getCourseCategories()
+            getLanguages()
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteTag'))
             return false
         }
     }
@@ -778,6 +829,7 @@ const DirectorContextProvider = (props) => {
         pricing, getPricing, upsertPricing, deletePricing,
         branches, getBranches, createBranch, updateBranch, deleteBranch, getTimetable,
         languages, getLanguages, createLanguage, updateLanguage, deleteLanguage,
+        courseCategories, getCourseCategories, createCourseCategory, updateCourseCategory, deleteCourseCategory,
         levels, getLevels, createLevel, updateLevel, deleteLevel, deleteLastLesson,
         getAttendanceOverview,
         settings, getSettings, updateSettings,

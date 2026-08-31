@@ -5,6 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>UniAcademy — Director</title>
 
+    <!-- applies the `dark` class before Tailwind's CSS even paints, so a returning user who
+         already chose dark mode never sees a flash of the light theme first. Light is ALWAYS the
+         default on a first visit (no stored choice yet) - deliberately does NOT check the device's
+         own OS/browser color-scheme preference (see admin app's ThemeContext saga: that silently
+         defaulted people into dark mode once before with no way to tell it wasn't a bug). Dark mode
+         here is strictly opt-in via the sidebar toggle. Kept in sync with ThemeContext.jsx, which
+         owns the class from here on once React mounts. -->
+    <script>
+      (function () {
+        try {
+          if (localStorage.getItem('uniacademy_director_dark_mode_v1') === 'dark') {
+            document.documentElement.classList.add('dark')
+          }
+        } catch (e) {}
+      })()
+    </script>
+
     <!-- installable as a home-screen app (Android/desktop native install prompt + iOS "Add to Home Screen") -->
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#4B4FE0" />
@@ -16,7 +33,10 @@
     <meta name="apple-mobile-web-app-title" content="UniAcademy" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://api.fontshare.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Clash Display is used ONLY for the "UniAcademy" wordmark (see components/Logo.jsx) -->
+    <link href="https://api.fontshare.com/v2/css?f[]=clash-display@600&display=swap" rel="stylesheet">
   </head>
   <body>
     <div id="root"></div>

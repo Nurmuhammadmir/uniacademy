@@ -9,50 +9,74 @@ body { @apply bg-bg text-ink font-body; }
    the pre-JS/first-paint fallback so tailwind.config.js's accent/accent-soft (which now resolve to
    var(--accent)/var(--accent-soft)) always have a value even before theme.js's module-load effect runs. */
 :root {
-  --accent: #2F6FED;
-  --accent-soft: #E4ECFD;
+  --accent: #0066CC;
+  --accent-soft: #E5F1FB;
 }
 
-/* subtle "raised" 3D depth for buttons and cards across the whole app - buttons lift off the page
-   and press down on tap, cards/panels get a soft ambient shadow instead of sitting flat. Every
-   button is also pill-shaped (rounded-full) with a gentle scale-up + brightness lift on hover - the
-   `button.rounded-*` selectors below beat a plain Tailwind rounding utility on specificity
-   (element+class always outranks class-alone) so this wins regardless of which rounded-* class a
-   given button already carries in its className, no !important needed. */
-button, [role="button"] {
-  border-radius: 9999px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+/* Light-mode values for the base surface/text tokens (bg/bg-elevated/bg-card/ink/muted/hairline -
+   tailwind.config.js points those classes at these variables instead of static hex). Matches the
+   "Pure Cupertino" palette exactly - only .dark below actually repaints anything. */
+:root {
+  --color-bg: #F5F5F7;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-card: #FFFFFF;
+  --color-ink: #1D1D1F;
+  --color-muted: #6E6E73;
+  --color-hairline: #D2D2D7;
+}
+
+/* Dark Mode - midnight blue-gray canvas with a velvety graphite surface for cards/sidebar/content,
+   one step lighter than the page so everything still visibly pops off the canvas (same logic as
+   the light theme's white-cards-on-#F5F5F7 contrast). Toggled by adding/removing this class on
+   <html> - see ThemeContext.jsx (state) and index.html's inline script (applies it before first
+   paint, defaulting to light unless the user has explicitly switched before). */
+.dark {
+  --color-bg: #0B0F19;
+  --color-bg-elevated: #161F30;
+  --color-bg-card: #161F30;
+  --color-ink: #F8FAFC;
+  --color-muted: #94A3B8;
+  --color-hairline: rgba(148, 163, 184, 0.2);
+}
+
+/* subtle "raised" depth is reserved for real call-to-action buttons - ones that carry their own
+   background color utility (bg-accent, bg-hairline, bg-red-500, etc) as an actual class token, not
+   merely a hover:/focus: variant of one. Plain inline actions (edit/delete/archive links in tables,
+   bare icon buttons) never carry a resting bg-* class in this codebase's convention, so scoping on
+   a bg- token tells the two apart without touching every button's className individually -
+   previously EVERY button/role=button got this treatment regardless of whether it was a real CTA or
+   a tiny text link, which read as noisy/unprofessional.
+   [class^="bg-"] / [class*=" bg-"] (start-of-string or preceded by a space) deliberately requires
+   "bg-" to start its own class TOKEN - a plain [class*="bg-"] substring match (an earlier version of
+   this rule) also matched "hover:bg-accent-soft/40" and similar hover-only variants, since "bg-" is
+   a substring of that token too, even though the button has no background at rest at all. That
+   false-matched a lot of buttons across the app (e.g. Timetable's empty grid-slot cells) into this
+   "raised CTA" treatment when they should have fallen into the plain-link bucket below.
+   Deliberately does NOT touch border-radius - every real button in this codebase already carries its
+   own rounded-lg/rounded-xl/etc utility, so it stays exactly as rounded as its own className says.
+   Forcing every one of them into a full rounded-full pill (the original version of this rule) made
+   every button read like a candy capsule instead of a normal, calm dashboard control; a soft shadow
+   plus a small hover lift is the "raised" cue on its own, no shape override needed. Also toned down
+   from the original (smaller scale delta, no extra active-state scale on top of the press-down) - a
+   subtle lift reads as polished, a big bounce reads as a toy. */
+button[class^="bg-"], button[class*=" bg-"], [role="button"][class^="bg-"], [role="button"][class*=" bg-"] {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.10), 0 1px 2px rgba(0, 0, 0, 0.06);
   transition: box-shadow 0.15s ease, transform 0.15s ease, filter 0.15s ease;
 }
-button.rounded-none, button.rounded-sm, button.rounded, button.rounded-md, button.rounded-lg, button.rounded-xl, button.rounded-2xl, button.rounded-3xl,
-[role="button"].rounded-none, [role="button"].rounded-sm, [role="button"].rounded, [role="button"].rounded-md, [role="button"].rounded-lg, [role="button"].rounded-xl, [role="button"].rounded-2xl, [role="button"].rounded-3xl {
-  border-radius: 9999px;
+button[class^="bg-"]:hover:not(:disabled), button[class*=" bg-"]:hover:not(:disabled),
+[role="button"][class^="bg-"]:hover:not(:disabled), [role="button"][class*=" bg-"]:hover:not(:disabled) {
+  transform: scale(1.02);
+  filter: brightness(1.05);
 }
-/* Timetable event cards (Timetable.jsx GroupCard) are exempt from the global pill-shaped button
-   rounding above - they need to read as normal moderately-rounded rectangular cards, not capsules.
-   Declared after the global rule (and with !important) so it wins regardless of selector order. */
-button.timetable-card {
-  border-radius: 0.5rem !important;
-}
-button:hover:not(:disabled), [role="button"]:hover:not(:disabled) {
-  transform: scale(1.05);
-  filter: brightness(1.08);
-}
-button:active, [role="button"]:active {
+button[class^="bg-"]:active, button[class*=" bg-"]:active,
+[role="button"][class^="bg-"]:active, [role="button"][class*=" bg-"]:active {
   box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08);
-  transform: translateY(1px) scale(1.03);
+  transform: translateY(1px);
 }
-button:disabled {
+button[class^="bg-"]:disabled, button[class*=" bg-"]:disabled,
+[role="button"][class^="bg-"]:disabled, [role="button"][class*=" bg-"]:disabled {
   box-shadow: none;
 }
-/* opt-out for buttons that exist purely for click-handling on what should visually read as plain
-   text/rows - drag handles, name-toggle wrappers, bare icon glyphs (Leads board: drag handles, the
-   lead-card name/phone/badge toggle, subgroup/column name-edit toggles, lock/delete/auto-intake
-   icons). These have no background of their own to justify the "raised pill button" look above, and
-   a rounded-full shadow silhouette traced around a tall multi-line text block makes its own padding
-   look inconsistent/cramped near the rounded ends even though the padding value itself never changed.
-   Declared after the base rule so it wins the specificity tie (button.plain has the same
-   element+class specificity as button.rounded-*, and source order breaks the tie). */
 button.plain, [role="button"].plain {
   border-radius: 0;
   box-shadow: none;
@@ -65,8 +89,30 @@ button.plain:active, [role="button"].plain:active {
   box-shadow: none;
   transform: none;
 }
+
+/* everything else (edit/delete/archive text links, bare icon buttons like the GroupDetails corner
+   icons) - no forced shape, no shadow, just a calm opacity fade so hover still reads as interactive
+   without any layout-shifting motion */
+button:not([class^="bg-"]):not([class*=" bg-"]), [role="button"]:not([class^="bg-"]):not([class*=" bg-"]) {
+  transition: opacity 0.15s ease;
+}
+button:not([class^="bg-"]):not([class*=" bg-"]):hover:not(:disabled), [role="button"]:not([class^="bg-"]):not([class*=" bg-"]):hover:not(:disabled) {
+  opacity: 0.7;
+}
+button:not([class^="bg-"]):not([class*=" bg-"]):disabled, [role="button"]:not([class^="bg-"]):not([class*=" bg-"]):disabled {
+  opacity: 0.4;
+}
 .bg-bg-elevated, .bg-bg-card {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+/* a shadow this faint would be invisible against a dark canvas - deepened so cards still visibly
+   lift off the page instead of relying on the bg/card color difference alone */
+.dark .bg-bg-elevated, .dark .bg-bg-card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.dark button[class^="bg-"], .dark button[class*=" bg-"],
+.dark [role="button"][class^="bg-"], .dark [role="button"][class*=" bg-"] {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 /* small visual gap between table rows so each row reads as a distinct block instead of running
@@ -85,7 +131,7 @@ table {
   border-spacing: 0 2px;
 }
 table td, table th {
-  border-bottom: 1px solid #E9E1D4;
+  border-bottom: 1px solid var(--color-hairline);
 }
 table tbody tr:last-child td {
   border-bottom: none;
@@ -95,6 +141,126 @@ table tbody tr:last-child td {
    nav, filter controls etc. and prints ONLY the `.print-area` content, full width. `.no-print`
    marks anything inside that area (the filter/scope controls) that still shouldn't print even
    though it's a sibling, not a descendant, of `.print-area` in the DOM. */
+/* thin, translucent scrollbar for wide-content areas (Timetable's room grid, etc) instead of the
+   OS's default thick scrollbar - `scrollbar-*` utilities need the tailwind-scrollbar plugin, which
+   isn't installed here, so this is the same look via plain CSS (webkit + Firefox properties). */
+.slim-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.slim-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.slim-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.slim-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 9999px;
+}
+.dark .slim-scrollbar {
+  scrollbar-color: #334155 transparent;
+}
+.dark .slim-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}
+
+/* fully hides the scrollbar (used for touch-swipe carousels like the Leads mobile board, where a
+   visible scrollbar track would fight the iOS-style snap-scroll paging feel) while keeping the
+   element scrollable by touch/trackpad/mouse-drag - not a Tailwind utility without a plugin, so
+   plain CSS instead. */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* react-day-picker (DatePicker.jsx) - fixed to the platform's one Cupertino royal-blue accent
+   (#0066CC) directly, rather than the per-profile accent-color picker (see ThemeColorControl.jsx),
+   so the calendar always matches the brand color regardless of whichever accent a given admin has
+   picked for their own profile. */
+.rdp-root {
+  --rdp-accent-color: #0066CC;
+  --rdp-accent-background-color: #E5F1FB;
+  /* compact, "glanced at for a second" size instead of react-day-picker's roomy desktop default -
+     see DatePicker.jsx's popover, which is capped at max-w-[280px] to match */
+  --rdp-day-width: 32px;
+  --rdp-day-height: 32px;
+  --rdp-day_button-width: 32px;
+  --rdp-day_button-height: 32px;
+  --rdp-nav-height: 2rem;
+  --rdp-nav_button-width: 1.75rem;
+  --rdp-nav_button-height: 1.75rem;
+  --rdp-weekday-padding: 0.25rem 0rem;
+}
+.rdp-month_caption {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1D1D1F;
+}
+.rdp-weekday {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6E6E73;
+  text-transform: none;
+}
+.rdp-day_button {
+  font-size: 12px;
+  border-radius: 9999px;
+}
+/* comes before .rdp-selected below in source order, at the same specificity - a selected day's own
+   hover state still wins the cascade and stays blue instead of flashing gray */
+.rdp-day_button:hover {
+  background-color: #f1f5f9;
+}
+.dark .rdp-day_button:hover {
+  background-color: #1e293b;
+}
+.rdp-selected .rdp-day_button {
+  background-color: #0066CC;
+  color: white;
+  border: none;
+  font-weight: 500;
+}
+.dark .rdp-selected .rdp-day_button {
+  background-color: #4F46E5;
+}
+/* today gets a thin ring instead of a filled circle, so it reads as "this is today" without
+   competing with the solid blue fill that means "this is selected" */
+.rdp-today:not(.rdp-selected) .rdp-day_button {
+  border: 1.5px solid #6E6E73;
+}
+.dark .rdp-root {
+  --rdp-accent-color: #4f46e5;
+  --rdp-accent-background-color: #1E1B4B;
+}
+.dark .rdp-month_caption {
+  color: #F8FAFC;
+}
+.dark .rdp-weekday {
+  color: #94A3B8;
+}
+.dark .rdp-day_button {
+  color: #F8FAFC;
+}
+.dark .rdp-today:not(.rdp-selected) .rdp-day_button {
+  border-color: #475569;
+}
+.dark .rdp-outside .rdp-day_button {
+  color: #475569;
+}
+
+@page {
+  /* zeroes the browser's own default page margin so content can start right at the printable
+     edge of a receipt-width page - the browser's own "Headers and footers" print-dialog option
+     (URL/date/page-number) is outside CSS's reach though; that has to be turned off once in the
+     print dialog itself (Chrome/Edge remember the setting after that) */
+  margin: 0;
+}
+
 @media print {
   body * {
     visibility: hidden;
@@ -107,8 +273,26 @@ table tbody tr:last-child td {
     left: 0;
     top: 0;
     width: 100%;
+    /* the on-screen preview (e.g. the receipt card) may cap itself to a fixed px width to look
+       right in a modal - printing must ignore that and fill whatever page width the OS printer
+       driver reports, since a receipt printer's roll width (58mm/80mm/etc) is a driver setting we
+       have no way to detect from CSS, not something this stylesheet should ever hardcode */
+    max-width: none !important;
+    box-shadow: none !important;
   }
   .no-print {
     display: none !important;
   }
+}
+
+/* a receipt's torn/perforated paper edge - a row of small circular cutouts along the top and bottom
+   of the card. Uses a mask (not a background image) so it punches real transparency through the
+   element regardless of what's behind it - on screen that's the modal backdrop, on a printed page
+   it's just the blank paper, which is exactly the physical torn-edge look this is standing in for. */
+.receipt-scallop-edge {
+  height: 14px;
+  flex-shrink: 0;
+  background-color: #ffffff;
+  -webkit-mask: radial-gradient(circle at 7px 7px, transparent 7px, #000 7.3px) 0 0 / 14px 14px repeat-x;
+  mask: radial-gradient(circle at 7px 7px, transparent 7px, #000 7.3px) 0 0 / 14px 14px repeat-x;
 }

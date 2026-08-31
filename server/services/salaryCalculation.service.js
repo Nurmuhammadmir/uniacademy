@@ -2,10 +2,10 @@ import Group from "../models/Group.js"
 import User from "../models/User.js"
 import Expense from "../models/Expense.js"
 import TeacherAttendance from "../models/TeacherAttendance.js"
-import CoursePeriod from "../models/CoursePeriod.js"
 import { getScheduleDays } from "./scheduleDays.service.js"
 import { prorateByDateOverlap } from "./attribution.service.js"
-import { computeCourseStatement } from "./studentLedger.service.js"
+import { computeCoveredDebtPeriodsBatch } from "./billingCycle.service.js"
+import { SALARY_CATEGORY, PREPAYMENT_CATEGORY } from "./expenseCategories.service.js"
 
 // per_lesson/per_hour pay only counts a day if the teacher's group was actually scheduled to meet
 // AND the teacher actually checked themselves in that day (TeacherAttendance) - ties pay to real
@@ -25,57 +25,53 @@ const taughtLessonDates = (group, attendedDates, from, to) => {
     return dates
 }
 
-// three levels of specificity, most specific wins: a rate set for this exact teacher+group beats
-// one set for this teacher across all their groups, which beats the branch-wide default. This is
-// what lets one teacher earn, say, 30% from one group and a flat 500,000 from another - each group
-// is resolved and computed completely independently (see computeGroupContribution below).
-export const resolveRateForGroup = (teacherId, groupId, rates) => {
-    const groupOverride = rates.find(r => r.teacherId && String(r.teacherId) === String(teacherId) && r.groupId && String(r.groupId) === String(groupId))
+// four levels of specificity, most specific wins: a rate set for this exact teacher+group beats one
+// set for this exact teacher across all their groups/courses, which beats one set for this exact
+// course across every teacher who runs it, which beats the branch-wide default. This is what lets
+// one teacher earn, say, 30% from one group and a flat 500,000 from another, or a course like
+// "English" always pay 40% of revenue no matter who's teaching it that term - each group is resolved
+// and computed completely independently (see computeGroupContribution below).
+export const resolveRateForGroup = (teacherId, group, rates) => {
+    const groupOverride = rates.find(r => r.teacherId && String(r.teacherId) === String(teacherId) && r.groupId && String(r.groupId) === String(group._id))
     if (groupOverride) return groupOverride
-    const teacherOverride = rates.find(r => r.teacherId && String(r.teacherId) === String(teacherId) && !r.groupId)
+    const teacherOverride = rates.find(r => r.teacherId && String(r.teacherId) === String(teacherId) && !r.groupId && !r.languageId)
     if (teacherOverride) return teacherOverride
-    return rates.find(r => !r.teacherId && !r.groupId) || null
+    // group.languageId may be a populated {_id,name} object (getTeacherSalaryDetail's own groups
+    // query populates it) or a raw ObjectId (calculateSalaries' doesn't) - unwrap either way, the
+    // same populated-vs-raw mismatch that's bitten this codebase before
+    const groupLanguageId = group.languageId?._id || group.languageId
+    const courseOverride = rates.find(r => r.languageId && String(r.languageId) === String(groupLanguageId) && !r.teacherId && !r.groupId)
+    if (courseOverride) return courseOverride
+    return rates.find(r => !r.teacherId && !r.groupId && !r.languageId) || null
 }
 
-// sums CoursePeriod (each real billing period actually consumed) for ONE specific group - a
-// CoursePeriod is attributed to whichever teacher/group was active WHEN THAT SPECIFIC PERIOD was
-// consumed, so a student switching groups mid-course correctly splits revenue between the old and
-// new teacher/group instead of a lump payment freezing everything to whoever happened to be
-// teaching at the moment the money was originally paid. Each period's contribution is PRORATED to
-// just the days that fall inside [dateFrom, dateTo].
+// sums each debt period actually PAID (not merely charged) for ONE specific group - a period is
+// attributed to whichever teacher/group was active WHEN THAT SPECIFIC PERIOD was recognized, so a
+// student switching groups mid-course correctly splits revenue between the old and new
+// teacher/group instead of everything freezing to whoever happened to be teaching when the money
+// arrived. Cash-basis on purpose (confirmed - see computeCoveredDebtPeriodsBatch's own comment) - a
+// teacher's revenue share is only ever computed on money the business has actually collected. Each
+// period's contribution is PRORATED to just the days that fall inside [dateFrom, dateTo].
+// Batched (one User.find + computeCoveredDebtPeriodsBatch's own 2 queries, ALL for the whole group at
+// once) instead of doing those per student - this used to be ~3 DB round-trips per student in the
+// group, which added up fast across every group a branch runs.
 const computeRevenueForGroup = async (teacherId, group, dateFrom, dateTo) => {
-    const periods = await CoursePeriod.find({ teacherId, groupId: group._id, periodStart: { $lte: dateTo }, periodEnd: { $gte: dateFrom } })
-        .populate('studentId', 'name')
     let revenue = 0
     const entries = []
-    for (const p of periods) {
-        const amount = prorateByDateOverlap(p.amount, p.periodStart, p.periodEnd, dateFrom, dateTo)
-        if (amount <= 0) continue
-        revenue += amount
-        entries.push({
-            studentId: p.studentId?._id, studentName: p.studentId?.name, groupId: group._id,
-            periodStart: p.periodStart, periodEnd: p.periodEnd, amount, pending: false,
-        })
-    }
-
-    // ALSO counts each of THIS group's current members' unconsumed balance (real money already
-    // paid, just not yet enough to complete a full period) as a live, not-yet-committed period - so
-    // a small leftover from proration/rounding isn't invisible to commission just because it hasn't
-    // been converted into a real CoursePeriod yet. Reuses computeCourseStatement's pendingCharge
-    // (same math the accounting Ledger already shows) rather than re-deriving the proration formula.
+    const students = await User.find({ _id: { $in: group.studentIds } }).select('name').lean()
+    const nameByStudent = new Map(students.map(s => [String(s._id), s.name]))
+    const coveredByStudent = await computeCoveredDebtPeriodsBatch(group.studentIds, group.languageId)
     for (const studentId of group.studentIds) {
-        const statement = await computeCourseStatement(studentId, group.languageId)
-        const pending = statement?.pendingCharge
-        if (!pending) continue
-        const paidPortion = pending.amount - pending.amountStillNeeded
-        if (paidPortion <= 0) continue
-        const amount = prorateByDateOverlap(paidPortion, pending.periodStart, pending.periodEnd, dateFrom, dateTo)
-        if (amount > 0) {
+        const covered = coveredByStudent.get(String(studentId)) || []
+        for (const p of covered) {
+            if (String(p.teacherId) !== String(teacherId) || String(p.groupId) !== String(group._id)) continue
+            if (p.periodStart > dateTo || p.periodEnd < dateFrom) continue
+            const amount = prorateByDateOverlap(p.amount, p.periodStart, p.periodEnd, dateFrom, dateTo)
+            if (amount <= 0) continue
             revenue += amount
-            entries.push({ studentId, studentName: statement.studentName, groupId: group._id, periodStart: pending.periodStart, periodEnd: pending.periodEnd, amount, pending: true })
+            entries.push({ studentId, studentName: nameByStudent.get(String(studentId)), groupId: group._id, periodStart: p.periodStart, periodEnd: p.periodEnd, amount, pending: false })
         }
     }
-
     return { revenue, entries }
 }
 
@@ -98,7 +94,7 @@ const computeGroupContribution = async (teacher, group, rate, dateFrom, dateTo) 
         revenueEntries = entries
         total = Math.round(revenue * (rate.rateValue / 100))
     } else if (rate.rateType === 'per_lesson' || rate.rateType === 'per_hour') {
-        const attendanceRows = await TeacherAttendance.find({ teacherId: teacher._id, date: { $gte: dateFrom, $lte: dateTo } }).select('date')
+        const attendanceRows = await TeacherAttendance.find({ teacherId: teacher._id, date: { $gte: dateFrom, $lte: dateTo } }).select('date').lean()
         const attendedDates = new Set(attendanceRows.map(a => a.date.toISOString().slice(0, 10)))
         const dates = taughtLessonDates(group, attendedDates, dateFrom, dateTo)
         dates.forEach(date => lessonEntries.push({ date, groupId: group._id, language: group.languageId?.name, level: group.levelId?.name }))
@@ -122,7 +118,7 @@ const computeTeacherAcrossGroups = async (teacher, teacherGroups, rates, dateFro
     const lessonEntries = []
 
     for (const group of teacherGroups) {
-        const rate = resolveRateForGroup(teacher._id, group._id, rates)
+        const rate = resolveRateForGroup(teacher._id, group, rates)
         if (!rate) continue // no default/teacher/group rate resolves for this group - it contributes nothing, not an error
         const { total: groupTotal, revenueEntries: gRevenue, lessonEntries: gLessons } = await computeGroupContribution(teacher, group, rate, dateFrom, dateTo)
         total += groupTotal
@@ -146,30 +142,24 @@ export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
     const teachers = await User.find({
         role: 'teacher',
         $or: [{ branchId }, { additionalBranchIds: branchId }],
-    }).select('name')
+    }).select('name').lean()
 
-    const groups = await Group.find({ branchId })
+    const groups = await Group.find({ branchId }).lean()
 
-    // a teacher already paid for this exact date range shows as "paid" instead of a Pay button -
-    // approximated by checking for any salary expense recorded for them within this window
+    // everything already given to a teacher for this exact date range - a real payout AND any
+    // advance both count as "already paid" toward the same number, so the admin sees one simple
+    // figure (how much of the calculated total is still owed for this period) instead of a separate
+    // paid/prepaid distinction to reconcile in their head
     const existingPayouts = await Expense.find({
-        branchId, category: 'Salary', teacherId: { $in: teachers.map(t => t._id) },
+        branchId, category: { $in: [SALARY_CATEGORY, PREPAYMENT_CATEGORY] }, teacherId: { $in: teachers.map(t => t._id) },
         date: { $gte: dateFrom, $lte: dateTo },
     })
-    const paidTeacherIds = new Set(existingPayouts.map(e => String(e.teacherId)))
-
-    // any advance already given for this same period - shown as a warning before a real salary
-    // payout, and blocks a second prepayment once the real payout has happened (see paySalary's
-    // own comment for why the payout itself is always dated "today", same approximation this reuses)
-    const existingPrepayments = await Expense.find({
-        branchId, category: 'Prepayment', teacherId: { $in: teachers.map(t => t._id) },
-        date: { $gte: dateFrom, $lte: dateTo },
-    })
-    const prepaymentsByTeacher = {}
-    for (const e of existingPrepayments) {
+    const paidByTeacher = {}
+    for (const e of existingPayouts) {
         const key = String(e.teacherId)
-        if (!prepaymentsByTeacher[key]) prepaymentsByTeacher[key] = []
-        prepaymentsByTeacher[key].push({ amount: e.amount, date: e.date, method: e.method })
+        if (!paidByTeacher[key]) paidByTeacher[key] = { amount: 0, payments: [] }
+        paidByTeacher[key].amount += e.amount
+        paidByTeacher[key].payments.push({ amount: e.amount, date: e.date, method: e.method, category: e.category })
     }
 
     const results = []
@@ -183,11 +173,16 @@ export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
         const uniqueStudents = new Set()
         teacherGroups.forEach(g => g.studentIds.forEach(id => uniqueStudents.add(String(id))))
 
+        const paidInfo = paidByTeacher[String(teacher._id)] || { amount: 0, payments: [] }
+
         results.push({
             teacherId: teacher._id, name: teacher.name, groupCount: teacherGroups.length, studentCount: uniqueStudents.size,
             rateType, rateValue, total,
-            paid: paidTeacherIds.has(String(teacher._id)),
-            prepayments: prepaymentsByTeacher[String(teacher._id)] || [],
+            paidAmount: paidInfo.amount,
+            // always a live figure, never a locked-in one - if a student pays more after a payout
+            // already happened for this period, the next Hisoblang just shows the new gap directly
+            remaining: Math.max(0, total - paidInfo.amount),
+            payments: paidInfo.payments,
         })
     }
 
@@ -199,11 +194,11 @@ export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
 // single number. Reuses computeTeacherAcrossGroups (the exact same function calculateSalaries
 // calls) so this view's total can never drift from the one shown in the results table.
 export const getTeacherSalaryDetail = async (branchId, teacherId, rates, dateFrom, dateTo) => {
-    const teacher = await User.findById(teacherId).select('name')
+    const teacher = await User.findById(teacherId).select('name').lean()
     if (!teacher) return null
 
     const teacherGroups = await Group.find({ branchId, teacherId })
-        .populate('languageId', 'name').populate('levelId', 'name').populate('roomId', 'name')
+        .populate('languageId', 'name').populate('levelId', 'name').populate('roomId', 'name').lean()
     if (teacherGroups.length === 0) return null
 
     const { total, groupBreakdown, rateType, rateValue, revenueEntries, lessonEntries } = await computeTeacherAcrossGroups(teacher, teacherGroups, rates, dateFrom, dateTo)

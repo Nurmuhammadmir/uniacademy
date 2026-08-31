@@ -6,6 +6,14 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL
 // automatically, no code change needed. Falls back to the built-in placeholder mark until then.
 const EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp']
 
+// server.js serves /static with a 7-day maxAge (see server.js's comment on that route) - great for
+// vocab/reading photos that never change once uploaded, but it means a *replaced* logo file (same
+// filename, same extension) keeps getting served from the browser's own cache for up to 7 days with
+// no way to tell it's stale. Computed once per page load (not per render) so it still busts on every
+// navigation/refresh without defeating in-page caching for the multiple <Logo> instances a single
+// page can render (sidebar + login, etc all share this one value during the same load).
+const CACHE_BUST = Date.now()
+
 const PlaceholderMark = ({ size }) => (
   <svg width={size} height={size} viewBox='0 0 40 40' fill='none' xmlns='http://www.w3.org/2000/svg' style={{ filter: 'drop-shadow(0 2px 4px rgba(75,79,224,0.35))' }}>
     <defs>
@@ -29,7 +37,10 @@ const PlaceholderMark = ({ size }) => (
 )
 
 // the shared brand mark - reads server/public/logoUniacademy.<ext> so replacing that one file
-// updates the logo across all 5 apps at once, with no rebuild/deploy of app code required
+// updates the logo across all 6 apps at once, with no rebuild/deploy of app code required. The
+// wordmark deliberately uses Clash Display inline rather than the platform's own font-display
+// utility (Plus Jakarta Sans, see tailwind-preset) - Clash Display is reserved for the brand name
+// alone, not for section headings elsewhere in the UI.
 const Logo = ({ size = 32, withWordmark = true }) => {
   const [extIndex, setExtIndex] = useState(0)
   const [exhausted, setExhausted] = useState(false)
@@ -45,13 +56,13 @@ const Logo = ({ size = 32, withWordmark = true }) => {
         <PlaceholderMark size={size} />
       ) : (
         <img
-          src={`${backendUrl}/static/logoUniacademy.${EXTENSIONS[extIndex]}`}
+          src={`${backendUrl}/static/logoUniacademy.${EXTENSIONS[extIndex]}?v=${CACHE_BUST}`}
           alt='UniAcademy' width={size} height={size}
           style={{ objectFit: 'contain', borderRadius: 8 }}
           onError={handleError}
         />
       )}
-      {withWordmark && <span className='font-display text-lg text-ink leading-none'>UniAcademy</span>}
+      {withWordmark && <span className='text-lg text-ink leading-none' style={{ fontFamily: '"Clash Display", sans-serif' }}>UniAcademy</span>}
     </div>
   )
 }

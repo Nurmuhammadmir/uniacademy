@@ -1,9 +1,22 @@
 import React, { useContext, useMemo, useState } from 'react'
+import { Search, Plus } from 'lucide-react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
 import TeacherProfileModal from '../components/TeacherProfileModal.jsx'
 import PasswordInput from '../components/PasswordInput.jsx'
+
+const AVATAR_GRADIENTS = [
+  'from-[#FF6B6B] to-[#FF3B30]', 'from-[#FF9F43] to-[#FF9500]', 'from-[#34C759] to-[#30B94D]',
+  'from-[#5AC8FA] to-[#007AFF]', 'from-[#5E5CE6] to-[#4B4FE0]', 'from-[#BF5AF2] to-[#AF52DE]',
+  'from-[#FF7EB9] to-[#FF2D55]', 'from-[#64D2FF] to-[#32ADE6]',
+]
+const avatarGradient = (name) => {
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length]
+}
+const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
 
 const Teachers = () => {
   const { teachers, createTeacher, updateTeacher, deleteTeacherAccount, branches, getTeacherProfile } = useContext(DirectorContext)
@@ -55,26 +68,34 @@ const Teachers = () => {
 
   return (
     <div>
-      <div className='flex justify-between items-center mb-4'>
-        <p className='font-display text-2xl text-ink'>{t('teachersTitle')}</p>
-        <button onClick={() => setShowCreate(true)} className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium'>{t('addTeacher')}</button>
+      <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4'>
+        <div className='flex items-baseline gap-3'>
+          <p className='font-display text-2xl text-ink'>{t('teachersTitle')}</p>
+          <span className='text-sm font-medium text-muted'>{visibleTeachers.length}</span>
+        </div>
+        <button onClick={() => setShowCreate(true)} className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium flex items-center gap-1.5 shadow-sm transition-transform active:scale-95'>
+          <Plus size={14} /> {t('addTeacher')}
+        </button>
       </div>
 
-      <div className='flex gap-3 mb-4'>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('searchStudents')}
-          className='flex-1 max-w-sm px-4 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm' />
-        <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)} className='px-3 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm'>
+      <div className='flex flex-wrap gap-3 mb-4'>
+        <div className='relative flex-1 min-w-[10rem] max-w-sm'>
+          <Search size={16} strokeWidth={2} className='absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none' />
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('searchStudents')}
+            className='w-full pl-10 pr-4 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm focus:outline-none focus:ring-2 focus:ring-accent/30' />
+        </div>
+        <select value={branchFilter} onChange={e => setBranchFilter(e.target.value)} className='px-3 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm transition-colors hover:border-accent/30'>
           <option value=''>{t('anyBranch')}</option>
           {branches.map(b => <option key={b._id} value={b._id}>{b.name}</option>)}
         </select>
-        <select value={sortBy} onChange={e => setSortBy(e.target.value)} className='px-3 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm'>
+        <select value={sortBy} onChange={e => setSortBy(e.target.value)} className='px-3 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-sm transition-colors hover:border-accent/30'>
           <option value='students'>{t('mostStudentsFirst')}</option>
           <option value='recent'>{t('recentlyAddedFirst')}</option>
           <option value='name'>{t('nameAZ')}</option>
         </select>
       </div>
 
-      <div className='bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
+      <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden overflow-x-auto shadow-sm'>
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
@@ -88,17 +109,22 @@ const Teachers = () => {
           </thead>
           <tbody>
             {visibleTeachers.map(tc => (
-              <tr key={tc._id} className='border-b border-hairline last:border-0'>
+              <tr key={tc._id} className='border-b border-hairline last:border-0 transition-colors hover:bg-bg'>
                 <td className='px-5 py-4 text-ink'>
-                  <button onClick={() => setViewingId(tc._id)} className='hover:underline text-left'>{tc.name}</button>
+                  <button onClick={() => setViewingId(tc._id)} className='plain flex items-center gap-2.5 text-left'>
+                    <span className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGradient(tc.name)} flex items-center justify-center flex-shrink-0 text-white font-semibold text-[11px]`}>
+                      {initials(tc.name)}
+                    </span>
+                    <span className='font-medium hover:underline'>{tc.name}</span>
+                  </button>
                 </td>
                 <td className='px-5 py-4 text-muted font-mono'>{tc.phone}</td>
                 <td className='px-5 py-4 text-muted'>{tc.branchId?.name}</td>
-                <td className='px-5 py-4 font-mono text-accent'>{tc.activeStudentCount ?? 0}</td>
+                <td className='px-5 py-4 font-mono text-accent font-medium'>{tc.activeStudentCount ?? 0}</td>
                 <td className='px-5 py-4 text-muted text-xs'>{new Date(tc.createdAt).toLocaleDateString()}</td>
                 <td className='px-5 py-4 text-right whitespace-nowrap'>
-                  <button onClick={() => openEdit(tc)} className='text-accent text-xs font-medium mr-3'>{t('edit')}</button>
-                  <button onClick={() => deleteTeacherAccount(tc._id)} className='text-muted text-xs font-medium'>{t('remove')}</button>
+                  <button onClick={() => openEdit(tc)} className='text-accent text-xs font-medium mr-3 hover:opacity-70 transition-opacity'>{t('edit')}</button>
+                  <button onClick={() => deleteTeacherAccount(tc._id)} className='text-muted text-xs font-medium hover:text-rose-500 transition-colors'>{t('remove')}</button>
                 </td>
               </tr>
             ))}
@@ -107,6 +133,33 @@ const Teachers = () => {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className='block md:hidden flex flex-col gap-2.5'>
+        {visibleTeachers.length === 0 && (
+          <p className='text-muted text-sm text-center py-8'>{teachers.length === 0 ? t('noTeachersYet') : t('noTeachersMatchFilters')}</p>
+        )}
+        {visibleTeachers.map(tc => (
+          <div key={tc._id} className='bg-bg-elevated border border-hairline rounded-xl p-3.5 shadow-sm flex items-center gap-3'>
+            <button onClick={() => setViewingId(tc._id)} className={`plain w-11 h-11 rounded-full bg-gradient-to-br ${avatarGradient(tc.name)} flex items-center justify-center flex-shrink-0 text-white font-semibold text-sm shadow-sm`}>
+              {initials(tc.name)}
+            </button>
+            <div className='min-w-0 flex-1'>
+              <div className='flex justify-between items-start gap-2'>
+                <button onClick={() => setViewingId(tc._id)} className='plain text-ink font-semibold text-sm text-left truncate block'>{tc.name}</button>
+                <span className='font-mono text-accent text-sm flex-shrink-0'>{tc.activeStudentCount ?? 0}</span>
+              </div>
+              <p className='text-muted text-xs mt-0.5 font-mono'>{tc.phone}</p>
+              <div className='flex justify-between items-center mt-1.5'>
+                <p className='text-muted text-xs'>{tc.branchId?.name} · {new Date(tc.createdAt).toLocaleDateString()}</p>
+                <div className='flex gap-3 flex-shrink-0'>
+                  <button onClick={() => openEdit(tc)} className='text-accent text-xs font-medium'>{t('edit')}</button>
+                  <button onClick={() => deleteTeacherAccount(tc._id)} className='text-muted text-xs font-medium'>{t('remove')}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       {showCreate && (

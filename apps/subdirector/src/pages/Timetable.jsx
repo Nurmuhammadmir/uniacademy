@@ -25,7 +25,7 @@ const Timetable = () => {
 
   return (
     <div>
-      <div className='flex justify-between items-center mb-6'>
+      <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6'>
         <p className='font-display text-2xl text-ink'>{t('navTimetable')}</p>
         <div className='flex gap-2 items-center'>
           <select value={branchId} onChange={e => setBranchId(e.target.value)} className='px-3 py-2 rounded-xl bg-bg-elevated border border-hairline text-sm'>

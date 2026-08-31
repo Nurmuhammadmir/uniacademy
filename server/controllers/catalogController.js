@@ -8,7 +8,7 @@ import Settings from "../models/Settings.js"
 // read this, only the director can change it (see directorController.updateSettings)
 export const getSettings = async (req, res) => {
     try {
-        let settings = await Settings.findOne({})
+        let settings = await Settings.findOne({}).lean()
         if (!settings) settings = await Settings.create({})
         res.json({ settings })
     } catch (error) {
@@ -21,7 +21,7 @@ export const getSettings = async (req, res) => {
 // skips building full Mongoose documents for data nobody here mutates or re-saves
 export const listLanguages = async (req, res) => {
     try {
-        const languages = await Language.find({}).lean()
+        const languages = await Language.find({}).populate('categoryIds', 'name').lean()
         res.json({ languages })
     } catch (error) {
         console.log(error)

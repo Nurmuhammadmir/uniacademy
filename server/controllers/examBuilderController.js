@@ -9,7 +9,7 @@ export const getExamConfig = async (req, res) => {
     try {
         const { languageId, levelId } = req.query
         if (!languageId || !levelId) return res.status(400).json({ error: 'missing_params' })
-        const exam = await Exam.findOne({ languageId, levelId })
+        const exam = await Exam.findOne({ languageId, levelId }).lean()
         res.json({
             exam: exam
                 ? { _id: exam._id, durationMinutes: exam.durationMinutes, passScore: exam.passScore }

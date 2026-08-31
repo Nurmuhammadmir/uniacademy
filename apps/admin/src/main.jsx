@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import AdminContextProvider from './context/AdminContext.jsx'
+import { ThemeProvider } from './context/ThemeContext.jsx'
 import './lib/fontScale.js'
 import './lib/theme.js'
 import './index.css'
@@ -14,10 +15,12 @@ if ('serviceWorker' in navigator) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AdminContextProvider>
-        <App />
-      </AdminContextProvider>
-    </BrowserRouter>
+    <ThemeProvider>
+      <BrowserRouter>
+        <AdminContextProvider>
+          <App />
+        </AdminContextProvider>
+      </BrowserRouter>
+    </ThemeProvider>
   </React.StrictMode>,
 )

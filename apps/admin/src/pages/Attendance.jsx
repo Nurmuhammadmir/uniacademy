@@ -1,6 +1,8 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import Select from '../components/Select.jsx'
+import DatePicker from '../components/DatePicker.jsx'
 import { todayISO } from '../lib/date.js'
 
 const monthOptions = () => {
@@ -17,7 +19,7 @@ const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
 
 const TEACHER_STATUS_STYLE = {
   unmarked: 'bg-bg border border-hairline text-muted',
-  conducted: 'bg-accent text-white',
+  conducted: 'bg-accent dark:bg-[#4F46E5] text-white',
   not_conducted: 'bg-red-500 text-white',
   substituted: 'bg-blue-400 text-white',
 }
@@ -25,7 +27,7 @@ const TEACHER_STATUS_ICON = { unmarked: '—', conducted: '✓', not_conducted: 
 
 const STUDENT_STATUS_STYLE = {
   unmarked: 'bg-bg border border-hairline text-muted',
-  present: 'bg-accent text-white',
+  present: 'bg-accent dark:bg-[#4F46E5] text-white',
   absent: 'bg-red-500 text-white',
   late: 'bg-yellow-500 text-white',
   excused: 'bg-blue-400 text-white',
@@ -73,7 +75,7 @@ const LessonDetailModal = ({ lessonId, onClose, onStatusChanged, t }) => {
   }
 
   return (
-    <div className='fixed inset-0 bg-black/30 flex items-center justify-center z-50 px-4' onClick={onClose}>
+    <div className='fixed inset-0 z-50 bg-slate-900/20 backdrop-blur-md dark:bg-[#0B0F19]/60 dark:backdrop-blur-lg transition-all duration-300 flex items-center justify-center p-4' onClick={onClose}>
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto' onClick={e => e.stopPropagation()}>
         {!data ? <p className='text-muted text-sm'>{t('loading')}</p> : (
           <>
@@ -95,14 +97,12 @@ const LessonDetailModal = ({ lessonId, onClose, onStatusChanged, t }) => {
               </div>
             ) : showSubstituteForm ? (
               <div className='flex gap-2 mb-3'>
-                <select value={substituteId} onChange={e => setSubstituteId(e.target.value)} className='flex-1 px-3 py-2 rounded-lg bg-bg border border-hairline text-sm'>
-                  <option value=''>{t('selectSubstituteLabel')}</option>
-                  {teachers.map(tc => <option key={tc._id} value={tc._id}>{tc.name}</option>)}
-                </select>
-                <button onClick={markSubstituted} disabled={!substituteId} className='px-3 py-2 rounded-lg bg-accent text-white text-sm font-medium disabled:opacity-50'>{t('save')}</button>
+                <Select className='flex-1' value={substituteId} onChange={setSubstituteId} placeholder={t('selectSubstituteLabel')}
+                  options={teachers.map(tc => ({ value: tc._id, label: tc.name }))} />
+                <button onClick={markSubstituted} disabled={!substituteId} className='px-3 py-2 rounded-lg bg-accent dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-white text-sm font-medium disabled:opacity-50'>{t('save')}</button>
               </div>
             ) : (
-              <button onClick={() => setShowSubstituteForm(true)} className='text-accent text-xs font-medium mb-3'>{t('markSubstitutedBtn')}</button>
+              <button onClick={() => setShowSubstituteForm(true)} className='text-accent dark:text-[#818CF8] text-xs font-medium mb-3'>{t('markSubstitutedBtn')}</button>
             )}
 
             <textarea value={note} onChange={e => setNote(e.target.value)} onBlur={saveNote}
@@ -113,7 +113,7 @@ const LessonDetailModal = ({ lessonId, onClose, onStatusChanged, t }) => {
               {data.students.map(s => (
                 <div key={s.studentId} className='flex justify-between text-sm bg-bg border border-hairline rounded-lg px-3 py-2'>
                   <span className='text-ink'>{s.name}</span>
-                  <span className={s.status === 'present' ? 'text-accent' : 'text-muted'}>{t('lessonStudentStatus_' + s.status)}</span>
+                  <span className={s.status === 'present' ? 'text-accent dark:text-[#818CF8]' : 'text-muted'}>{t('lessonStudentStatus_' + s.status)}</span>
                 </div>
               ))}
               {data.students.length === 0 && <p className='text-muted text-sm'>{t('notPlacedYet')}</p>}
@@ -220,15 +220,15 @@ const Attendance = () => {
       <p className='text-ink font-medium mb-3'>{t('teacherCheckIns')}</p>
       <div className='bg-bg-elevated border border-hairline rounded-2xl p-5 mb-8'>
         <div className='flex justify-between items-center mb-3'>
-          <p className='text-muted text-sm'>{t('checkedIn')} <span className='font-mono text-accent'>{data ? `${data.teachers.filter(tc => tc.checkedIn).length}/${data.teachers.length}` : '—'}</span></p>
-          <input type='date' value={date} onChange={e => setDate(e.target.value)} className='px-3 py-2 rounded-xl bg-bg border border-hairline text-sm' />
+          <p className='text-muted text-sm'>{t('checkedIn')} <span className='font-mono text-accent dark:text-[#818CF8]'>{data ? `${data.teachers.filter(tc => tc.checkedIn).length}/${data.teachers.length}` : '—'}</span></p>
+          <DatePicker className='w-40' value={date} onChange={setDate} />
         </div>
         {!data ? <p className='text-muted text-sm'>{t('loadingAttendance')}</p> : (
           <div className='flex flex-col gap-3'>
             {data.teachers.map(tc => (
               <div key={tc.teacherId} className='flex justify-between text-sm'>
                 <span className={tc.checkedIn ? 'text-ink' : 'text-muted'}>{tc.name}</span>
-                <span className={`font-mono text-xs ${tc.checkedIn ? (tc.late ? 'text-red-500' : 'text-accent') : 'text-muted'}`}>
+                <span className={`font-mono text-xs ${tc.checkedIn ? (tc.late ? 'text-red-500' : 'text-accent dark:text-[#818CF8]') : 'text-muted'}`}>
                   {tc.checkedIn ? `${new Date(tc.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${tc.late ? ` · ${t('lateBadge')}` : ''}` : t('notCheckedIn')}
                 </span>
               </div>
@@ -239,35 +239,35 @@ const Attendance = () => {
       </div>
 
       <div className='flex gap-2 mb-4'>
-        <button onClick={() => switchMode('students')} className={`px-4 py-2 rounded-lg text-sm font-medium ${mode === 'students' ? 'bg-accent text-white' : 'bg-bg-elevated border border-hairline text-muted'}`}>{t('studentsAttendanceTab')}</button>
-        <button onClick={() => switchMode('teachers')} className={`px-4 py-2 rounded-lg text-sm font-medium ${mode === 'teachers' ? 'bg-accent text-white' : 'bg-bg-elevated border border-hairline text-muted'}`}>{t('teachersAttendanceTab')}</button>
+        <button onClick={() => switchMode('students')} className={`px-4 py-2 rounded-lg text-sm font-medium ${mode === 'students' ? 'bg-accent dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-white' : 'bg-bg-elevated border border-hairline text-muted'}`}>{t('studentsAttendanceTab')}</button>
+        <button onClick={() => switchMode('teachers')} className={`px-4 py-2 rounded-lg text-sm font-medium ${mode === 'teachers' ? 'bg-accent dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-white' : 'bg-bg-elevated border border-hairline text-muted'}`}>{t('teachersAttendanceTab')}</button>
       </div>
 
       <div className='flex flex-wrap gap-3 items-center mb-4'>
         <div className='flex gap-2 overflow-x-auto'>
           {monthOptions().map(m => (
-            <button key={m} onClick={() => setMonth(m)} className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${m === month ? 'bg-accent text-white' : 'bg-bg-elevated border border-hairline text-muted'}`}>
+            <button key={m} onClick={() => setMonth(m)} className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap ${m === month ? 'bg-accent dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-white' : 'bg-bg-elevated border border-hairline text-muted'}`}>
               {new Date(m + '-01').toLocaleDateString(undefined, { month: 'short', year: '2-digit' })}
             </button>
           ))}
         </div>
         <div className='flex gap-2 items-center'>
-          <input type='date' value={rangeFrom} onChange={e => setRangeFrom(e.target.value)} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm' title={t('dateFromLabel')} />
-          <input type='date' value={rangeTo} onChange={e => setRangeTo(e.target.value)} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm' title={t('dateToLabel')} />
+          <DatePicker className='w-40' value={rangeFrom} onChange={setRangeFrom} />
+          <DatePicker className='w-40' value={rangeTo} onChange={setRangeTo} />
           {(rangeFrom || rangeTo) && (
             <button onClick={() => { setRangeFrom(''); setRangeTo('') }} className='text-muted text-sm'>{t('clearFilters')}</button>
           )}
         </div>
       </div>
 
-      <div className='grid grid-cols-3 gap-6'>
-        <div className='col-span-1 bg-bg-elevated border border-hairline rounded-2xl p-4 max-h-[70vh] overflow-y-auto'>
+      <div className='grid grid-cols-1 lg:grid-cols-3 gap-6'>
+        <div className='lg:col-span-1 bg-bg-elevated border border-hairline rounded-2xl p-4 max-h-[70vh] overflow-y-auto'>
           <input value={personSearch} onChange={e => setPersonSearch(e.target.value)} placeholder={t('searchByNameOrPhone')}
             className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm mb-3' />
           <div className='flex flex-col gap-2'>
             {filteredPeople.map(p => (
               <button key={p._id} onClick={() => setSelectedId(p._id)}
-                className={`text-left px-3 py-2.5 rounded-lg text-sm font-medium ${selectedId === p._id ? 'bg-accent-soft text-accent' : 'bg-bg border border-hairline text-ink'}`}>
+                className={`text-left px-3 py-2.5 rounded-lg text-sm font-medium ${selectedId === p._id ? 'bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]' : 'bg-bg border border-hairline text-ink'}`}>
                 {p.name}
               </button>
             ))}
@@ -275,7 +275,7 @@ const Attendance = () => {
           </div>
         </div>
 
-        <div className='col-span-2'>
+        <div className='lg:col-span-2'>
           {!selectedId ? (
             <p className='text-muted text-sm'>{t('selectPersonHint')}</p>
           ) : (

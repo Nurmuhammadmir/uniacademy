@@ -18,8 +18,8 @@ import ReadingExercise from "../models/ReadingExercise.js"
 import Exam from "../models/Exam.js"
 import ExamAttempt from "../models/ExamAttempt.js"
 import ExamSession from "../models/ExamSession.js"
-import Pricing from "../models/Pricing.js"
-import Payment from "../models/Payment.js"
+import { getOrCreateAccount } from "../services/ledger.service.js"
+import { computeCourseOwed, computeCourseCovered } from "../services/billingCycle.service.js"
 import Attendance from "../models/Attendance.js"
 import AttendanceSession from "../models/AttendanceSession.js"
 import LessonAttendance from "../models/LessonAttendance.js"
@@ -40,27 +40,35 @@ import { notifyParentsOfAttendance } from "../services/parentNotifications.servi
 // defined thing. Callers that omit groupId fall back to an arbitrary active group, kept only for
 // safety against any not-yet-updated caller, not as a real multi-group strategy.
 const getGroupAndSyncWindow = async (studentId, groupId) => {
+    // levelCompletedAt:null excludes a group whose cohort already graduated away from it - its
+    // studentIds are deliberately kept (not cleared) for historical reporting, and its `status`
+    // itself is never auto-changed (an admin's own manual call, always - see Group.js), so without
+    // this a student could still match BOTH their old, graduated group and their real current one
     let group = groupId
-        ? await Group.findOne({ _id: groupId, studentIds: studentId, status: 'active' }).populate('roomId', 'name')
-        : await Group.findOne({ studentIds: studentId, status: 'active' }).populate('roomId', 'name')
+        ? await Group.findOne({ _id: groupId, studentIds: studentId, status: 'active', levelCompletedAt: null }).populate('roomId', 'name')
+        : await Group.findOne({ studentIds: studentId, status: 'active', levelCompletedAt: null }).populate('roomId', 'name')
     if (!group) return null
 
-    const level = await Level.findById(group.levelId).select('durationDays hasReading')
+    const level = await Level.findById(group.levelId).select('durationDays hasReading').lean()
     const durationDays = level?.durationDays || 30
     const hasReading = level?.hasReading !== false
     group.dayCounter = computeDayCounter(group, durationDays)
 
     const originalLanguageId = group.languageId
     // the whole group moves to the next level together once it finishes this one - independent of
-    // any individual exam result (see groupPromotion.service.js) - so re-fetch afterwards in case
+    // any individual exam result (see groupPromotion.service.js) - so re-check afterwards in case
     // this request is what just tipped the group over that line and this student landed elsewhere.
     // Re-fetched by language (not just "any active group") so a student with several concurrent
     // languages lands back in the SAME language's replacement group, not a different course entirely.
+    // promoteGroupIfLevelComplete never mutates the `group` object it's given (only writes the DB),
+    // so re-reading levelCompletedAt fresh is the only reliable way to tell whether THIS call (or a
+    // concurrent one) is what just tipped it over.
     await promoteGroupIfLevelComplete(group, durationDays)
-    if (group.status !== 'active') {
-        group = await Group.findOne({ studentIds: studentId, languageId: originalLanguageId, status: 'active' }).populate('roomId', 'name')
+    const justCompleted = await Group.exists({ _id: group._id, levelCompletedAt: { $ne: null } })
+    if (justCompleted) {
+        group = await Group.findOne({ studentIds: studentId, languageId: originalLanguageId, status: 'active', levelCompletedAt: null }).populate('roomId', 'name')
         if (!group) return null
-        const newLevel = await Level.findById(group.levelId).select('durationDays hasReading')
+        const newLevel = await Level.findById(group.levelId).select('durationDays hasReading').lean()
         return { group, durationDays: newLevel?.durationDays || 30, hasReading: newLevel?.hasReading !== false }
     }
 
@@ -95,7 +103,7 @@ export const getHomeworkWeek = async (req, res) => {
 
         const dayNumbers = []
         for (let d = windowStartLessonDay; d <= group.dayCounter; d++) dayNumbers.push(d)
-        const rows = await StudentProgress.find({ studentId: req.auth.userId, groupId: group._id, day: { $in: dayNumbers } })
+        const rows = await StudentProgress.find({ studentId: req.auth.userId, groupId: group._id, day: { $in: dayNumbers } }).lean()
         const rowByDay = Object.fromEntries(rows.map(r => [r.day, r]))
 
         const days = []
@@ -120,7 +128,7 @@ export const getHomeworkWeek = async (req, res) => {
             cursor.setUTCDate(cursor.getUTCDate() + 1)
         }
 
-        const exam = await Exam.findOne({ levelId: group.levelId })
+        const exam = await Exam.findOne({ levelId: group.levelId }).lean()
         const examAttempted = exam ? await ExamAttempt.exists({ studentId: req.auth.userId, examId: exam._id }) : false
 
         // exam opens 3 days before the level ends, not just on the final day, so a student isn't
@@ -163,7 +171,7 @@ export const getHomeworkForDay = async (req, res) => {
         }
 
         const status = resolveDayStatus(day, group.dayCounter)
-        const row = await StudentProgress.findOne({ studentId: req.auth.userId, groupId: group._id, day })
+        const row = await StudentProgress.findOne({ studentId: req.auth.userId, groupId: group._id, day }).lean()
 
         if (status === 'locked' && (!row || row.status !== 'done')) {
             return res.status(403).json({ error: 'day_locked' })
@@ -174,15 +182,15 @@ export const getHomeworkForDay = async (req, res) => {
 
         // day numbers (1..durationDays) are lesson-content ordinals now, not calendar days - a rest
         // day never gets one, so every reachable day here always has real curriculum content
-        const curriculum = await Curriculum.findOne({ languageId: group.languageId, levelId: group.levelId, day }).populate('conceptIds')
+        const curriculum = await Curriculum.findOne({ languageId: group.languageId, levelId: group.levelId, day }).populate('conceptIds').lean()
         const vocab = await VocabExercise.find({ languageId: group.languageId, levelId: group.levelId, day })
             .populate('conceptId')
             .populate('options')
             .populate('correct')
-        const grammar = await GrammarExercise.find({ languageId: group.languageId, levelId: group.levelId, day })
-        const readingText = await ReadingText.findOne({ languageId: group.languageId, levelId: group.levelId, day })
+        const grammar = await GrammarExercise.find({ languageId: group.languageId, levelId: group.levelId, day }).lean()
+        const readingText = await ReadingText.findOne({ languageId: group.languageId, levelId: group.levelId, day }).lean()
         const readingExercises = readingText
-            ? await ReadingExercise.find({ readingTextId: readingText._id })
+            ? await ReadingExercise.find({ readingTextId: readingText._id }).lean()
             : []
 
         // Concept only holds { image, category } - the actual word, its example sentence and its
@@ -196,12 +204,12 @@ export const getHomeworkForDay = async (req, res) => {
             ;(v.options || []).forEach(o => conceptIds.add(String(o._id)))
             if (v.correct) conceptIds.add(String(v.correct._id))
         })
-        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: group.languageId })
+        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: group.languageId }).lean()
         const wordFormByConceptId = Object.fromEntries(wordForms.map(w => [String(w.conceptId), w]))
         // every native language (ru/uz/kaa), not just one - a translation question shows all three
         // at once (e.g. "день / kun / kún") so it works for the whole student body, not just Russian
         // speakers
-        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } })
+        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } }).lean()
         const translationsByConceptId = {}
         translations.forEach(t => {
             const key = String(t.conceptId)
@@ -273,7 +281,7 @@ const maybeMarkDone = async (row) => {
 // the review is purely supplementary (see reviewHomework.service.js) so it reuses the exact same
 // grading rules without touching any StudentProgress row.
 const scoreVocabAnswers = async (answers) => {
-    const exercises = await VocabExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } })
+    const exercises = await VocabExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } }).lean()
     let correctCount = 0
     // the frontend already has these exercises' full populated concept/word data loaded from
     // when it originally fetched the homework, so returning bare ids is enough for it to
@@ -289,7 +297,7 @@ const scoreVocabAnswers = async (answers) => {
 }
 
 const scoreGrammarAnswers = async (answers) => {
-    const exercises = await GrammarExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } })
+    const exercises = await GrammarExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } }).lean()
     let correctCount = 0
     const results = []
     for (const answer of answers) {
@@ -353,9 +361,9 @@ export const getHomeworkReview = async (req, res) => {
             ;(v.options || []).forEach(o => conceptIds.add(String(o._id)))
             if (v.correct) conceptIds.add(String(v.correct._id))
         })
-        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: group.languageId })
+        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: group.languageId }).lean()
         const wordFormByConceptId = Object.fromEntries(wordForms.map(w => [String(w.conceptId), w]))
-        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } })
+        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } }).lean()
         const translationsByConceptId = {}
         translations.forEach(t => {
             const key = String(t.conceptId)
@@ -408,7 +416,7 @@ export const submitReading = async (req, res) => {
         const { groupId, day, answers } = req.body
         const row = await assertDayIsOpen(req.auth.userId, groupId, day)
 
-        const exercises = await ReadingExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } })
+        const exercises = await ReadingExercise.find({ _id: { $in: answers.map(a => a.exerciseId) } }).lean()
         let correctCount = 0
         const results = []
         for (const answer of answers) {
@@ -445,7 +453,7 @@ export const getProgress = async (req, res) => {
         if (!result) return res.status(404).json({ error: 'no_active_group' })
         const { group, durationDays } = result
 
-        const rows = await StudentProgress.find({ studentId: req.auth.userId, groupId: group._id }).sort({ day: 1 })
+        const rows = await StudentProgress.find({ studentId: req.auth.userId, groupId: group._id }).sort({ day: 1 }).lean()
 
         let streak = 0
         for (let i = rows.length - 1; i >= 0; i--) {
@@ -500,17 +508,29 @@ export const getMe = async (req, res) => {
             .populate('courses.levelId', 'name order')
         if (!student) return res.status(404).json({ error: 'not_found' })
 
-        const courses = await Promise.all(student.courses.map(async (c) => {
-            const pricing = c.levelId ? await Pricing.findOne({ languageId: c.languageId._id, levelId: c.levelId._id }) : null
-            const payments = await Payment.find({ studentId: student._id, languageId: c.languageId._id })
+        const account = await getOrCreateAccount('student', student._id)
+        // only courses the student is CURRENTLY placed in a group for - one they left keeps its
+        // course entry (groupId cleared) purely so the admin's balance history can still trace what
+        // was ever billed for it, but that's not "a course I'm taking" from the student's own view
+        // "totalPaid" per course is no longer a sum of Payment rows tagged to that course - a payment
+        // is never earmarked for one course (confirmed spec: one shared wallet) - it's however much
+        // of THIS course's debt has actually been settled by the wallet's account-wide FIFO
+        // allocation, which is the same figure computeCourseOwed is the unpaid remainder of.
+        const courses = await Promise.all(student.courses.filter(c => c.groupId).map(async (c) => {
+            const group = await Group.findById(c.groupId).select('price').lean()
+            const [owed, covered] = await Promise.all([
+                computeCourseOwed(account._id, c.languageId._id),
+                computeCourseCovered(account._id, c.languageId._id),
+            ])
             return {
                 ...c.toObject(),
-                price: pricing?.monthlyPrice ?? null,
-                totalPaid: payments.reduce((sum, p) => sum + p.amount, 0),
+                price: group?.price ?? null,
+                totalPaid: covered,
+                owed: Math.max(0, owed),
             }
         }))
 
-        res.json({ student, courses })
+        res.json({ student, courses, accountBalance: account.balance })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -522,11 +542,12 @@ export const getMe = async (req, res) => {
 // of assuming a single "the" group
 export const getMyGroups = async (req, res) => {
     try {
-        const groups = await Group.find({ studentIds: req.auth.userId, status: 'active' })
+        const groups = await Group.find({ studentIds: req.auth.userId, status: 'active', levelCompletedAt: null })
             .populate('languageId', 'name')
             .populate('levelId', 'name durationDays')
             .populate('teacherId', 'name')
             .populate('roomId', 'name')
+            .lean()
         res.json({ groups })
     } catch (error) {
         console.log(error)
@@ -540,7 +561,7 @@ export const getGroupRanking = async (req, res) => {
         if (!result) return res.status(404).json({ error: 'no_active_group' })
         const { group } = result
 
-        const rows = await StudentProgress.find({ groupId: group._id, status: 'done' })
+        const rows = await StudentProgress.find({ groupId: group._id, status: 'done' }).lean()
 
         const byStudent = {}
         for (const row of rows) {
@@ -551,7 +572,7 @@ export const getGroupRanking = async (req, res) => {
             byStudent[key].count += 1
         }
 
-        const students = await User.find({ _id: { $in: Object.keys(byStudent) } }).select('name')
+        const students = await User.find({ _id: { $in: Object.keys(byStudent) } }).select('name').lean()
         const nameById = Object.fromEntries(students.map(s => [String(s._id), s.name]))
 
         const ranking = Object.entries(byStudent)
@@ -577,8 +598,8 @@ export const getGroupProgress = async (req, res) => {
         await group.populate('levelId', 'name')
         await group.populate('teacherId', 'name')
 
-        const students = await User.find({ _id: { $in: group.studentIds } }).select('name')
-        const rows = await StudentProgress.find({ groupId: group._id }).sort({ day: 1 })
+        const students = await User.find({ _id: { $in: group.studentIds } }).select('name').lean()
+        const rows = await StudentProgress.find({ groupId: group._id }).sort({ day: 1 }).lean()
 
         const roster = students.map(s => ({
             studentId: s._id,
@@ -643,14 +664,14 @@ const pickOnePerRandomDay = (byDay, count) => {
 // many times the page is reloaded.
 export const getExam = async (req, res) => {
     try {
-        const group = await Group.findOne({ studentIds: req.auth.userId, levelId: req.params.levelId })
+        const group = await Group.findOne({ studentIds: req.auth.userId, levelId: req.params.levelId }).lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         // exam settings (pass mark / time limit) default to 90 min / 70% the moment a level's exam
         // is actually needed, rather than 404ing just because a director never separately visited
         // that level's Homework page to click "Save settings" - the exam itself no longer needs any
         // director authoring, so requiring a settings visit first would be a pointless manual step
-        let exam = await Exam.findOne({ levelId: req.params.levelId })
+        let exam = await Exam.findOne({ levelId: req.params.levelId }).lean()
         if (!exam) {
             exam = await Exam.create({ languageId: group.languageId, levelId: req.params.levelId, durationMinutes: 90, passScore: 70 })
         }
@@ -658,7 +679,7 @@ export const getExam = async (req, res) => {
         const alreadyAttempted = await ExamAttempt.exists({ studentId: req.auth.userId, examId: exam._id })
         if (alreadyAttempted) return res.status(403).json({ error: 'exam_already_attempted' })
 
-        const existingSession = await ExamSession.findOne({ studentId: req.auth.userId, examId: exam._id })
+        const existingSession = await ExamSession.findOne({ studentId: req.auth.userId, examId: exam._id }).lean()
         if (existingSession) {
             return res.json({
                 examId: exam._id,
@@ -669,7 +690,7 @@ export const getExam = async (req, res) => {
             })
         }
 
-        const level = await Level.findById(req.params.levelId).select('durationDays hasReading')
+        const level = await Level.findById(req.params.levelId).select('durationDays hasReading').lean()
         const durationDays = level?.durationDays || 30
         const hasReading = level?.hasReading !== false
         const dayCounter = computeDayCounter(group, durationDays)
@@ -685,7 +706,7 @@ export const getExam = async (req, res) => {
 
         // ---- vocab: 25 slots ----
         const vocabDocs = await VocabExercise.find({ languageId: exam.languageId, levelId: exam.levelId, day: { $in: learnedDays } })
-            .populate('conceptId').populate('options')
+            .populate('conceptId').populate('options').lean()
         const vocabByDay = {}
         vocabDocs.forEach(v => { (vocabByDay[v.day] = vocabByDay[v.day] || []).push(v) })
         const pickedVocab = pickOnePerRandomDay(vocabByDay, 25)
@@ -697,9 +718,9 @@ export const getExam = async (req, res) => {
             if (v.conceptId) conceptIds.add(String(v.conceptId._id))
             ;(v.options || []).forEach(o => conceptIds.add(String(o._id)))
         })
-        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: exam.languageId })
+        const wordForms = await WordForm.find({ conceptId: { $in: [...conceptIds] }, languageId: exam.languageId }).lean()
         const wordFormByConceptId = Object.fromEntries(wordForms.map(w => [String(w.conceptId), w]))
-        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } })
+        const translations = await Translation.find({ conceptId: { $in: [...conceptIds] } }).lean()
         const translationsByConceptId = {}
         translations.forEach(t => {
             const key = String(t.conceptId)
@@ -720,7 +741,7 @@ export const getExam = async (req, res) => {
         }))
 
         // ---- grammar: 25 slots ----
-        const grammarDocs = await GrammarExercise.find({ languageId: exam.languageId, levelId: exam.levelId, day: { $in: learnedDays } })
+        const grammarDocs = await GrammarExercise.find({ languageId: exam.languageId, levelId: exam.levelId, day: { $in: learnedDays } }).lean()
         const grammarByDay = {}
         grammarDocs.forEach(g => { (grammarByDay[g.day] = grammarByDay[g.day] || []).push(g) })
         const pickedGrammar = pickOnePerRandomDay(grammarByDay, 25)
@@ -734,10 +755,10 @@ export const getExam = async (req, res) => {
         // never include reading, full stop, not just "hidden if nothing was authored" ----
         const readingTexts = []
         if (hasReading) {
-            const readingCandidates = await ReadingText.find({ languageId: exam.languageId, levelId: exam.levelId, day: { $in: learnedDays } })
+            const readingCandidates = await ReadingText.find({ languageId: exam.languageId, levelId: exam.levelId, day: { $in: learnedDays } }).lean()
             const chosenReadingTexts = shuffle(readingCandidates).slice(0, 3)
             for (const rt of chosenReadingTexts) {
-                const exercises = await ReadingExercise.find({ readingTextId: rt._id })
+                const exercises = await ReadingExercise.find({ readingTextId: rt._id }).lean()
                 readingTexts.push({
                     readingTextId: rt._id,
                     title: rt.title,
@@ -774,7 +795,7 @@ export const getExam = async (req, res) => {
 export const submitExam = async (req, res) => {
     try {
         const { answers } = req.body // [{ questionId, answer }] - only the questions this attempt was actually shown
-        const exam = await Exam.findById(req.params.id)
+        const exam = await Exam.findById(req.params.id).lean()
         if (!exam) return res.status(404).json({ error: 'not_found' })
 
         // a student can only ever self-submit an exam ONCE - any retake after that is admin-only
@@ -786,7 +807,7 @@ export const submitExam = async (req, res) => {
 
         // must have actually opened this exam via getExam first (which creates the session) -
         // closes off submitting a guessed/discovered examId for a level never taken
-        const session = await ExamSession.findOne({ studentId: req.auth.userId, examId: exam._id })
+        const session = await ExamSession.findOne({ studentId: req.auth.userId, examId: exam._id }).lean()
         if (!session) return res.status(404).json({ error: 'no_exam_session' })
 
         const list = Array.isArray(answers) ? answers : []
@@ -796,9 +817,9 @@ export const submitExam = async (req, res) => {
         // using the exact same per-section comparison rules as daily homework (submitVocab/
         // submitGrammar/submitReading above) so an exam and a practice day always agree on "correct"
         const [vocabDocs, grammarDocs, readingDocs] = await Promise.all([
-            VocabExercise.find({ _id: { $in: ids } }),
-            GrammarExercise.find({ _id: { $in: ids } }),
-            ReadingExercise.find({ _id: { $in: ids } }),
+            VocabExercise.find({ _id: { $in: ids } }).lean(),
+            GrammarExercise.find({ _id: { $in: ids } }).lean(),
+            ReadingExercise.find({ _id: { $in: ids } }).lean(),
         ])
         const vocabById = new Map(vocabDocs.map(v => [String(v._id), v]))
         const grammarById = new Map(grammarDocs.map(g => [String(g._id), g]))
@@ -822,7 +843,7 @@ export const submitExam = async (req, res) => {
         }
         const score = Math.round((correctCount / (list.length || 1)) * 100)
 
-        const student = await User.findById(req.auth.userId)
+        const student = await User.findById(req.auth.userId).lean()
 
         const result = await handleExamResult({ student, exam, score })
         // the in-progress snapshot is fully consumed now that a real ExamAttempt exists - clear it
@@ -847,15 +868,15 @@ export const submitExam = async (req, res) => {
 export const scanAttendance = async (req, res) => {
     try {
         const { token } = req.body
-        const session = await AttendanceSession.findOne({ token })
+        const session = await AttendanceSession.findOne({ token }).lean()
         if (!session || session.expiresAt < new Date()) {
             return res.status(400).json({ error: 'qr_expired' })
         }
 
-        // status:'active' - a completed group's roster is kept for historical reporting (see
+        // levelCompletedAt:null - a graduated group's roster is kept for historical reporting (see
         // groupPromotion.service.js), so matching on studentIds alone could otherwise let a stale
         // QR scan register attendance against a group the student has already moved on from
-        const group = await Group.findOne({ _id: session.groupId, studentIds: req.auth.userId, status: 'active' })
+        const group = await Group.findOne({ _id: session.groupId, studentIds: req.auth.userId, status: 'active', levelCompletedAt: null }).lean()
         if (!group) {
             return res.status(403).json({ error: 'not_in_this_group' })
         }
@@ -877,7 +898,7 @@ export const scanAttendance = async (req, res) => {
             )
         }
 
-        const existing = await Attendance.findOne({ studentId: req.auth.userId, groupId: group._id, day: session.day })
+        const existing = await Attendance.findOne({ studentId: req.auth.userId, groupId: group._id, day: session.day }).lean()
         if (existing) {
             await markRealLessonAttendance()
             return res.json({ alreadyMarked: true, day: session.day })
@@ -897,7 +918,7 @@ export const scanAttendance = async (req, res) => {
         await markRealLessonAttendance()
         // real-time push to any linked parent - only on a genuinely NEW check-in, not a re-scan,
         // so a parent gets exactly one "attended today" notification per real attendance event
-        const student = await User.findById(req.auth.userId).select('name')
+        const student = await User.findById(req.auth.userId).select('name').lean()
         notifyParentsOfAttendance(req.auth.userId, student?.name || 'Your child')
         res.status(201).json({ alreadyMarked: false, day: session.day })
     } catch (error) {

@@ -15,7 +15,7 @@ const FontSizeControl = ({ label }) => {
       <div className='flex items-center gap-3 max-w-xs'>
         <span className='text-xs text-muted'>A</span>
         <input type='range' min={MIN_SCALE} max={MAX_SCALE} step={5} value={scale} onChange={onChange}
-          className='flex-1 accent-accent' />
+          className='flex-1 accent-accent dark:accent-[#4F46E5]' />
         <span className='text-2xl text-muted leading-none'>A</span>
       </div>
     </div>

@@ -72,8 +72,8 @@ const Progress = () => {
             const score = dayScore(row)
             const isToday = day === lastKnownDay
             const bg = row?.status === 'done' ? 'bg-gold text-white'
-              : row?.status === 'expired' ? 'bg-red-100 text-red-500'
-              : day <= lastKnownDay ? 'bg-accent-soft text-accent'
+              : row?.status === 'expired' ? 'bg-red-100 text-red-500 dark:bg-red-500/10 dark:text-red-400'
+              : day <= lastKnownDay ? 'bg-accent-soft dark:bg-white/10 text-accent'
               : 'bg-hairline text-muted opacity-50'
             return (
               <div key={day} ref={isToday ? todayRef : null} className={`shrink-0 w-14 h-16 rounded-2xl flex flex-col items-center justify-center font-mono ${bg}`}>
@@ -114,9 +114,9 @@ const Progress = () => {
                   <td className='py-2 px-3 font-mono text-muted'>{row.readingScore ?? '—'}</td>
                   <td className='py-2 pl-3'>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      row.status === 'done' ? 'bg-gold-soft text-gold' :
-                      row.status === 'expired' ? 'bg-red-100 text-red-500' :
-                      'bg-accent-soft text-accent'
+                      row.status === 'done' ? 'bg-gold-soft dark:bg-white/10 text-gold' :
+                      row.status === 'expired' ? 'bg-red-100 text-red-500 dark:bg-red-500/10 dark:text-red-400' :
+                      'bg-accent-soft dark:bg-white/10 text-accent'
                     }`}>{row.status}</span>
                   </td>
                 </tr>

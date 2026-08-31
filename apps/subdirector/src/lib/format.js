@@ -1,10 +1,10 @@
-// space-separated thousands (500 000, 1 200 000) regardless of the browser's locale settings -
+// comma-separated thousands (500,000, 1,200,000) regardless of the browser's locale settings -
 // .toLocaleString() without an explicit locale can render commas, dots, or nothing depending on
 // the user's OS/browser, so this guarantees a consistent, easily-readable format everywhere money
 // is shown across the app.
 export const formatMoney = (n) => {
     if (n === null || n === undefined || Number.isNaN(n)) return '—'
-    return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+    return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
 
 // a payment's real remaining (net) value - `refunded: true` always means net 0, even on legacy rows
@@ -19,5 +19,7 @@ export const paymentMethodLabelKey = (method) => ({
 }[method] || 'paymentMethodUnrecorded')
 
 // a group's display label - its admin-given name if one was set, otherwise the language·level
-// composite every group used to be identified by exclusively
-export const groupLabel = (g) => g?.name || `${g?.languageId?.name || ''} · ${g?.levelId?.name || ''}`
+// composite every group used to be identified by exclusively. A group can legitimately have no
+// level at all (a course with zero levels defined) - drop the trailing " · " instead of showing it
+// with nothing after it.
+export const groupLabel = (g) => g?.name || `${g?.languageId?.name || ''}${g?.levelId?.name ? ' · ' + g.levelId.name : ''}`

@@ -8,7 +8,7 @@ export const login = async (req, res) => {
         const { phone, password } = req.body
         if (!phone || !password) return res.status(400).json({ error: 'missing_credentials' })
 
-        const user = await User.findOne({ phone })
+        const user = await User.findOne({ phone }).lean()
         if (!user) return res.status(401).json({ error: 'invalid_credentials' })
 
         const match = await bcrypt.compare(password, user.passwordHash)

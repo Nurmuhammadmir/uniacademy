@@ -15,7 +15,8 @@ import StudentProgress from "../models/StudentProgress.js"
 import ExtraLesson from "../models/ExtraLesson.js"
 import TeacherPayRate from "../models/TeacherPayRate.js"
 import Payment from "../models/Payment.js"
-import CoursePeriod from "../models/CoursePeriod.js"
+import LedgerEntry from "../models/LedgerEntry.js"
+import User from "../models/User.js"
 
 export const hardDeleteGroup = async (groupId) => {
     const lessons = await Lesson.find({ groupId }).select('_id')
@@ -33,7 +34,16 @@ export const hardDeleteGroup = async (groupId) => {
         ExtraLesson.deleteMany({ groupId }),
         TeacherPayRate.deleteMany({ groupId }),
         Payment.updateMany({ groupId }, { $set: { groupId: null } }),
-        CoursePeriod.updateMany({ groupId }, { $set: { groupId: null } }),
+        LedgerEntry.updateMany({ groupId }, { $set: { groupId: null } }),
+        // every student's OWN course entry pointing at this group needs the same reference clear -
+        // missing this left a permanent "ghost" course on a student's profile (real price lookup
+        // fails forever since the group is gone, showing an unexplainable blank price stuck at
+        // "unpaid") every time a group they'd been in was permanently deleted
+        User.updateMany(
+            { 'courses.groupId': groupId },
+            { $set: { 'courses.$[c].groupId': null } },
+            { arrayFilters: [{ 'c.groupId': groupId }] },
+        ),
     ])
     await Group.deleteOne({ _id: groupId })
 }

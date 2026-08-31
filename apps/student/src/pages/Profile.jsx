@@ -1,29 +1,29 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { StudentContext } from '../context/StudentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import { useTheme } from '../context/ThemeContext.jsx'
 import { formatMoney } from '../lib/format.js'
 import FontSizeControl from '../components/FontSizeControl.jsx'
 import InstallAppCard from '../components/InstallAppCard.jsx'
 import { groupLabel } from '../lib/format.js'
 
 const CourseCard = ({ course, t }) => {
-  const remaining = course.price ? Math.max(0, course.price - course.balance) : null
+  const isActive = course.enrollmentStatus === 'active'
   return (
     <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-3'>
       <div className='flex justify-between items-start mb-2'>
         <p className='text-ink font-medium'>{course.languageId?.name} · {course.levelId?.name}</p>
-        <span className={`text-xs font-medium px-2 py-1 rounded-full ${course.isActive ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>
-          {course.isActive ? t('active') : t('unpaid')}
+        <span className={`text-xs font-medium px-2 py-1 rounded-full ${isActive ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>
+          {isActive ? t('active') : t('unpaid')}
         </span>
       </div>
       <div className='grid grid-cols-2 gap-2 text-sm'>
         <div><p className='text-muted text-xs'>{t('monthlyPrice')}</p><p className='font-mono text-ink'>{course.price !== null ? formatMoney(course.price) : '—'}</p></div>
         <div><p className='text-muted text-xs'>{t('totalPaid')}</p><p className='font-mono text-ink'>{formatMoney(course.totalPaid)}</p></div>
-        <div><p className='text-muted text-xs'>{t('balance')}</p><p className={`font-mono ${course.balance > 0 ? 'text-green-600' : 'text-ink'}`}>{formatMoney(course.balance)}</p></div>
-        <div><p className='text-muted text-xs'>{t('nextDue')}</p><p className='font-mono text-ink'>{course.subscriptionExpiresAt ? new Date(course.subscriptionExpiresAt).toLocaleDateString() : '—'}</p></div>
+        <div><p className='text-muted text-xs'>{t('balance')}</p><p className={`font-mono ${course.owed > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-ink'}`}>{course.owed > 0 ? `-${formatMoney(course.owed)}` : formatMoney(0)}</p></div>
       </div>
-      {!course.isActive && remaining !== null && remaining > 0 && (
-        <p className='text-xs text-accent mt-2'>{t('moreNeeded', { amount: formatMoney(remaining) })}</p>
+      {!isActive && course.owed > 0 && (
+        <p className='text-xs text-accent mt-2'>{t('moreNeeded', { amount: formatMoney(course.owed) })}</p>
       )}
     </div>
   )
@@ -32,6 +32,7 @@ const CourseCard = ({ course, t }) => {
 const Profile = () => {
   const { me, logout, getAttendanceSummary, myGroups, selectedGroupId, setSelectedGroupId } = useContext(StudentContext)
   const { t, lang, setLang, availableLanguages } = useLanguage()
+  const { isDark, toggleTheme } = useTheme()
   const [attendance, setAttendance] = useState(null)
 
   useEffect(() => { getAttendanceSummary().then(setAttendance) }, [selectedGroupId])
@@ -96,6 +97,11 @@ const Profile = () => {
       <p className='text-ink font-medium mb-2'>{t('myCourses')}</p>
       {courses.map(c => <CourseCard key={c._id} course={c} t={t} />)}
       {courses.length === 0 && <p className='text-muted text-sm mb-4'>{t('noCourseYet')}</p>}
+
+      <button onClick={toggleTheme} className='w-full py-4 rounded-2xl border border-hairline text-ink font-medium mt-3 flex items-center justify-center gap-2'>
+        <span className='text-lg leading-none'>{isDark ? '☀️' : '🌙'}</span>
+        {isDark ? t('lightModeBtn') : t('darkModeBtn')}
+      </button>
 
       <button onClick={logout} className='w-full py-4 rounded-2xl border border-hairline text-muted font-medium mt-3'>
         {t('signOut')}

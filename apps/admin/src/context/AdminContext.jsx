@@ -1,8 +1,7 @@
 import { createContext, useEffect, useState } from "react"
 import axios from 'axios'
-import { toast } from 'react-toastify'
+import { toast } from 'sonner'
 import { confirm } from '../lib/confirm.js'
-import { formatMoney } from '../lib/format.js'
 import { t } from '../i18n/LanguageContext.jsx'
 
 export const AdminContext = createContext()
@@ -10,9 +9,12 @@ export const AdminContext = createContext()
 const AdminContextProvider = (props) => {
     const backendUrl = import.meta.env.VITE_BACKEND_URL
     const [token, setToken] = useState(localStorage.getItem('token') ? localStorage.getItem('token') : false)
+    // true only for the initial post-login data burst (getStudents/getGroups/etc all firing at
+    // once) - App.jsx shows a full-page spinner while this is true instead of every list page
+    // rendering an empty table for a moment, which read as "did this even load?" on a slow server
+    const [initialLoading, setInitialLoading] = useState(true)
     const [students, setStudents] = useState([])
     const [groups, setGroups] = useState([])
-    const [payments, setPayments] = useState([])
     const [teachers, setTeachers] = useState([])
     const [languages, setLanguages] = useState([])
     const [levels, setLevels] = useState([])
@@ -86,6 +88,7 @@ const AdminContextProvider = (props) => {
             if (code === 'passport_info_required') toast.error(t('passportRequiredError'))
             else if (code === 'parent_password_required') toast.error(t('parentPasswordRequiredError'))
             else if (code === 'phone_already_in_use') toast.error(t('phoneAlreadyInUseError'))
+            else if (code === 'location_required') toast.error(t('locationRequiredWarning'))
             else toast.error(code || t('couldNotCreateStudent'))
             return false
         }
@@ -164,86 +167,83 @@ const AdminContextProvider = (props) => {
         }
     }
 
-    // api to correct a student's level within an existing course (e.g. after a placement test)
-    const updateStudentCourse = async (studentId, courseId, levelId) => {
+
+    // applies a discount RIGHT NOW - confirmed spec: the course's own price never changes, instead a
+    // real "Chegirma" branch expense posts (the cost of the discount) and the student's own balance
+    // is credited by that same amount, exactly like a payment would reduce it. One call covers all
+    // three scopes: `{ scope: 'students', studentIds, languageId, type, value }`,
+    // `{ scope: 'group', groupId, type, value }`, or `{ scope: 'course', languageId, type, value }`.
+    const applyDiscount = async (payload) => {
         try {
-            if (!levelId) { toast.error(t('levelRequiredError')); return false }
-            await axios.put(backendUrl + `/api/admin/students/${studentId}/courses/${courseId}`, { levelId }, authHeader)
-            toast.success(t('courseLevelUpdated'))
+            const { data } = await axios.post(backendUrl + '/api/admin/discounts', payload, authHeader)
+            if (data.appliedCount > 0) toast.success(t('discountAppliedToAll', { count: data.appliedCount }))
+            if (data.skippedCount > 0) toast.error(t('discountAppliedPartially', { ok: data.appliedCount, total: data.appliedCount + data.skippedCount }))
             getStudents()
-            return true
-        } catch (error) {
-            const code = error.response?.data?.error
-            toast.error(code === 'level_required' ? t('levelRequiredError') : (code || t('couldNotUpdateCourseLevel')))
-            return false
-        }
-    }
-
-    // a genuine price reduction for one student's course for one month (not an expense) - see
-    // discount.service.js. Applies to potentially several students at once (a bulk selection from
-    // the Students list), so the summary toast counts successes/failures across all of them rather
-    // than firing one toast per student
-    const applyDiscountToStudents = async (studentIds, payload) => {
-        const results = await Promise.all(studentIds.map(async (studentId) => {
-            try {
-                await axios.post(backendUrl + `/api/admin/students/${studentId}/discounts`, payload, authHeader)
-                return true
-            } catch (error) {
-                return false
-            }
-        }))
-        const failCount = results.filter(ok => !ok).length
-        if (failCount === 0) toast.success(t('discountAppliedToAll', { count: studentIds.length }))
-        else toast.error(t('discountAppliedPartially', { ok: results.length - failCount, total: results.length }))
-        getStudents()
-        return failCount === 0
-    }
-
-    // never blocks on "already enrolled" - the caller (Students.jsx/StudentProfile.jsx) confirms
-    // with the admin BEFORE calling this, when they can see the student already has that language,
-    // so by the time this fires the intent is already confirmed. The server responds 200 (not an
-    // error) when the language already exists, so this only ever returns false on a real failure.
-    const addStudentCourse = async (studentId, languageId) => {
-        try {
-            const { data } = await axios.post(backendUrl + `/api/admin/students/${studentId}/courses`, { languageId }, authHeader)
-            toast.success(data.alreadyEnrolled ? t('alreadyEnrolledNotice') : t('courseAdded'))
-            getStudents()
-            return true
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotAddCourse'))
-            return false
-        }
-    }
-
-    const createPayment = async (studentId, languageId, levelId, amount, method) => {
-        try {
-            const { data } = await axios.post(backendUrl + '/api/admin/payments', { studentId, languageId, levelId, amount, method }, authHeader)
-            if (data.isActive) {
-                toast.success(t('paymentRecordedActive'))
-            } else {
-                toast.success(t('paymentRecordedMoreNeeded', { amount: formatMoney(data.amountStillNeeded) }))
-            }
-            getStudents(); getPayments()
-            return true
-        } catch (error) {
-            const code = error.response?.data?.error
-            if (code === 'student_has_no_course') toast.error(t('studentNoCourseError'))
-            else if (code === 'invalid_payment_method') toast.error(t('invalidPaymentMethodError'))
-            else if (code === 'level_required') toast.error(t('levelRequiredError'))
-            else if (code === 'level_mismatch') toast.error(t('levelMismatchError'))
-            else toast.error(code || t('couldNotRecordPayment'))
-            return false
-        }
-    }
-
-    // read-only, no toast - a silent lookup the payment form polls as the admin picks a
-    // language/level, purely to render a "this covers you through X" hint before they submit
-    const getPaymentPreview = async (studentId, languageId, levelId) => {
-        try {
-            const { data } = await axios.get(backendUrl + '/api/admin/payments/preview', { params: { studentId, languageId, levelId }, ...authHeader })
             return data
         } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotApplyDiscount'))
             return null
+        }
+    }
+
+    // undoes one previously-applied discount - the student's balance/debt returns to exactly what
+    // it was before. `entryId` is the ledger entry's own _id (StudentProfile reads it straight off
+    // the statement, there's no separate "discount id" concept anywhere else)
+    const deleteDiscount = async (entryId) => {
+        if (!(await confirm(t('confirmDeleteDiscount')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/admin/discounts/' + entryId, authHeader)
+            toast.success(t('discountDeleted'))
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteDiscount'))
+            return false
+        }
+    }
+
+    // freeze pauses billing for the STUDENT'S WHOLE ACCOUNT (not per-course, not per-group) - no new
+    // debt accrues on any of their courses while frozen. Toggled from the student's profile when
+    // they say they can't come for a while.
+    const setStudentFreeze = async (studentId, frozen, reason) => {
+        try {
+            const { data } = await axios.put(backendUrl + `/api/admin/students/${studentId}/freeze`, { frozen, reason }, authHeader)
+            toast.success(frozen ? t('studentFrozenNotice') : t('studentUnfrozenNotice'))
+            return data.student
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotUpdateFreeze'))
+            return null
+        }
+    }
+
+    // read-only - prices are still director-set (Pricing.jsx there), this just lets admin see what's
+    // configured, since creating a group now needs a price to already exist for that language+level
+    const [pricingList, setPricingList] = useState([])
+    const getPricingList = async () => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/admin/pricing', authHeader)
+            setPricingList(data.pricing)
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadPricing'))
+        }
+    }
+
+    // confirmed spec: a payment is never for one particular course - it's a deposit into the
+    // student's one shared wallet. No languageId/levelId is sent or asked for anymore; whichever
+    // course(s) this money ends up settling is decided entirely by the account-wide FIFO walk on
+    // the backend (see billingCycle.service.js), not by anything picked here.
+    const createPayment = async (studentId, amount, method, date) => {
+        try {
+            const { data } = await axios.post(backendUrl + '/api/admin/payments', { studentId, amount, method, date }, authHeader)
+            toast.success(t('paymentRecorded'))
+            getStudents()
+            // the id (not just true/false) - lets the caller pop the receipt for THIS exact payment
+            // right after it's recorded, instead of only via the print icon in a payment list later
+            return data.payment._id
+        } catch (error) {
+            const code = error.response?.data?.error
+            if (code === 'invalid_payment_method') toast.error(t('invalidPaymentMethodError'))
+            else toast.error(code || t('couldNotRecordPayment'))
+            return false
         }
     }
 
@@ -300,20 +300,11 @@ const AdminContextProvider = (props) => {
         try {
             await axios.put(backendUrl + '/api/admin/payments/' + id, payload, authHeader)
             toast.success(t('paymentUpdated'))
-            getPayments(); getStudents()
+            getStudents()
             return true
         } catch (error) {
             toast.error(error.response?.data?.error || t('couldNotUpdatePayment'))
             return false
-        }
-    }
-
-    const getPayments = async () => {
-        try {
-            const { data } = await axios.get(backendUrl + '/api/admin/payments', authHeader)
-            setPayments(data.payments)
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotLoadPayments'))
         }
     }
 
@@ -331,40 +322,9 @@ const AdminContextProvider = (props) => {
     }
 
     // ==== Salary ("Ish haqi") ====
-    const [payRates, setPayRatesState] = useState([])
-
-    const getPayRates = async () => {
-        try {
-            const { data } = await axios.get(backendUrl + '/api/admin/pay-rates', authHeader)
-            setPayRatesState(data.rates)
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotLoadPayRates'))
-        }
-    }
-
-    const setPayRate = async (payload) => {
-        try {
-            await axios.post(backendUrl + '/api/admin/pay-rates', payload, authHeader)
-            toast.success(t('payRateSaved'))
-            getPayRates()
-            return true
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotSavePayRate'))
-            return false
-        }
-    }
-
-    const deletePayRate = async (id) => {
-        if (!(await confirm(t('confirmDeletePayRate')))) return
-        try {
-            await axios.delete(backendUrl + '/api/admin/pay-rates/' + id, authHeader)
-            toast.success(t('payRateDeleted'))
-            getPayRates()
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotDeletePayRate'))
-        }
-    }
-
+    // rate configuration (rateType/rateValue - the "Hisoblash usuli") is director-only (confirmed) -
+    // admin only ever calculates and pays, never sets or sees what percentage/method a teacher is
+    // paid at, so there's no pay-rate CRUD here at all, and the results below never carry that field.
     const calculateSalary = async (dateFrom, dateTo) => {
         try {
             const { data } = await axios.get(backendUrl + `/api/admin/salary/calculate?dateFrom=${dateFrom}&dateTo=${dateTo}`, authHeader)
@@ -400,8 +360,8 @@ const AdminContextProvider = (props) => {
         }
     }
 
-    // an advance against a teacher's salary, booked as its own 'Prepayment' expense category -
-    // blocked server-side once the real salary for this exact period has already been paid
+    // an advance against a teacher's salary, booked as its own "Avans" expense category - counts
+    // toward the same remaining-for-this-period figure as a real payout, so it's never blocked
     const prepaySalary = async (teacherId, amount, dateFrom, dateTo, method) => {
         try {
             await axios.post(backendUrl + '/api/admin/salary/prepay', { teacherId, amount, dateFrom, dateTo, method }, authHeader)
@@ -409,8 +369,7 @@ const AdminContextProvider = (props) => {
             return true
         } catch (error) {
             const code = error.response?.data?.error
-            if (code === 'salary_already_paid') toast.error(t('salaryAlreadyPaidError'))
-            else toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError') : (code || t('couldNotPrepaySalary')))
+            toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError') : (code || t('couldNotPrepaySalary')))
             return false
         }
     }
@@ -422,7 +381,7 @@ const AdminContextProvider = (props) => {
         try {
             await axios.post(backendUrl + '/api/admin/payments/' + paymentId + '/refund', amount !== undefined ? { amount } : {}, authHeader)
             toast.success(t('paymentRefunded'))
-            getPayments(); getStudents()
+            getStudents()
             return true
         } catch (error) {
             const code = error.response?.data?.error
@@ -440,7 +399,7 @@ const AdminContextProvider = (props) => {
         try {
             await axios.delete(backendUrl + '/api/admin/payments/' + paymentId, authHeader)
             toast.success(t('paymentDeleted'))
-            getPayments(); getStudents()
+            getStudents()
             return true
         } catch (error) {
             toast.error(error.response?.data?.error || t('couldNotDeletePayment'))
@@ -467,6 +426,7 @@ const AdminContextProvider = (props) => {
             const code = error.response?.data?.error
             if (code === 'teacher_schedule_conflict') toast.error(t('teacherScheduleConflict'))
             else if (code === 'room_schedule_conflict') toast.error(t('roomScheduleConflict'))
+            else if (code === 'end_date_before_start_date') toast.error(t('endDateBeforeStartDate'))
             else toast.error(code || t('couldNotCreateGroup'))
             return null
         }
@@ -494,6 +454,7 @@ const AdminContextProvider = (props) => {
             const code = error.response?.data?.error
             if (code === 'teacher_schedule_conflict') toast.error(t('teacherScheduleConflict'))
             else if (code === 'room_schedule_conflict') toast.error(t('roomScheduleConflict'))
+            else if (code === 'end_date_before_start_date') toast.error(t('endDateBeforeStartDate'))
             else toast.error(code || t('couldNotUpdateGroup'))
             return null
         }
@@ -547,9 +508,11 @@ const AdminContextProvider = (props) => {
         }
     }
 
+    // levelId is optional - a course can legitimately have zero levels defined, in which case its
+    // groups have no level either
     const suggestGroup = async (languageId, levelId) => {
         try {
-            const { data } = await axios.get(backendUrl + `/api/admin/groups/suggest?languageId=${languageId}&levelId=${levelId}`, authHeader)
+            const { data } = await axios.get(backendUrl + '/api/admin/groups/suggest', { params: { languageId, levelId: levelId || undefined }, ...authHeader })
             return data.suggestion
         } catch (error) {
             toast.error(error.response?.data?.error || t('couldNotFetchSuggestion'))
@@ -594,6 +557,33 @@ const AdminContextProvider = (props) => {
             setTeachers(data.teachers)
         } catch (error) {
             toast.error(error.response?.data?.error || t('couldNotLoadTeachers'))
+        }
+    }
+
+    // admin can add/edit a teacher for their own branch, but never delete one (director-only,
+    // confirmed spec) - there is deliberately no deleteTeacherAccount here and no delete affordance
+    // in the UI, only a warning note explaining why
+    const createTeacher = async (payload) => {
+        try {
+            await axios.post(backendUrl + '/api/admin/teachers', payload, authHeader)
+            toast.success(t('teacherCreated'))
+            getTeachers()
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotCreateTeacher'))
+            return false
+        }
+    }
+
+    const updateTeacher = async (id, payload) => {
+        try {
+            await axios.put(backendUrl + '/api/admin/teachers/' + id, payload, authHeader)
+            toast.success(t('teacherUpdated'))
+            getTeachers()
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotUpdateTeacher'))
+            return false
         }
     }
 
@@ -724,16 +714,6 @@ const AdminContextProvider = (props) => {
         }
     }
 
-    const updateGroupDiscount = async (id, discountPercent) => {
-        try {
-            await axios.put(backendUrl + '/api/admin/groups/' + id + '/discount', { discountPercent }, authHeader)
-            toast.success(t('discountSaved'))
-            return true
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotSaveDiscount'))
-            return false
-        }
-    }
 
     const getGroupAttendanceGrid = async (id, month) => {
         try {
@@ -1020,7 +1000,8 @@ const AdminContextProvider = (props) => {
             toast.success(t('expenseSaved'))
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotSaveExpense'))
+            const code = error.response?.data?.error
+            toast.error(code === 'expense_locked' ? t('expenseLockedError') : (code || t('couldNotSaveExpense')))
             return false
         }
     }
@@ -1032,7 +1013,8 @@ const AdminContextProvider = (props) => {
             toast.success(t('expenseDeleted'))
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotDeleteExpense'))
+            const code = error.response?.data?.error
+            toast.error(code === 'expense_locked' ? t('expenseLockedError') : (code || t('couldNotDeleteExpense')))
             return false
         }
     }
@@ -1251,14 +1233,14 @@ const AdminContextProvider = (props) => {
     }
 
     const value = {
-        token, login, logout,
-        students, getStudents, createStudent, updateStudent, deleteStudent, permanentlyDeleteStudent, unarchiveStudent, getStudentProfile, addStudentCourse, updateStudentCourse, linkParent,
-        applyDiscountToStudents,
-        payments, getPayments, createPayment, refundPayment, updatePayment, getFinanceOverview, getPaymentPreview, getPaymentDetail,
+        token, login, logout, initialLoading,
+        students, getStudents, createStudent, updateStudent, deleteStudent, permanentlyDeleteStudent, unarchiveStudent, getStudentProfile, linkParent,
+        applyDiscount, deleteDiscount, setStudentFreeze, pricingList, getPricingList,
+        createPayment, refundPayment, updatePayment, getFinanceOverview, getPaymentDetail,
         getStudentStatement, getReconciliation, deletePayment, getBusinessLedger,
-        payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, paySalary, prepaySalary, getSalaryDetail,
+        calculateSalary, paySalary, prepaySalary, getSalaryDetail,
         groups, getGroups, createGroup, getGroupProfile, updateGroup, deleteGroup, permanentlyDeleteGroup, unarchiveGroup, suggestGroup, addStudentToGroup, removeStudentFromGroup, retakeExam,
-        teachers, getTeachers,
+        teachers, getTeachers, createTeacher, updateTeacher,
         languages, getLanguages,
         levels, getLevels,
         me, getMe,
@@ -1266,7 +1248,7 @@ const AdminContextProvider = (props) => {
         createTeacherAttendanceQR, getTeacherProfile,
         getAttendanceOverview,
         rooms, getRooms, createRoom, updateRoom, deleteRoom,
-        getGroupDetails, updateGroupDiscount, getGroupAttendanceGrid,
+        getGroupDetails, getGroupAttendanceGrid,
         getGroupMaterials, addGroupMaterial, deleteGroupMaterial,
         getGroupComments, addGroupComment, deleteGroupComment,
         getExtraLessons, createExtraLesson, deleteExtraLesson,
@@ -1284,7 +1266,10 @@ const AdminContextProvider = (props) => {
 
     useEffect(() => {
         if (token) {
-            getStudents(); getGroups(); getPayments(); getTeachers(); getLanguages(); getMe(); getSettings(); getRooms(); getExpenseCategories(); getLeadSources()
+            setInitialLoading(true)
+            Promise.all([
+                getStudents(), getGroups(), getTeachers(), getLanguages(), getMe(), getSettings(), getRooms(), getExpenseCategories(), getLeadSources(), getPricingList(),
+            ]).finally(() => setInitialLoading(false))
         }
     }, [token])
 

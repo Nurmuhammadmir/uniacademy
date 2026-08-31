@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { ParentContext } from '../context/ParentContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import { useTheme } from '../context/ThemeContext.jsx'
 import FontSizeControl from '../components/FontSizeControl.jsx'
 import InstallAppCard from '../components/InstallAppCard.jsx'
 import { pushSupported, subscribeToPush, getExistingPushSubscription, unsubscribeFromPushLocally } from '../lib/push.js'
@@ -8,6 +9,7 @@ import { pushSupported, subscribeToPush, getExistingPushSubscription, unsubscrib
 const Profile = () => {
   const { me, logout, registerPushSubscription, unregisterPushSubscription } = useContext(ParentContext)
   const { t, lang, setLang, availableLanguages } = useLanguage()
+  const { isDark, toggleTheme } = useTheme()
   const [pushEnabled, setPushEnabled] = useState(false)
   const [togglingPush, setTogglingPush] = useState(false)
 
@@ -40,7 +42,7 @@ const Profile = () => {
       <p className='font-display text-2xl text-ink mb-6'>{t('profile')}</p>
 
       <div className='bg-bg-card border border-hairline rounded-2xl p-5 mb-4'>
-        <div className='w-14 h-14 rounded-full bg-accent-soft text-accent flex items-center justify-center font-display text-xl mb-4'>
+        <div className='w-14 h-14 rounded-full bg-accent-soft text-accent dark:bg-white/10 flex items-center justify-center font-display text-xl mb-4'>
           {me.name?.[0]?.toUpperCase()}
         </div>
         <p className='text-ink font-medium text-lg mb-1'>{me.name}</p>
@@ -82,6 +84,13 @@ const Profile = () => {
       )}
 
       <InstallAppCard />
+
+      {/* Sun/Moon toggle row, right above sign-out - no lucide-react in this app, so the icon is
+          a plain emoji glyph, matching the emoji already used for BottomNav's tab icons and
+          PasswordInput's show/hide toggle rather than pulling in a new icon dependency. */}
+      <button onClick={toggleTheme} className='w-full py-4 rounded-2xl border border-hairline text-ink font-medium mt-3 flex items-center justify-center gap-2'>
+        <span aria-hidden='true'>{isDark ? '☀️' : '🌙'}</span> {isDark ? t('lightModeBtn') : t('darkModeBtn')}
+      </button>
 
       <button onClick={logout} className='w-full py-4 rounded-2xl border border-hairline text-muted font-medium mt-3'>
         {t('signOut')}

@@ -3,7 +3,7 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 const statusStyles = {
   done: 'bg-gold text-white',
-  open: 'bg-accent-soft text-accent',
+  open: 'bg-accent-soft dark:bg-white/10 text-accent',
   rest: 'bg-hairline text-muted',
   expired: 'bg-hairline text-muted opacity-60',
 }
