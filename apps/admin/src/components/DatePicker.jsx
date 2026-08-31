@@ -3,7 +3,7 @@ import { Popover } from '@headlessui/react'
 import { DayPicker } from 'react-day-picker'
 import 'react-day-picker/style.css'
 import { enUS, ru, uz } from 'react-day-picker/locale'
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Calendar, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 // react-day-picker has no dedicated Karakalpak locale - falls back to Uzbek, same convention
@@ -18,10 +18,11 @@ const formatDMY = (d) => `${String(d.getDate()).padStart(2, '0')}.${String(d.get
 
 // react-day-picker's own Chevron renders a plain SVG that reads as heavy/mismatched next to the
 // rest of the app's lucide icon set - swap it for the real thing, still respecting whichever
-// direction react-day-picker asks for (nav arrows pass 'left'/'right', multi-month views can also
-// ask for 'up'/'down', not used here but handled for completeness)
+// direction react-day-picker asks for: nav arrows pass 'left'/'right', the year dropdown's own
+// caret passes 'down' (this used to fall through to the ChevronRight default, rendering as a
+// sideways arrow next to the year instead of a proper dropdown caret)
 const Chevron = ({ orientation, ...props }) => {
-  const Icon = orientation === 'left' ? ChevronLeft : ChevronRight
+  const Icon = orientation === 'left' ? ChevronLeft : orientation === 'down' ? ChevronDown : ChevronRight
   return <Icon size={16} strokeWidth={1.5} {...props} />
 }
 
@@ -30,10 +31,16 @@ const Chevron = ({ orientation, ...props }) => {
 // the filter bar around), and is deliberately sized down from react-day-picker's roomy desktop
 // default (see the .rdp-root size overrides in index.css) - a date picker this style is meant to be
 // glanced at for a second, not a full calendar app.
-const DatePicker = ({ value, onChange, className = '' }) => {
+// withYearSelect: for a field like date of birth, clicking "previous month" dozens of times to
+// reach 1995 is unusable - this adds a year dropdown next to the month caption (month itself still
+// just navigates via the existing prev/next arrows, no separate month dropdown - confirmed spec:
+// only the year needs to be pickable directly, and a second dropdown was overflowing the popover's
+// width anyway), bounded to a century back (comfortably covers any real birth date) through today.
+const DatePicker = ({ value, onChange, className = '', withYearSelect = false }) => {
   const { lang } = useLanguage()
   const selected = value ? new Date(value + 'T00:00:00') : undefined
   const formatted = selected ? formatDMY(selected) : ''
+  const today = new Date()
 
   return (
     <Popover className={className}>
@@ -53,6 +60,7 @@ const DatePicker = ({ value, onChange, className = '' }) => {
         className='z-50 w-[280px] rounded-2xl bg-white border border-slate-100 shadow-xl dark:bg-[#161F30] dark:border-slate-800 dark:shadow-black/40 p-4 transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 [--anchor-gap:6px]'>
         {({ close }) => (
           <DayPicker mode='single' selected={selected} locale={LOCALES[lang] || enUS} components={{ Chevron }}
+            {...(withYearSelect ? { captionLayout: 'dropdown-years', startMonth: new Date(today.getFullYear() - 100, 0), endMonth: today } : {})}
             onSelect={(d) => { onChange(d ? toISODate(d) : ''); close() }} />
         )}
       </Popover.Panel>

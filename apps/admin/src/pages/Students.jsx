@@ -548,7 +548,7 @@ const Students = () => {
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <div>
               <label className='text-xs text-muted mb-1 block'>{t('dateOfBirthLabel')}</label>
-              <DatePicker value={form.dateOfBirth} onChange={(v) => setForm({ ...form, dateOfBirth: v })} />
+              <DatePicker withYearSelect value={form.dateOfBirth} onChange={(v) => setForm({ ...form, dateOfBirth: v })} />
             </div>
             <input
               placeholder={settings?.passportRequired === false ? t('passportIdInfoOptional') : t('passportIdInfo')}
@@ -590,7 +590,7 @@ const Students = () => {
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' />
             <div>
               <label className='text-xs text-muted mb-1 block'>{t('dateOfBirthLabel')}</label>
-              <DatePicker value={editForm.dateOfBirth} onChange={(v) => setEditForm({ ...editForm, dateOfBirth: v })} />
+              <DatePicker withYearSelect value={editForm.dateOfBirth} onChange={(v) => setEditForm({ ...editForm, dateOfBirth: v })} />
             </div>
             <input
               placeholder={settings?.passportRequired === false ? t('passportIdInfoOptional') : t('passportIdInfo')}

@@ -201,6 +201,25 @@ table tbody tr:last-child td {
   font-weight: 600;
   color: #1D1D1F;
 }
+/* the year dropdown (withYearSelect) - the real <select> stays invisible (react-day-picker's own
+   base CSS), overlaid on this pill so it still LOOKS like a normal styled control instead of the
+   browser's bare default outline/box poking through around the caption text */
+.rdp-dropdown_root {
+  border-radius: 8px;
+  padding: 1px 4px;
+  transition: background-color 0.15s;
+}
+.rdp-dropdown_root:hover {
+  background-color: #f1f5f9;
+}
+.rdp-root .rdp-dropdown:focus-visible ~ .rdp-caption_label {
+  outline: 2px solid #0066CC;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.rdp-chevron {
+  fill: #9CA3AF;
+}
 .rdp-weekday {
   font-size: 11px;
   font-weight: 500;
@@ -239,6 +258,15 @@ table tbody tr:last-child td {
 }
 .dark .rdp-month_caption {
   color: #F8FAFC;
+}
+.dark .rdp-dropdown_root:hover {
+  background-color: #1E293B;
+}
+.dark .rdp-root .rdp-dropdown:focus-visible ~ .rdp-caption_label {
+  outline-color: #4F46E5;
+}
+.dark .rdp-chevron {
+  fill: #64748B;
 }
 .dark .rdp-weekday {
   color: #94A3B8;
