@@ -1,10 +1,10 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Edit2, Printer } from 'lucide-react'
+import { Edit2, Printer, Lock } from 'lucide-react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney, paymentMethodLabelKey } from '../lib/format.js'
-import { formatDateTime as fullDate } from '../lib/date.js'
+import { formatDateTime as fullDate, todayISO } from '../lib/date.js'
 import Select from '../components/Select.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
 
@@ -75,10 +75,14 @@ const TransactionDetail = ({ type }) => {
             </button>
           )}
           {isPayment && !record.refunded && (
-            <button onClick={openEditPayment}
-              className='bg-slate-100 hover:bg-slate-200 dark:bg-[#1E293B] dark:hover:bg-[#334155] text-slate-700 dark:text-slate-200 rounded-xl px-4 py-2 text-xs font-semibold flex items-center gap-2 transition-colors'>
-              <Edit2 size={14} strokeWidth={1.5} className='w-4 h-4' /> {t('edit')}
-            </button>
+            record.date.slice(0, 10) === todayISO() ? (
+              <button onClick={openEditPayment}
+                className='bg-slate-100 hover:bg-slate-200 dark:bg-[#1E293B] dark:hover:bg-[#334155] text-slate-700 dark:text-slate-200 rounded-xl px-4 py-2 text-xs font-semibold flex items-center gap-2 transition-colors'>
+                <Edit2 size={14} strokeWidth={1.5} className='w-4 h-4' /> {t('edit')}
+              </button>
+            ) : (
+              <span title={t('paymentLockedHint')} className='inline-flex items-center gap-1 text-slate-300 dark:text-slate-600 text-xs px-2'><Lock size={14} strokeWidth={1.5} /></span>
+            )
           )}
         </div>
       </div>

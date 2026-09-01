@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
-import { CreditCard, TrendingUp, SlidersHorizontal, Printer } from 'lucide-react'
+import { CreditCard, TrendingUp, SlidersHorizontal, Printer, Lock } from 'lucide-react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
@@ -86,6 +86,10 @@ const FinancePayments = () => {
   // doesn't mean anything (e.g. filtering to one student still subtracts the entire branch's
   // expenses), so the headline figure is replaced with an explanation instead of a wrong number.
   const hasNonNeutralFilter = !!(appliedFilters.search || appliedFilters.groupId || appliedFilters.teacherId)
+  // matches the backend's own same-day lock (adminController.js's isEditableToday) - a payment can
+  // only be refunded/deleted while it's still dated today; once the day rolls over it's locked in,
+  // so a branch's daily cash position can't quietly change after the fact
+  const isEditableToday = (payment) => payment.date.slice(0, 10) === todayISO()
 
   const toggleNetProfitBreakdown = async () => {
     if (showNetProfitBreakdown) { setShowNetProfitBreakdown(false); return }
@@ -253,12 +257,16 @@ const FinancePayments = () => {
                   </button>
                   {p.refunded ? (
                     <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted mr-2'>{t('refundedBadge')}</span>
+                  ) : !isEditableToday(p) ? (
+                    <span title={t('paymentLockedHint')} className='inline-flex items-center gap-1 text-slate-300 dark:text-slate-600 text-xs mr-2'><Lock size={13} strokeWidth={1.75} /></span>
                   ) : (
                     <button onClick={(e) => { e.stopPropagation(); openRefund(p) }} className='text-muted text-xs font-medium mr-3'>{t('refundBtn')}</button>
                   )}
-                  <button onClick={async (e) => { e.stopPropagation(); if (await deletePayment(p._id)) load() }} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>
-                    {t('deleteBtn')}
-                  </button>
+                  {isEditableToday(p) && (
+                    <button onClick={async (e) => { e.stopPropagation(); if (await deletePayment(p._id)) load() }} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>
+                      {t('deleteBtn')}
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

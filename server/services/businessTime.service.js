@@ -14,3 +14,15 @@ export const endOfLocalDay = (dateStr) => new Date(startOfLocalDay(dateStr).getT
 // "today" a human means when they say "today's expense" - not the UTC calendar date, which can
 // already be tomorrow in Tashkent for several hours each evening
 export const todayLocalISO = () => new Date(Date.now() + TZ_OFFSET_MS).toISOString().slice(0, 10)
+
+// confirmed spec: a financial record (payment or expense) can only be edited/deleted/refunded on
+// the same business-local calendar day it's dated for - once that day has passed, it's locked as
+// permanent history, so a branch's daily cash position can never quietly change after the fact.
+// Shared by expenseController and adminController's payment endpoints so this rule can't drift
+// between the two. Keyed off the record's own `date` field (when it happened), not `createdAt`
+// (when someone typed it in) - those can differ if it's logged for an earlier time the same day,
+// but never differ once a whole day has actually rolled over.
+export const isEditableToday = (record) => {
+    const today = todayLocalISO()
+    return record.date >= startOfLocalDay(today) && record.date <= endOfLocalDay(today)
+}

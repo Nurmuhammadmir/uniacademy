@@ -1,4 +1,5 @@
 import React, { useContext, useEffect, useMemo, useState } from 'react'
+import { Lock } from 'lucide-react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Select from '../components/Select.jsx'
@@ -182,9 +183,13 @@ const CourseStatement = ({ course, onDeletePayment, t }) => (
               <td className='px-3 py-2.5 text-right font-mono text-ink'>{formatMoney(e.balanceAfter)}</td>
               <td className='px-3 py-2.5 text-right no-print'>
                 {e.paymentId && (
-                  <button onClick={() => onDeletePayment(e.paymentId)} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>
-                    {t('deleteBtn')}
-                  </button>
+                  e.date.slice(0, 10) === todayISO() ? (
+                    <button onClick={() => onDeletePayment(e.paymentId)} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>
+                      {t('deleteBtn')}
+                    </button>
+                  ) : (
+                    <span title={t('paymentLockedHint')} className='inline-flex items-center gap-1 text-slate-300 dark:text-slate-600 text-xs'><Lock size={13} strokeWidth={1.75} /></span>
+                  )
                 )}
               </td>
             </tr>

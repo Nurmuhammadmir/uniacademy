@@ -255,15 +255,7 @@ export const updateLead = async (req, res) => {
     }
 }
 
-export const deleteLead = async (req, res) => {
-    try {
-        await Lead.findOneAndDelete({ _id: req.params.id, branchId: req.auth.branchId })
-        res.json({ deleted: true })
-    } catch (error) {
-        console.log(error)
-        res.status(500).json({ error: 'server_error' })
-    }
-}
+// confirmed spec: a lead is never permanently deletable - no deleteLead exists here at all
 
 // ==== Lead intake forms ====
 

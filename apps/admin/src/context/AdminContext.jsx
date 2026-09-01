@@ -145,21 +145,8 @@ const AdminContextProvider = (props) => {
         }
     }
 
-    // genuinely irreversible - erases the student and every payment/attendance/exam/homework
-    // record referencing them, not just an archive. The strong warning lives in the confirm text
-    // itself since confirm() here is a plain yes/no, not a type-to-confirm dialog.
-    const permanentlyDeleteStudent = async (id) => {
-        if (!(await confirm(t('confirmPermanentlyDeleteStudent')))) return false
-        try {
-            await axios.delete(backendUrl + '/api/admin/students/' + id + '/permanent', authHeader)
-            toast.success(t('studentPermanentlyDeleted'))
-            getStudents()
-            return true
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotDeleteStudentPermanently'))
-            return false
-        }
-    }
+    // confirmed spec: a student can never be permanently deleted from the admin app, only
+    // archived/reactivated - no permanentlyDeleteStudent exists here at all
 
     const getStudentProfile = async (id) => {
         try {
@@ -307,7 +294,8 @@ const AdminContextProvider = (props) => {
             getStudents()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotUpdatePayment'))
+            const code = error.response?.data?.error
+            toast.error(code === 'payment_locked' ? t('paymentLockedError') : (code || t('couldNotUpdatePayment')))
             return false
         }
     }
@@ -391,6 +379,7 @@ const AdminContextProvider = (props) => {
             const code = error.response?.data?.error
             if (code === 'invalid_refund_amount') toast.error(t('invalidRefundAmountError'))
             else if (code === 'already_refunded') toast.error(t('alreadyRefundedError'))
+            else if (code === 'payment_locked') toast.error(t('paymentLockedError'))
             else toast.error(code || t('couldNotRefundPayment'))
             return false
         }
@@ -406,7 +395,8 @@ const AdminContextProvider = (props) => {
             getStudents()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotDeletePayment'))
+            const code = error.response?.data?.error
+            toast.error(code === 'payment_locked' ? t('paymentLockedError') : (code || t('couldNotDeletePayment')))
             return false
         }
     }
@@ -1121,17 +1111,6 @@ const AdminContextProvider = (props) => {
         }
     }
 
-    const deleteLead = async (id) => {
-        if (!(await confirm(t('confirmDeleteLead')))) return false
-        try {
-            await axios.delete(backendUrl + '/api/admin/leads/' + id, authHeader)
-            return true
-        } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotDeleteLead'))
-            return false
-        }
-    }
-
     // ==== Lead sources (manageable list, used by the board filter, subgroup auto-intake, and forms) ====
     const [leadSources, setLeadSources] = useState([])
 
@@ -1239,7 +1218,7 @@ const AdminContextProvider = (props) => {
 
     const value = {
         token, login, logout, initialLoading,
-        students, getStudents, createStudent, updateStudent, deleteStudent, permanentlyDeleteStudent, unarchiveStudent, getStudentProfile, linkParent,
+        students, getStudents, createStudent, updateStudent, deleteStudent, unarchiveStudent, getStudentProfile, linkParent,
         applyDiscount, deleteDiscount, setStudentFreeze, pricingList, getPricingList,
         createPayment, refundPayment, updatePayment, getFinanceOverview, getPaymentDetail,
         getStudentStatement, getReconciliation, deletePayment, getBusinessLedger,
@@ -1261,7 +1240,7 @@ const AdminContextProvider = (props) => {
         getGroupExamsTab, getTimetable,
         getLeadsBoard, createLeadColumn, updateLeadColumn, deleteLeadColumn,
         createLeadSubgroup, updateLeadSubgroup, deleteLeadSubgroup,
-        createLead, updateLead, deleteLead,
+        createLead, updateLead,
         getTeacherAttendanceGrid, getStudentAttendanceGrid, getLessonDetail, setLessonTeacherStatus,
         expenseCategories, getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
         getExpensesOverview, createExpense, updateExpense, deleteExpense, getExpenseDetail,

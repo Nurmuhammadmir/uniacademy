@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useContext, useEffect, useRef, useState } from '
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Menu } from '@headlessui/react'
-import { MoreHorizontal, Edit2, CreditCard, Archive, RotateCcw, Trash2, Plus, Download, Tag, Search, Users, Phone, AlertCircle } from 'lucide-react'
+import { MoreHorizontal, Edit2, CreditCard, Archive, RotateCcw, Plus, Download, Tag, Search, Users, Phone, AlertCircle } from 'lucide-react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
@@ -33,7 +33,7 @@ const MapFallback = () => (
 // `overflow-hidden` (needed for its rounded corners) clips/misplaces for any row near the bottom of
 // the table. Anchored positioning escapes that clipping instead of fighting it.
 const MENU_ITEM = 'plain w-full flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-lg transition-colors'
-const RowActionsMenu = ({ student, statusTab, onEdit, onPay, onArchive, onUnarchive, onDeletePermanently, t }) => (
+const RowActionsMenu = ({ student, statusTab, onEdit, onPay, onArchive, onUnarchive, t }) => (
   <Menu as='div' className='relative inline-block text-left' onClick={e => e.stopPropagation()}>
     <Menu.Button className='plain p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors dark:text-slate-600 dark:hover:text-slate-300 dark:hover:bg-slate-800/40'>
       <MoreHorizontal size={18} strokeWidth={1.5} />
@@ -57,9 +57,8 @@ const RowActionsMenu = ({ student, statusTab, onEdit, onPay, onArchive, onUnarch
           {({ active }) => <button onClick={() => onUnarchive(student._id)} className={`${MENU_ITEM} text-slate-700 dark:text-slate-300 ${active ? 'bg-slate-50 dark:bg-slate-800/40' : ''}`}><RotateCcw size={14} strokeWidth={1.5} /> {t('reactivateBtn')}</button>}
         </Menu.Item>
       )}
-      <Menu.Item>
-        {({ active }) => <button onClick={() => onDeletePermanently(student._id)} className={`${MENU_ITEM} text-rose-600 dark:text-rose-400 ${active ? 'bg-rose-50 dark:bg-rose-500/10' : ''}`}><Trash2 size={14} strokeWidth={1.5} /> {t('deletePermanentlyBtn')}</button>}
-      </Menu.Item>
+      {/* confirmed spec: a student can never be permanently deleted from the admin app, only
+          archived/reactivated - no delete-forever action exists here at all */}
     </Menu.Items>
   </Menu>
 )
@@ -169,7 +168,7 @@ const SwipeableStudentCard = ({ student, statusTab, owed, courseTags, selecting,
 }
 
 const Students = () => {
-  const { students, createStudent, updateStudent, deleteStudent, permanentlyDeleteStudent, unarchiveStudent, createPayment, applyDiscount, languages, settings, groups } = useContext(AdminContext)
+  const { students, createStudent, updateStudent, deleteStudent, unarchiveStudent, createPayment, applyDiscount, languages, settings, groups } = useContext(AdminContext)
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -515,7 +514,7 @@ const Students = () => {
                 </td>
                 <td className='w-12 pr-4 py-4 align-middle text-right whitespace-nowrap'>
                   <RowActionsMenu student={s} statusTab={statusTab} onEdit={openEdit} onPay={openPay}
-                    onArchive={deleteStudent} onUnarchive={unarchiveStudent} onDeletePermanently={permanentlyDeleteStudent} t={t} />
+                    onArchive={deleteStudent} onUnarchive={unarchiveStudent} t={t} />
                 </td>
               </tr>
             ))}

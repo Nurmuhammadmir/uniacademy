@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Phone, Wallet, Pencil, Archive, Trash2, Receipt, UsersRound, Plus, Printer, Snowflake } from 'lucide-react'
+import { ArrowLeft, Phone, Wallet, Pencil, Archive, Receipt, UsersRound, Plus, Printer, Snowflake, Lock } from 'lucide-react'
 import { formatMoney, paymentMethodLabelKey, remainingAmount, groupLabel } from '../lib/format.js'
 import { todayISO, formatUTCDate, formatDateTime } from '../lib/date.js'
 import { AdminContext } from '../context/AdminContext.jsx'
@@ -27,7 +27,7 @@ const StudentProfile = () => {
   const navigate = useNavigate()
   const {
     getStudentProfile,
-    refundPayment, updatePayment, updateStudent, deleteStudent, permanentlyDeleteStudent,
+    refundPayment, updatePayment, updateStudent, deleteStudent,
     groups, addStudentToGroup, removeStudentFromGroup, linkParent, getStudentStatement, createPayment,
     setStudentFreeze, deleteDiscount,
   } = useContext(AdminContext)
@@ -71,6 +71,10 @@ const StudentProfile = () => {
     setSavingParent(false)
     if (ok) setParentForm({ parentPhone: '', parentPassword: '' })
   }
+
+  // matches the backend's own same-day lock (adminController.js's isEditableToday) - a payment can
+  // only be edited/refunded while it's still dated today
+  const isEditableToday = (payment) => payment.date.slice(0, 10) === todayISO()
 
   const openRefund = (payment) => {
     setRefundingPayment(payment)
@@ -124,11 +128,6 @@ const StudentProfile = () => {
 
   const handleArchive = async () => {
     const ok = await deleteStudent(studentId)
-    if (ok) navigate('/')
-  }
-
-  const handleDeletePermanently = async () => {
-    const ok = await permanentlyDeleteStudent(studentId)
     if (ok) navigate('/')
   }
 
@@ -267,11 +266,11 @@ const StudentProfile = () => {
               <button onClick={openEditStudent} className='flex-1 py-2 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-xs font-medium flex items-center justify-center gap-1.5 transition-colors dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200 dark:border-none'>
                 <Pencil size={13} strokeWidth={1.5} /> {t('edit')}
               </button>
+              {/* confirmed spec: a student can never be permanently deleted from the admin app, only
+                  archived - so there's no delete action here at all, not even hidden behind a
+                  confirm step. Archiving already keeps their real history intact and reversible. */}
               <button onClick={handleArchive} className='flex-1 py-2 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-xs font-medium flex items-center justify-center gap-1.5 transition-colors dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200 dark:border-none'>
                 <Archive size={13} strokeWidth={1.5} /> {t('archiveBtn')}
-              </button>
-              <button onClick={handleDeletePermanently} className='py-2 px-2.5 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 transition-colors dark:text-slate-600 dark:hover:text-rose-400 dark:hover:bg-rose-500/10'>
-                <Trash2 size={14} strokeWidth={1.5} />
               </button>
             </div>
 
@@ -401,6 +400,8 @@ const StudentProfile = () => {
                       </button>
                       {item.payment.refunded ? (
                         <span className='text-xs font-medium px-2 py-1 rounded-full bg-white text-muted dark:bg-[#1E293B]'>{t('refundedBadge')}</span>
+                      ) : !isEditableToday(item.payment) ? (
+                        <span title={t('paymentLockedHint')} className='inline-flex items-center gap-1 text-slate-300 dark:text-slate-600 text-xs'><Lock size={13} strokeWidth={1.75} /></span>
                       ) : (
                         <>
                           {!item.payment.refundedAmount && <button onClick={() => openEditPayment(item.payment)} className='text-accent text-xs font-medium dark:text-[#818CF8]'>{t('editPaymentBtn')}</button>}

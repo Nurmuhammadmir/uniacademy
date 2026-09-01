@@ -27,7 +27,7 @@ const bucketKey = (columnId, subgroupId) => `bucket-${columnId}-${subgroupId || 
 // together and the delete button could end up scrolled off-screen once a card in a narrow column
 // grew tall enough. Editing now opens a proper centered modal instead; the card itself always stays
 // the plain, minimal display (name/phone/source/call) no matter what.
-const LeadEditModal = ({ lead, sources, onSave, onDelete, onEditForm, onClose, t }) => {
+const LeadEditModal = ({ lead, sources, onSave, onEditForm, onClose, t }) => {
   const [form, setForm] = useState({ name: lead.name, phone: lead.phone, source: lead.source, comment: lead.comment })
 
   const save = async (e) => {
@@ -55,11 +55,9 @@ const LeadEditModal = ({ lead, sources, onSave, onDelete, onEditForm, onClose, t
           {lead.formId && (
             <button type='button' onClick={() => onEditForm(lead.formId)} className='text-accent dark:text-[#818CF8] text-xs font-medium text-left'>{t('editFormBtn')}</button>
           )}
-          <div className='flex justify-between items-center mt-2'>
-            <button type='button' onClick={() => onDelete(lead._id)}
-              className='px-3 py-2 rounded-lg text-slate-400 dark:text-slate-600 hover:text-rose-500 hover:bg-rose-50 dark:hover:text-rose-400 dark:hover:bg-rose-500/10 text-sm transition-colors'>{t('removeBtn')}</button>
-            <button type='submit' className='px-4 py-2.5 rounded-xl bg-accent text-white text-sm font-medium dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 transition-colors'>{t('sendBtn')}</button>
-          </div>
+          {/* confirmed spec: a lead can never be deleted, only moved/edited - so there's no delete
+              action here at all, not even hidden behind a confirm step */}
+          <button type='submit' className='px-4 py-2.5 rounded-xl bg-accent text-white text-sm font-medium mt-2 dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 transition-colors'>{t('sendBtn')}</button>
         </form>
       </div>
     </div>
@@ -68,7 +66,7 @@ const LeadEditModal = ({ lead, sources, onSave, onDelete, onEditForm, onClose, t
 
 const DEFAULT_DOT_COLOR = '#94A3B8'
 
-const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onDelete, onEditForm, t, isCompact }) => {
+const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, t, isCompact }) => {
   const [editing, setEditing] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: 'lead-' + lead._id, data: { type: 'lead', leadId: lead._id, columnId, subgroupId },
@@ -92,7 +90,7 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onDelete, onEdi
           <span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: dotColor }} />
         </button>
         {editing && (
-          <LeadEditModal lead={lead} sources={sources} onSave={onSave} onDelete={onDelete} onEditForm={onEditForm} onClose={() => setEditing(false)} t={t} />
+          <LeadEditModal lead={lead} sources={sources} onSave={onSave} onEditForm={onEditForm} onClose={() => setEditing(false)} t={t} />
         )}
       </div>
     )
@@ -116,13 +114,13 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onDelete, onEdi
       </div>
 
       {editing && (
-        <LeadEditModal lead={lead} sources={sources} onSave={onSave} onDelete={onDelete} onEditForm={onEditForm} onClose={() => setEditing(false)} t={t} />
+        <LeadEditModal lead={lead} sources={sources} onSave={onSave} onEditForm={onEditForm} onClose={() => setEditing(false)} t={t} />
       )}
     </div>
   )
 }
 
-const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, onDeleteLead, onAddLead, onEditForm, isCompact }) => {
+const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, onAddLead, onEditForm, isCompact }) => {
   const { setNodeRef } = useDroppable({ id: bucketKey(columnId, subgroupId), data: { type: 'bucket', columnId, subgroupId } })
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', source: sources[0]?.name || 'Other', comment: '' })
@@ -138,7 +136,7 @@ const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, o
       <SortableContext items={leads.map(l => 'lead-' + l._id)} strategy={verticalListSortingStrategy}>
         {leads.map(lead => (
           <LeadCard key={lead._id} lead={lead} columnId={columnId} subgroupId={subgroupId} sources={sources}
-            onSave={onSaveLead} onDelete={onDeleteLead} onEditForm={onEditForm} t={t} isCompact={isCompact} />
+            onSave={onSaveLead} onEditForm={onEditForm} t={t} isCompact={isCompact} />
         ))}
       </SortableContext>
       {!locked && (adding ? (
@@ -286,7 +284,7 @@ const Leads = () => {
   const {
     getLeadsBoard, createLeadColumn, updateLeadColumn, deleteLeadColumn,
     createLeadSubgroup, updateLeadSubgroup, deleteLeadSubgroup,
-    createLead, updateLead, deleteLead, leadSources, getLeadSources,
+    createLead, updateLead, leadSources, getLeadSources,
   } = useContext(AdminContext)
   const { t } = useLanguage()
 
@@ -404,11 +402,6 @@ const Leads = () => {
     const lead = await updateLead(id, form)
     if (lead) { setLeads(ls => ls.map(l => l._id === id ? lead : l)); return true }
     return false
-  }
-
-  const onDeleteLead = async (id) => {
-    const ok = await deleteLead(id)
-    if (ok) setLeads(ls => ls.filter(l => l._id !== id))
   }
 
   const submitNewColumn = async (e) => {
@@ -540,7 +533,7 @@ const Leads = () => {
                   t={t} onRename={onRename} onToggleLock={onToggleLock} onDelete={onDeleteColumn}
                   onAddSubgroup={onAddSubgroup} onRenameSubgroup={onRenameSubgroup} onDeleteSubgroup={onDeleteSubgroup}
                   onOpenAutoIntake={setAutoIntakeSubgroup} onOpenFormWizard={(columnId) => setFormWizard({ columnId })}
-                  onSaveLead={onSaveLead} onDeleteLead={onDeleteLead} onAddLead={onAddLead}
+                  onSaveLead={onSaveLead} onAddLead={onAddLead}
                   onEditForm={(formId) => setFormWizard({ formId })} isCompact={isCompact} />
               </div>
             ))}

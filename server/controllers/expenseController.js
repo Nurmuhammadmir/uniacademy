@@ -4,19 +4,9 @@ import mongoose from "mongoose"
 import Expense, { EXPENSE_METHODS } from "../models/Expense.js"
 import ExpenseCategory from "../models/ExpenseCategory.js"
 import LedgerEntry from "../models/LedgerEntry.js"
-import { startOfLocalDay, endOfLocalDay, todayLocalISO } from "../services/businessTime.service.js"
+import { startOfLocalDay, endOfLocalDay, isEditableToday } from "../services/businessTime.service.js"
 import { ensureDefaultCategories, OTHER_CATEGORY } from "../services/expenseCategories.service.js"
 import { getOrCreateAccount, postEntry, deleteEntries } from "../services/ledger.service.js"
-
-// an expense can only be edited/deleted on the same (business-local) calendar day it's dated for -
-// once that day has passed, the record is locked so a branch's daily cash position can't quietly
-// change after the fact. Keyed off the expense's own `date` field (when it happened), not
-// `createdAt` (when someone typed it in) - those can differ if an expense is logged for an earlier
-// time the same day, but never differ once a whole day has actually rolled over.
-const isEditableToday = (expense) => {
-    const today = todayLocalISO()
-    return expense.date >= startOfLocalDay(today) && expense.date <= endOfLocalDay(today)
-}
 
 // ==== Categories ====
 

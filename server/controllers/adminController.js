@@ -26,11 +26,10 @@ import { assertNoScheduleConflict } from "../services/scheduleConflict.service.j
 import { suggestLeastLoadedGroup } from "../services/loadBalance.service.js"
 import { enrollStudentMidCycle } from "../services/enrollMidCycle.service.js"
 import { computeDayCounter, startDateForTargetDayToday } from "../services/dayCounter.service.js"
-import { hardDeleteStudent } from "../services/studentCascade.service.js"
 import { hardDeleteGroup } from "../services/groupCascade.service.js"
 import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
-import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
+import { startOfLocalDay, endOfLocalDay, isEditableToday } from "../services/businessTime.service.js"
 import { ensureDefaultCategories, ensureCategoryExists, SALARY_CATEGORY, PREPAYMENT_CATEGORY, REFUND_CATEGORY } from "../services/expenseCategories.service.js"
 import { computeStudentStatements, computeReconciliation, computeGroupRevenue } from "../services/studentLedger.service.js"
 import { earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
@@ -731,21 +730,10 @@ export const deleteStudent = async (req, res) => {
     }
 }
 
-// genuine, permanent delete - unlike deleteStudent above (which only archives), this actually
-// erases the student and every record referencing them (payments, attendance, exam history,
-// homework progress, group membership, parent links). Irreversible - the frontend gates this
-// behind its own explicit warning confirm before ever calling it.
-export const permanentlyDeleteStudent = async (req, res) => {
-    try {
-        const student = await User.findOne({ _id: req.params.id, branchId: req.auth.branchId, role: 'student' }).lean()
-        if (!student) return res.status(404).json({ error: 'not_found' })
-        await hardDeleteStudent(student._id)
-        res.json({ deleted: true })
-    } catch (error) {
-        console.log(error)
-        res.status(500).json({ error: 'server_error' })
-    }
-}
+// confirmed spec: an admin can never permanently delete a student, only archive/unarchive one (see
+// deleteStudent/unarchiveStudent above) - that capability stays director-only now (see
+// directorController.js's own permanentlyDeleteStudent), so there's no admin-facing route for it at
+// all anymore, not just a hidden/removed button.
 
 // api to bring an archived student back to active (undoes an accidental archive)
 export const unarchiveStudent = async (req, res) => {
@@ -943,6 +931,10 @@ export const refundPayment = async (req, res) => {
     try {
         const payment = await Payment.findById(req.params.id)
         if (!payment) return res.status(404).json({ error: 'not_found' })
+        // confirmed spec: same same-day rule as editing/deleting a payment outright (see
+        // updatePayment/deletePayment below) - once the day it happened has passed, it's locked
+        // history and can't be refunded through this endpoint either.
+        if (!isEditableToday(payment)) return res.status(403).json({ error: 'payment_locked' })
 
         // rows refunded before refundedAmount existed have refunded:true but refundedAmount:0 - treat
         // that combination as "fully refunded" (what refunded:true always meant back then) rather
@@ -1006,6 +998,7 @@ export const deletePayment = async (req, res) => {
     try {
         const payment = await Payment.findById(req.params.id)
         if (!payment) return res.status(404).json({ error: 'not_found' })
+        if (!isEditableToday(payment)) return res.status(403).json({ error: 'payment_locked' })
         const student = await User.findOne({ _id: payment.studentId, branchId: req.auth.branchId })
         if (!student) return res.status(404).json({ error: 'not_found' })
 
@@ -1035,6 +1028,7 @@ export const updatePayment = async (req, res) => {
         const { amount, method } = req.body
         const payment = await Payment.findById(req.params.id)
         if (!payment) return res.status(404).json({ error: 'not_found' })
+        if (!isEditableToday(payment)) return res.status(403).json({ error: 'payment_locked' })
         if (payment.refundedAmount > 0) return res.status(400).json({ error: 'already_refunded' })
 
         if (amount !== undefined && Number(amount) !== payment.amount) {

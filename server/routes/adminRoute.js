@@ -1,7 +1,7 @@
 import express from "express"
 import requireRole from "../middleware/auth.js"
 import {
-    createStudent, listStudents, updateStudent, deleteStudent, permanentlyDeleteStudent, unarchiveStudent, getStudentProfile, linkParent,
+    createStudent, listStudents, updateStudent, deleteStudent, unarchiveStudent, getStudentProfile, linkParent,
     createPayment, refundPayment, deletePayment, updatePayment, getFinanceOverview, getPaymentDetail,
     createGroup, listGroups, getGroupProfile, updateGroup, deleteGroup, permanentlyDeleteGroup, unarchiveGroup, suggestGroup, addStudentToGroup, removeStudentFromGroup,
     retakeExam, listBranchTeachers, createTeacher, updateTeacher, getTeacherProfile, getTeacherAttendanceGrid, getStudentAttendanceGrid, getLessonDetail, setLessonTeacherStatus,
@@ -23,7 +23,7 @@ import {
 import {
     getLeadsBoard, createColumn, updateColumn, deleteColumn,
     createSubgroup, updateSubgroup, deleteSubgroup,
-    createLead, updateLead, deleteLead,
+    createLead, updateLead,
     listLeadSources, createLeadSource, updateLeadSource, deleteLeadSource,
     listLeadForms, getLeadForm, createLeadForm, updateLeadForm, deleteLeadForm,
 } from "../controllers/leadsController.js"
@@ -61,7 +61,6 @@ adminRouter.get('/students/:id/attendance-grid', getStudentAttendanceGrid)
 adminRouter.get('/students/:id/statement', getStudentStatement)
 adminRouter.put('/students/:id', updateStudent)
 adminRouter.delete('/students/:id', deleteStudent)
-adminRouter.delete('/students/:id/permanent', permanentlyDeleteStudent)
 adminRouter.post('/students/:id/unarchive', unarchiveStudent)
 adminRouter.post('/students/:id/parent', linkParent)
 adminRouter.put('/students/:id/freeze', setStudentFreeze)
@@ -124,7 +123,9 @@ adminRouter.put('/leads/subgroups/:id', updateSubgroup)
 adminRouter.delete('/leads/subgroups/:id', deleteSubgroup)
 adminRouter.post('/leads', createLead)
 adminRouter.put('/leads/:id', updateLead)
-adminRouter.delete('/leads/:id', deleteLead)
+// confirmed spec: a lead is never permanently deletable, only moved through the board or edited -
+// no DELETE route exists for a single lead at all (unlike columns/subgroups/sources/forms, which
+// are just board structure, not customer records)
 
 adminRouter.get('/leads/sources', listLeadSources)
 adminRouter.post('/leads/sources', createLeadSource)
