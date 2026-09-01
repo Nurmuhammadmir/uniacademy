@@ -38,7 +38,7 @@ import { computeBusinessLedger } from "../services/businessLedger.service.js"
 import { applyDiscountToStudent, deleteDiscountEntry } from "../services/discountApplication.service.js"
 import { openMembership, closeMembership } from "../services/groupMembership.service.js"
 import { getOrCreateAccount, postTransfer, postEntry, deleteEntries } from "../services/ledger.service.js"
-import { recognizeEnrollmentDebt, computeCourseOwed, recomputeEnrollmentStatus, reverseUnusedPeriod } from "../services/billingCycle.service.js"
+import { recognizeEnrollmentDebt, computeCourseOwed, recomputeEnrollmentStatus, reverseUnusedPeriod, recognizeNextPeriod } from "../services/billingCycle.service.js"
 
 // api for the teacher profile view, admin version - scoped to admin's own branch. A teacher may
 // work in more than one branch (additionalBranchIds), so visibility is membership, not equality -
@@ -674,12 +674,18 @@ export const deleteDiscount = async (req, res) => {
 }
 
 // freeze/unfreeze a student's WHOLE account - for when they can't come for a while (e.g. travelling
-// abroad). Pauses billing only (confirmed: whole-account, not per-course, not per-group): the daily
-// billing-cycle job skips every one of a frozen student's courses, so no new debt accrues anywhere
-// on their account while frozen - whatever's already on their balance just sits there instead of
-// being consumed by a period they were never billed for. Attendance/homework are completely
-// untouched - they're driven by Group.schedulePattern/dayCounter, an entirely separate system.
-// Toggled from the student's profile.
+// abroad). Whole-account, not per-course/per-group (confirmed spec).
+// Freezing immediately returns the UNUSED tail of whatever period is currently in progress on each
+// of their courses back to their balance - the exact same day-proration reversal
+// removeStudentFromGroup already uses (see reverseUnusedPeriod) - and "un-recognizes" that
+// now-partially-reversed period (clears recognizedThrough) so it isn't silently left looking
+// already-paid-for. Unfreezing immediately re-bills the remaining days of whatever calendar month it
+// happens to land in: with recognizedThrough cleared, recognizeNextPeriod's own no-history path
+// treats "today" (the unfreeze date) exactly like a fresh enrollment date, prorating from there to
+// the end of that month - so a student frozen mid-month and unfrozen mid-month only ever pays for
+// the days they could actually attend on either side of the freeze, never the days in between.
+// Attendance/homework are completely untouched - they're driven by Group.schedulePattern/dayCounter,
+// an entirely separate system. Toggled from the student's profile.
 export const setStudentFreeze = async (req, res) => {
     try {
         const { frozen, reason } = req.body
@@ -689,6 +695,25 @@ export const setStudentFreeze = async (req, res) => {
         student.frozen = !!frozen
         student.frozenAt = frozen ? new Date() : null
         student.frozenReason = frozen ? (reason || '') : ''
+
+        for (const course of student.courses) {
+            if (!course.groupId || course.courseCompleted) continue
+            const group = await Group.findById(course.groupId)
+            if (!group) continue
+            if (frozen) {
+                const reversal = await reverseUnusedPeriod(student, course, group, req.auth.userId)
+                // only un-recognize the period if there was actually something to reverse - if the
+                // student was already caught up with no period in progress, freezing just blocks the
+                // next one from being recognized (the existing student.frozen guard in
+                // recognizeNextPeriod already does that), there's nothing to prorate here
+                if (reversal) course.recognizedThrough = null
+            } else {
+                // re-bills today's remaining days of the month right now instead of waiting for
+                // tomorrow's cron - matches how a fresh enrollment charges immediately too
+                await recognizeNextPeriod(student, course, { createdBy: req.auth.userId })
+            }
+        }
+
         await student.save()
 
         res.json({ student })

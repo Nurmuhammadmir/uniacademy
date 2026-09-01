@@ -137,9 +137,23 @@ export const recognizeNextPeriod = async (student, course, { createdBy = null, e
     // course price is never discounted here (confirmed spec) - a discount is a separate, immediate
     // transaction (see discountApplication.service.js: a real "Chegirma" branch expense crediting the
     // student's balance), not a reduction baked into this month's charge
-    const { rawCost: cost, windowEnd } = computePeriodCost(group.price, windowStart)
+    const natural = computePeriodCost(group.price, windowStart)
+    let cost = natural.rawCost
+    let windowEnd = natural.windowEnd
+    let isFullMonth = natural.isFullMonth
 
-    const isFullMonth = windowStart.getUTCDate() === 1
+    // if the course itself ends partway through this calendar month (group.endDate falls before the
+    // month's natural last day), the last chunk must stop there too - otherwise a course ending
+    // mid-month (e.g. group runs Aug 10 - Sep 10) still got billed for the FULL September price even
+    // though it only actually runs 10 of September's days. Same day-proration formula as a partial
+    // FIRST month (price * daysCharged / daysInMonth), just applied to the tail end instead.
+    if (group.endDate && group.endDate < windowEnd) {
+        windowEnd = group.endDate
+        const daysCharged = Math.round((windowEnd - windowStart) / 86400000) + 1
+        cost = Math.round(group.price * daysCharged / natural.daysInMonth)
+        isFullMonth = false
+    }
+
     const dayLabel = isFullMonth
         ? `${windowStart.toISOString().slice(0, 10)} – ${windowEnd.toISOString().slice(0, 10)}`
         : `${windowStart.toISOString().slice(0, 10)} – ${windowEnd.toISOString().slice(0, 10)} (partial month)`
