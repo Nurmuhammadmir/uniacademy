@@ -102,6 +102,9 @@ cron.schedule('0 8 * * *', () => {
 // once its own due date has actually arrived), so this is safe to run daily with zero special-casing
 // for "did this already run today" - running it twice, or missing a day and catching up the next,
 // both just work.
+// Note: 3am Tashkent (UTC+5) is still before the UTC day itself rolls over (that happens at 5am
+// local), so the very first run of a new month can see "yesterday" in UTC terms and defer that
+// month's charge to the next day's run - a 1-day lag, confirmed acceptable, kept as-is.
 cron.schedule('0 3 * * *', () => {
     runDailyBillingCycle()
         .then(result => console.log('runDailyBillingCycle:', result))

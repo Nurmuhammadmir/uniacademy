@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ArrowLeft, Phone, Wallet, Pencil, Archive, Trash2, Receipt, UsersRound, Plus, Printer, Snowflake } from 'lucide-react'
-import { formatMoney, paymentMethodLabelKey, remainingAmount } from '../lib/format.js'
+import { formatMoney, paymentMethodLabelKey, remainingAmount, groupLabel } from '../lib/format.js'
 import { todayISO, formatUTCDate, formatDateTime } from '../lib/date.js'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
@@ -453,7 +453,7 @@ const StudentProfile = () => {
             <form onSubmit={submitAddToGroup} className='flex gap-2 items-center pb-3 mb-1 border-b border-slate-100 dark:border-slate-800/80'>
               <Select forceSearch className='flex-1' value={addGroupId} onChange={setAddGroupId} placeholder={t('selectGroupToAdd')}
                 options={availableGroups.map(g => ({
-                  value: g._id, label: `${g.languageId?.name}${g.levelId?.name ? ' · ' + g.levelId.name : ''} · ${g.teacherId?.name} · ${formatMoney(g.price)} · ${g.studentIds.length}/${g.capacity}`,
+                  value: g._id, label: `${g.name ? g.name + ' · ' : ''}${g.languageId?.name}${g.levelId?.name ? ' · ' + g.levelId.name : ''} · ${g.teacherId?.name} · ${formatMoney(g.price)} · ${g.studentIds.length}/${g.capacity}`,
                 }))} />
               <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium flex-shrink-0 dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10'>{t('addToGroupBtn')}</button>
             </form>
