@@ -37,6 +37,8 @@ const StudentProfile = () => {
   const [notes, setNotes] = useState('')
   const [savingNotes, setSavingNotes] = useState(false)
   const [addGroupId, setAddGroupId] = useState('')
+  const [enrolledAt, setEnrolledAt] = useState(todayISO())
+  const [showAddGroupModal, setShowAddGroupModal] = useState(false)
   const [editingPayment, setEditingPayment] = useState(null)
   const [editPaymentForm, setEditPaymentForm] = useState({ amount: '', method: '' })
   const [refundingPayment, setRefundingPayment] = useState(null)
@@ -100,8 +102,8 @@ const StudentProfile = () => {
   const submitAddToGroup = async (e) => {
     e.preventDefault()
     if (!addGroupId) return
-    const ok = await addStudentToGroup(addGroupId, studentId)
-    if (ok) { setAddGroupId(''); reload() }
+    const ok = await addStudentToGroup(addGroupId, studentId, enrolledAt)
+    if (ok) { setAddGroupId(''); setEnrolledAt(todayISO()); setShowAddGroupModal(false); reload() }
   }
 
   const handleRemoveFromGroup = async (groupId) => {
@@ -446,28 +448,29 @@ const StudentProfile = () => {
           </div>
 
           <div className={CARD}>
-            <p className='text-ink font-medium mb-2'>{t('groupHistory')}</p>
-            {/* the add-to-group control stays right under the heading, not after a potentially long
-                roster list below it - it was getting pushed out of view for any student with a few
-                groups in their history, forcing a scroll just to find it */}
-            <form onSubmit={submitAddToGroup} className='flex gap-2 items-center pb-3 mb-1 border-b border-slate-100 dark:border-slate-800/80'>
-              <Select forceSearch className='flex-1' value={addGroupId} onChange={setAddGroupId} placeholder={t('selectGroupToAdd')}
-                options={availableGroups.map(g => ({
-                  value: g._id, label: `${g.name ? g.name + ' · ' : ''}${g.languageId?.name}${g.levelId?.name ? ' · ' + g.levelId.name : ''} · ${g.teacherId?.name} · ${formatMoney(g.price)} · ${g.studentIds.length}/${g.capacity}`,
-                }))} />
-              <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium flex-shrink-0 dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10'>{t('addToGroupBtn')}</button>
-            </form>
+            <div className='flex items-center justify-between mb-3'>
+              <p className='text-ink font-medium'>{t('groupHistory')}</p>
+              <button onClick={() => setShowAddGroupModal(true)}
+                className='flex items-center gap-1.5 bg-accent dark:bg-[#4F46E5] dark:shadow-lg dark:shadow-indigo-500/10 text-white text-xs font-semibold rounded-xl px-3.5 py-1.5 shadow-sm transition-colors'>
+                <Plus size={13} strokeWidth={1.75} /> {t('addToGroupBtn')}
+              </button>
+            </div>
             {data.groups.length === 0 ? (
               <div className={EMPTY}><UsersRound size={28} strokeWidth={1.5} className='text-slate-300 dark:text-slate-600' /> {t('notPlacedYet')}</div>
             ) : (
-              <div className='flex flex-col gap-3'>
+              <div className='flex flex-col gap-2'>
                 {data.groups.map(g => (
-                  <div key={g._id} className='flex justify-between items-center text-sm bg-[#f5f5f7] rounded-lg px-3 py-2 dark:bg-slate-800/40'>
-                    <span className='text-ink'>{g.languageId?.name}{g.levelId?.name ? ` · ${g.levelId.name}` : ''} · {g.teacherId?.name}</span>
-                    <span className='flex items-center gap-2'>
-                      <span className='text-muted'>{g.status}</span>
+                  <div key={g._id} className='flex justify-between items-center text-sm bg-[#f5f5f7] rounded-xl px-3.5 py-2.5 dark:bg-slate-800/40'>
+                    <div className='min-w-0'>
+                      <p className='text-[#1D1D1F] font-medium truncate dark:text-[#F8FAFC]'>{g.name ? `${g.name} · ` : ''}{g.languageId?.name}{g.levelId?.name ? ` · ${g.levelId.name}` : ''}</p>
+                      <p className='text-slate-400 text-xs mt-0.5 dark:text-slate-600'>{g.teacherId?.name}</p>
+                    </div>
+                    <span className='flex items-center gap-2.5 flex-shrink-0'>
+                      <span className='flex items-center gap-1.5 text-muted text-xs capitalize'>
+                        <span className={`w-1.5 h-1.5 rounded-full ${g.status === 'active' ? 'bg-emerald-500' : 'bg-rose-400'}`} /> {g.status}
+                      </span>
                       {g.status === 'active' && (
-                        <button onClick={() => handleRemoveFromGroup(g._id)} className='text-muted text-xs font-medium'>{t('removeFromGroupBtn')}</button>
+                        <button onClick={() => handleRemoveFromGroup(g._id)} className='text-muted text-xs font-medium hover:text-rose-500 transition-colors'>{t('removeFromGroupBtn')}</button>
                       )}
                     </span>
                   </div>
@@ -477,6 +480,27 @@ const StudentProfile = () => {
           </div>
         </div>
       </div>
+
+      {showAddGroupModal && (
+        <Modal title={t('addToGroupBtn')} onClose={() => setShowAddGroupModal(false)}>
+          <form onSubmit={submitAddToGroup} className='flex flex-col gap-3'>
+            <div>
+              <p className='text-xs text-muted mb-1'>{t('selectGroupToAdd')}</p>
+              <Select forceSearch value={addGroupId} onChange={setAddGroupId} placeholder={t('selectGroupToAdd')}
+                options={availableGroups.map(g => ({
+                  value: g._id, label: `${g.name ? g.name + ' · ' : ''}${g.languageId?.name}${g.levelId?.name ? ' · ' + g.levelId.name : ''} · ${g.teacherId?.name} · ${formatMoney(g.price)} · ${g.studentIds.length}/${g.capacity}`,
+                }))} />
+            </div>
+            <div>
+              {/* confirmed spec: billing starts from whichever date is actually chosen here, not
+                  always today - the admin can backdate when the student really joined this group */}
+              <p className='text-xs text-muted mb-1'>{t('enrolledAtLabel')}</p>
+              <DatePicker value={enrolledAt} onChange={setEnrolledAt} />
+            </div>
+            <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium mt-1 dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10'>{t('addToGroupBtn')}</button>
+          </form>
+        </Modal>
+      )}
 
       {showEditStudent && (
         <Modal title={t('edit')} onClose={() => setShowEditStudent(false)}>

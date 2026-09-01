@@ -12,6 +12,7 @@ import Spinner from '../components/Spinner.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
 import { formatMoney, groupLabel } from '../lib/format.js'
+import { todayISO } from '../lib/date.js'
 
 // mapbox-gl alone is well over a megabyte - pulling it in as a normal top-level import would bloat
 // THIS page's chunk even though the map only ever renders inside the add/edit-student modals. Lazy
@@ -180,7 +181,7 @@ const Students = () => {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [payingStudent, setPayingStudent] = useState(null)
-  const [form, setForm] = useState({ name: '', phone: '', password: '', address: '', dateOfBirth: '', geo: { lat: null, lng: null }, groupId: '', passportInfo: '', parentPhone: '', parentPassword: '' })
+  const [form, setForm] = useState({ name: '', phone: '', password: '', address: '', dateOfBirth: '', geo: { lat: null, lng: null }, groupId: '', passportInfo: '', parentPhone: '', parentPassword: '', registeredAt: todayISO(), enrolledAt: todayISO() })
   const [editForm, setEditForm] = useState({ name: '', phone: '', password: '', address: '', dateOfBirth: '', geo: { lat: null, lng: null }, passportInfo: '' })
   const [paymentForm, setPaymentForm] = useState({ amount: '', method: '' })
   const [submittingPayment, setSubmittingPayment] = useState(false)
@@ -196,7 +197,7 @@ const Students = () => {
     e.preventDefault()
     if (form.geo.lat == null || form.geo.lng == null) { toast.error(t('locationRequiredWarning')); return }
     const ok = await createStudent({ ...form, groupId: form.groupId || undefined })
-    if (ok) { setShowCreate(false); setForm({ name: '', phone: '', password: '', address: '', dateOfBirth: '', geo: { lat: null, lng: null }, groupId: '', passportInfo: '', parentPhone: '', parentPassword: '' }) }
+    if (ok) { setShowCreate(false); setForm({ name: '', phone: '', password: '', address: '', dateOfBirth: '', geo: { lat: null, lng: null }, groupId: '', passportInfo: '', parentPhone: '', parentPassword: '', registeredAt: todayISO(), enrolledAt: todayISO() }) }
   }
 
   const openEdit = (student) => {
@@ -550,6 +551,12 @@ const Students = () => {
               <label className='text-xs text-muted mb-1 block'>{t('dateOfBirthLabel')}</label>
               <DatePicker withYearSelect value={form.dateOfBirth} onChange={(v) => setForm({ ...form, dateOfBirth: v })} />
             </div>
+            <div>
+              {/* confirmed spec: a student who actually joined earlier and is only now being
+                  entered into the system needs their real registration date, not always "today" */}
+              <label className='text-xs text-muted mb-1 block'>{t('registeredAtLabel')}</label>
+              <DatePicker value={form.registeredAt} onChange={(v) => setForm({ ...form, registeredAt: v })} />
+            </div>
             <input
               placeholder={settings?.passportRequired === false ? t('passportIdInfoOptional') : t('passportIdInfo')}
               value={form.passportInfo}
@@ -562,6 +569,14 @@ const Students = () => {
               options={[{ value: '', label: t('noGroupOption') }, ...groups.filter(g => g.status === 'active').map(g => ({
                 value: g._id, label: `${groupLabel(g)} · ${g.languageId?.name}${g.levelId?.name ? ' · ' + g.levelId.name : ''} · ${formatMoney(g.price)}`,
               }))]} />
+            {form.groupId && (
+              <div>
+                {/* confirmed spec: billing starts from whichever date is actually chosen here, not
+                    always today - the admin can backdate when the student really joined this group */}
+                <label className='text-xs text-muted mb-1 block'>{t('enrolledAtLabel')}</label>
+                <DatePicker value={form.enrolledAt} onChange={(v) => setForm({ ...form, enrolledAt: v })} />
+              </div>
+            )}
             <p className='text-xs text-muted -mb-1'>{t('locationRequiredHint')}</p>
             <Suspense fallback={<MapFallback />}>
               <MapPicker address={form.address} lat={form.geo.lat} lng={form.geo.lng}

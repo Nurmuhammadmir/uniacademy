@@ -6,6 +6,8 @@ import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
 import PasswordInput from '../components/PasswordInput.jsx'
+import DatePicker from '../components/DatePicker.jsx'
+import { todayISO } from '../lib/date.js'
 
 // this screen is meant to live on a monitor at the reception desk (qabulxona) - split into a QR
 // panel (left) teachers scan on arrival and a live "who's checked in today" roster (right), sized
@@ -20,14 +22,14 @@ const TeachersList = () => {
   const [qr, setQr] = useState(null)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [showCreate, setShowCreate] = useState(false)
-  const [form, setForm] = useState({ name: '', phone: '', password: '' })
+  const [form, setForm] = useState({ name: '', phone: '', password: '', registeredAt: todayISO() })
   const [editing, setEditing] = useState(null)
   const [editForm, setEditForm] = useState({ name: '', phone: '', password: '' })
 
   const submitCreate = async (e) => {
     e.preventDefault()
     const ok = await createTeacher(form)
-    if (ok) { setShowCreate(false); setForm({ name: '', phone: '', password: '' }) }
+    if (ok) { setShowCreate(false); setForm({ name: '', phone: '', password: '', registeredAt: todayISO() }) }
   }
 
   const openEdit = (e, teacher) => {
@@ -174,6 +176,10 @@ const TeachersList = () => {
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <PasswordInput placeholder={t('teacherPassword')} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
+            <div>
+              <label className='text-xs text-muted mb-1 block'>{t('registeredAtLabel')}</label>
+              <DatePicker value={form.registeredAt} onChange={(v) => setForm({ ...form, registeredAt: v })} />
+            </div>
             <div className='flex items-start gap-2 bg-amber-50 text-amber-800 text-xs px-3 py-2.5 rounded-xl border border-amber-100 dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20'>
               <ShieldAlert size={15} strokeWidth={1.75} className='flex-shrink-0 mt-0.5' />
               <span>{t('onlyDirectorCanDeleteTeacherNote')}</span>

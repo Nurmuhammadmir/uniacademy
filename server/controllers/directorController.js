@@ -382,15 +382,24 @@ export const deleteAdmin = async (req, res) => {
 
 export const createTeacher = async (req, res) => {
     try {
-        const { name, phone, password, additionalBranchIds } = req.body
+        const { name, phone, password, additionalBranchIds, registeredAt } = req.body
         // a sub_director can only ever create teachers in their own branch - their own branchId
         // wins regardless of whatever the request body says, and they can't grant multi-branch
         // access to a branch they don't themselves belong to
         const branchId = isSubDirector(req) ? req.auth.branchId : req.body.branchId
         const finalAdditionalBranchIds = isSubDirector(req) ? [] : (additionalBranchIds || [])
+        // optional - same "backdate a real-world event that's only being entered today" pattern as
+        // adminController.createStudent's own registeredAt - a teacher who actually started earlier
+        // shouldn't show "today" as their join date just because that's when someone got around to
+        // typing them in.
+        let createdAt
+        if (registeredAt) {
+            createdAt = new Date(registeredAt)
+            if (isNaN(createdAt) || createdAt > new Date()) return res.status(400).json({ error: 'invalid_registration_date' })
+        }
         const salt = await bcrypt.genSalt(10)
         const passwordHash = await bcrypt.hash(password, salt)
-        const teacher = await User.create({ name, phone, passwordHash, role: 'teacher', branchId, additionalBranchIds: finalAdditionalBranchIds })
+        const teacher = await User.create({ name, phone, passwordHash, role: 'teacher', branchId, additionalBranchIds: finalAdditionalBranchIds, ...(createdAt ? { createdAt } : {}) })
         res.status(201).json({ teacher: { id: teacher._id, name: teacher.name, branchId: teacher.branchId, additionalBranchIds: teacher.additionalBranchIds } })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'phone_already_in_use' })

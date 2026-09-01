@@ -296,10 +296,18 @@ export const listBranchTeachers = async (req, res) => {
 // exactly like createStudent already does.
 export const createTeacher = async (req, res) => {
     try {
-        const { name, phone, password } = req.body
+        const { name, phone, password, registeredAt } = req.body
+        // optional - same "backdate a real-world event that's only being entered today" pattern as
+        // createStudent's own registeredAt - a teacher who actually started earlier shouldn't show
+        // "today" as their join date just because that's when someone got around to typing them in.
+        let createdAt
+        if (registeredAt) {
+            createdAt = new Date(registeredAt)
+            if (isNaN(createdAt) || createdAt > new Date()) return res.status(400).json({ error: 'invalid_registration_date' })
+        }
         const salt = await bcrypt.genSalt(10)
         const passwordHash = await bcrypt.hash(password, salt)
-        const teacher = await User.create({ name, phone, passwordHash, role: 'teacher', branchId: req.auth.branchId })
+        const teacher = await User.create({ name, phone, passwordHash, role: 'teacher', branchId: req.auth.branchId, ...(createdAt ? { createdAt } : {}) })
         res.status(201).json({ teacher: { id: teacher._id, name: teacher.name, branchId: teacher.branchId } })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'phone_already_in_use' })
@@ -421,7 +429,7 @@ const linkParentToStudent = async (studentId, parentPhone, parentPassword) => {
 // creation time posts its first debt immediately, same as if it had been assigned afterward.
 export const createStudent = async (req, res) => {
     try {
-        const { name, phone, password, address, dateOfBirth, geo, groupId, passportInfo, parentPhone, parentPassword, registeredAt } = req.body
+        const { name, phone, password, address, dateOfBirth, geo, groupId, passportInfo, parentPhone, parentPassword, registeredAt, enrolledAt } = req.body
 
         const settings = await Settings.findOne({}).lean() || { passportRequired: true }
         if (settings.passportRequired && !passportInfo?.trim()) {
@@ -446,6 +454,16 @@ export const createStudent = async (req, res) => {
             if (!group) return res.status(400).json({ error: 'invalid_group' })
             if (group.studentIds.length >= group.capacity) return res.status(409).json({ error: 'group_full' })
         }
+        // separate from registeredAt on purpose - a student can be entered into the system on one
+        // date but their real enrollment in THIS group started on another (same [group.startDate,
+        // today] bound as addStudentToGroup's own version of this check)
+        let enrolledDate = null
+        if (group && enrolledAt) {
+            enrolledDate = new Date(enrolledAt)
+            if (isNaN(enrolledDate)) return res.status(400).json({ error: 'invalid_enrollment_date' })
+            if (enrolledDate > new Date()) return res.status(400).json({ error: 'enrollment_date_in_future' })
+            if (group.startDate && enrolledDate < group.startDate) return res.status(400).json({ error: 'enrollment_date_before_group_start' })
+        }
 
         const salt = await bcrypt.genSalt(10)
         const passwordHash = await bcrypt.hash(password, salt)
@@ -465,10 +483,11 @@ export const createStudent = async (req, res) => {
         if (group) {
             group.studentIds.push(student._id)
             await group.save()
-            await openMembership(student._id, group)
+            await openMembership(student._id, group, enrolledDate || new Date())
             const level = group.levelId ? await Level.findById(group.levelId).lean() : null
+            // deliberately NOT backdated - see addStudentToGroup's identical comment (RULE #6)
             await enrollStudentMidCycle(student._id, group, level?.durationDays)
-            await recognizeEnrollmentDebt(student, student.courses[0], req.auth.userId)
+            await recognizeEnrollmentDebt(student, student.courses[0], req.auth.userId, enrolledDate)
         }
 
         if (parentPhone) await linkParentToStudent(student._id, parentPhone, parentPassword)
@@ -1308,7 +1327,7 @@ export const suggestGroup = async (req, res) => {
 // same group twice.
 export const addStudentToGroup = async (req, res) => {
     try {
-        const { studentId } = req.body
+        const { studentId, enrolledAt } = req.body
         const group = await Group.findOne({ _id: req.params.id, branchId: req.auth.branchId })
         if (!group) return res.status(404).json({ error: 'not_found' })
 
@@ -1319,13 +1338,30 @@ export const addStudentToGroup = async (req, res) => {
             return res.status(409).json({ error: 'group_full' })
         }
 
+        // optional - confirmed spec: the admin can backdate WHEN a student actually joined this
+        // group (they really joined weeks ago, only being entered into the system today), so the
+        // first period's debt is prorated from that real date rather than always from today. Bounded
+        // to [group.startDate, today] - can't have joined before the group existed, and a future
+        // join date makes no sense for something happening right now.
+        let enrolledDate = null
+        if (enrolledAt) {
+            enrolledDate = new Date(enrolledAt)
+            if (isNaN(enrolledDate)) return res.status(400).json({ error: 'invalid_enrollment_date' })
+            if (enrolledDate > new Date()) return res.status(400).json({ error: 'enrollment_date_in_future' })
+            if (group.startDate && enrolledDate < group.startDate) return res.status(400).json({ error: 'enrollment_date_before_group_start' })
+        }
+
         const student = await User.findOne({ _id: studentId, branchId: req.auth.branchId })
         if (!student) return res.status(404).json({ error: 'not_found' })
 
         group.studentIds.push(studentId)
         await group.save()
-        await openMembership(studentId, group)
+        await openMembership(studentId, group, enrolledDate || new Date())
         const level = await Level.findById(group.levelId).select('durationDays').lean()
+        // deliberately NOT backdated - RULE #6 (enrollMidCycle.service.js): joining a group mid-cycle
+        // always seeds homework/attendance at the group's REAL current lesson day (as of today), same
+        // as everyone else in the class right now, regardless of which calendar date billing treats
+        // this enrollment as having started on.
         await enrollStudentMidCycle(studentId, group, level?.durationDays || 30)
 
         let course = student.courses.find(c => String(c.languageId) === String(group.languageId))
@@ -1337,7 +1373,7 @@ export const addStudentToGroup = async (req, res) => {
         // the student would show up in the group's own roster (group.studentIds, saved above) but their
         // own profile would have no matching course entry at all.
         await student.save()
-        await recognizeEnrollmentDebt(student, course, req.auth.userId)
+        await recognizeEnrollmentDebt(student, course, req.auth.userId, enrolledDate)
 
         res.json({ group })
     } catch (error) {

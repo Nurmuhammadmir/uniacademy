@@ -119,13 +119,17 @@ export const computeCourseCovered = async (accountId, languageId) => {
 //     the group's endDate
 // Confirmed cadence: the FIRST chunk (right at enrollment) is day-prorated from the enrollment date
 // to the end of that calendar month; every chunk after that is a full month, starting the 1st.
-export const recognizeNextPeriod = async (student, course, { createdBy = null } = {}) => {
+export const recognizeNextPeriod = async (student, course, { createdBy = null, enrolledAt = null } = {}) => {
     if (!course.groupId) return null
     const group = await Group.findById(course.groupId)
     if (!group) return null
 
     const today = dateOnlyUTC(new Date())
-    const windowStart = course.recognizedThrough ? startOfNextMonthUTC(course.recognizedThrough) : today
+    // enrolledAt only ever affects the very FIRST period (recognizedThrough not set yet) - once a
+    // course has a real billing history, every later period is always "the 1st of whatever month is
+    // next", never backdated, so this can't retroactively touch anything already recognized.
+    const firstWindowStart = enrolledAt ? dateOnlyUTC(enrolledAt) : today
+    const windowStart = course.recognizedThrough ? startOfNextMonthUTC(course.recognizedThrough) : firstWindowStart
     if (windowStart > today) return null // not due yet
     if (windowStart > group.endDate) return null // course's billing window is over
     if (student.frozen) return null // freeze pauses billing only, whole-account - nothing posts, recognizedThrough does NOT advance, so the paused period is picked back up whenever unfrozen
@@ -141,6 +145,12 @@ export const recognizeNextPeriod = async (student, course, { createdBy = null } 
         : `${windowStart.toISOString().slice(0, 10)} – ${windowEnd.toISOString().slice(0, 10)} (partial month)`
     const description = `${dayLabel} · ${group.price.toLocaleString()}/mo = ${cost.toLocaleString()}`
 
+    // a deliberately backdated first period is dated to when it actually started (windowStart), not
+    // "today" (when the admin happens to be entering it), so it sorts correctly against anything
+    // else backdated around the same real-world date - every other case (a normal, non-backdated
+    // enrollment, or any later recurring monthly period) keeps dating by `today` exactly as before,
+    // completely untouched, including the already-discussed/confirmed 3am cron timing behavior.
+    const isBackdatedFirstPeriod = !course.recognizedThrough && enrolledAt
     let entry = null
     if (cost > 0) {
         const studentAccount = await getOrCreateAccount('student', student._id)
@@ -155,7 +165,7 @@ export const recognizeNextPeriod = async (student, course, { createdBy = null } 
             },
             description,
             createdBy,
-            date: today,
+            date: isBackdatedFirstPeriod ? windowStart : today,
         })
     }
 
@@ -186,8 +196,11 @@ export const recomputeEnrollmentStatus = async (student) => {
 // called once, immediately, when an admin assigns a student to a group (see adminController's
 // addStudentToGroup) - posts the first (day-prorated) debt right away rather than waiting for the
 // daily job, per the confirmed "debt recorded at enrollment, not lazily after payment" requirement.
-export const recognizeEnrollmentDebt = async (student, course, createdBy) => {
-    return recognizeNextPeriod(student, course, { createdBy })
+// enrolledAt is optional - confirmed spec: an admin can backdate WHEN a student actually joined (they
+// really joined weeks ago, only being entered into the system now), and the first period's debt is
+// prorated from that real date instead of always from today.
+export const recognizeEnrollmentDebt = async (student, course, createdBy, enrolledAt = null) => {
+    return recognizeNextPeriod(student, course, { createdBy, enrolledAt })
 }
 
 // called when an admin removes a student from a group (see adminController's removeStudentFromGroup)

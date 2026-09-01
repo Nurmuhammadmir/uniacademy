@@ -5,6 +5,8 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
 import TeacherProfileModal from '../components/TeacherProfileModal.jsx'
 import PasswordInput from '../components/PasswordInput.jsx'
+import DatePicker from '../components/DatePicker.jsx'
+import { todayISO } from '../lib/date.js'
 
 const AVATAR_GRADIENTS = [
   'from-[#FF6B6B] to-[#FF3B30]', 'from-[#FF9F43] to-[#FF9500]', 'from-[#34C759] to-[#30B94D]',
@@ -27,7 +29,7 @@ const Teachers = () => {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [viewingId, setViewingId] = useState(null)
-  const [form, setForm] = useState({ name: '', phone: '', password: '', branchId: '', additionalBranchIds: [] })
+  const [form, setForm] = useState({ name: '', phone: '', password: '', branchId: '', additionalBranchIds: [], registeredAt: todayISO() })
   const [editForm, setEditForm] = useState({ name: '', phone: '', branchId: '', password: '', additionalBranchIds: [] })
 
   const toggleAdditionalBranch = (setter, current, branchId) => {
@@ -39,7 +41,7 @@ const Teachers = () => {
   const submit = async (e) => {
     e.preventDefault()
     const ok = await createTeacher(form)
-    if (ok) { setShowCreate(false); setForm({ name: '', phone: '', password: '', branchId: '', additionalBranchIds: [] }) }
+    if (ok) { setShowCreate(false); setForm({ name: '', phone: '', password: '', branchId: '', additionalBranchIds: [], registeredAt: todayISO() }) }
   }
 
   const openEdit = (teacher) => {
@@ -189,6 +191,10 @@ const Teachers = () => {
                 </div>
               </div>
             )}
+            <div>
+              <label className='text-xs text-muted mb-1 block'>{t('registeredAtLabel')}</label>
+              <DatePicker value={form.registeredAt} onChange={(v) => setForm({ ...form, registeredAt: v })} />
+            </div>
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('createTeacherBtn')}</button>
           </form>
         </Modal>

@@ -108,7 +108,7 @@ const StudentProfile = () => {
           <div className='flex flex-col gap-3'>
             {data.groups.map(g => (
               <div key={g._id} className='flex flex-wrap justify-between gap-2 text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2'>
-                <span className='text-ink'>{g.languageId?.name} · {g.levelId?.name} · {g.teacherId?.name}</span>
+                <span className='text-ink'>{g.name ? `${g.name} · ` : ''}{g.languageId?.name} · {g.levelId?.name} · {g.teacherId?.name}</span>
                 <span className='text-muted'>{g.status}</span>
               </div>
             ))}

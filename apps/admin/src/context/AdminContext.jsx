@@ -89,6 +89,10 @@ const AdminContextProvider = (props) => {
             else if (code === 'parent_password_required') toast.error(t('parentPasswordRequiredError'))
             else if (code === 'phone_already_in_use') toast.error(t('phoneAlreadyInUseError'))
             else if (code === 'location_required') toast.error(t('locationRequiredWarning'))
+            else if (code === 'invalid_registration_date') toast.error(t('invalidRegistrationDateError'))
+            else if (code === 'enrollment_date_in_future') toast.error(t('enrollmentDateInFutureError'))
+            else if (code === 'enrollment_date_before_group_start') toast.error(t('enrollmentDateBeforeGroupStartError'))
+            else if (code === 'invalid_enrollment_date') toast.error(t('invalidEnrollmentDateError'))
             else toast.error(code || t('couldNotCreateStudent'))
             return false
         }
@@ -520,22 +524,21 @@ const AdminContextProvider = (props) => {
         }
     }
 
-    const addStudentToGroup = async (groupId, studentId) => {
+    const addStudentToGroup = async (groupId, studentId, enrolledAt) => {
         try {
-            await axios.post(backendUrl + `/api/admin/groups/${groupId}/students`, { studentId }, authHeader)
+            await axios.post(backendUrl + `/api/admin/groups/${groupId}/students`, { studentId, enrolledAt: enrolledAt || undefined }, authHeader)
             toast.success(t('studentAddedToGroup'))
             getGroups()
             return true
         } catch (error) {
-            if (error.response?.data?.error === 'payment_required') {
-                toast.error(t('paymentRequiredError'))
-            } else if (error.response?.data?.error === 'group_full') {
-                toast.error(t('groupFullError'))
-            } else if (error.response?.data?.error === 'already_in_this_group') {
-                toast.error(t('alreadyInThisGroupError'))
-            } else {
-                toast.error(error.response?.data?.error || t('couldNotAddStudent'))
-            }
+            const code = error.response?.data?.error
+            if (code === 'payment_required') toast.error(t('paymentRequiredError'))
+            else if (code === 'group_full') toast.error(t('groupFullError'))
+            else if (code === 'already_in_this_group') toast.error(t('alreadyInThisGroupError'))
+            else if (code === 'enrollment_date_in_future') toast.error(t('enrollmentDateInFutureError'))
+            else if (code === 'enrollment_date_before_group_start') toast.error(t('enrollmentDateBeforeGroupStartError'))
+            else if (code === 'invalid_enrollment_date') toast.error(t('invalidEnrollmentDateError'))
+            else toast.error(code || t('couldNotAddStudent'))
             return false
         }
     }
@@ -570,7 +573,9 @@ const AdminContextProvider = (props) => {
             getTeachers()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotCreateTeacher'))
+            const code = error.response?.data?.error
+            if (code === 'invalid_registration_date') toast.error(t('invalidRegistrationDateError'))
+            else toast.error(code || t('couldNotCreateTeacher'))
             return false
         }
     }
