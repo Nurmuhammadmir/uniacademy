@@ -1381,7 +1381,9 @@ export const addStudentToGroup = async (req, res) => {
         const student = await User.findOne({ _id: studentId, branchId: req.auth.branchId })
         if (!student) return res.status(404).json({ error: 'not_found' })
 
-        group.studentIds.push(studentId)
+        // guards against a double-click/retry silently double-counting this student everywhere
+        // group.studentIds.length drives a real number (per_student_month salary rate, roster size)
+        if (!group.studentIds.some(id => String(id) === String(studentId))) group.studentIds.push(studentId)
         await group.save()
         await openMembership(studentId, group, enrolledDate || new Date())
         const level = await Level.findById(group.levelId).select('durationDays').lean()
