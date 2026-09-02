@@ -33,7 +33,11 @@ export const applyDiscountToStudent = async ({ student, languageId, type, value,
     const owed = await computeCourseOwed(studentAccount._id, languageId)
     if (!(owed > 0)) return null
 
-    const amount = type === 'percent' ? Math.round(owed * value / 100) : Math.round(value)
+    // a discount reduces a charge - it can never exceed what's actually owed for this course (a
+    // fixed-amount discount has no natural upper bound from the input itself, unlike percent, which
+    // can never exceed 100% of `owed` by construction) - clamped here so a typo (e.g. an extra zero)
+    // can't manufacture wallet credit out of nowhere instead of just settling the real debt
+    const amount = Math.min(owed, type === 'percent' ? Math.round(owed * value / 100) : Math.round(value))
     if (!(amount > 0)) return null
 
     const label = type === 'percent' ? `${value}% chegirma` : `${amount.toLocaleString()} chegirma`

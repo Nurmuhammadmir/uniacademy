@@ -123,6 +123,13 @@ export const recognizeNextPeriod = async (student, course, { createdBy = null, e
     if (!course.groupId) return null
     const group = await Group.findById(course.groupId)
     if (!group) return null
+    // confirmed real incident: a group with a null/non-numeric price crashed this function entirely
+    // (group.price.toLocaleString() on null) - the daily cron's own try/catch now stops that from
+    // taking down every OTHER student's billing too, but this ONE course would otherwise silently
+    // fail to bill forever, every single day, with nothing but an invisible console.log to show for
+    // it. Bailing out cleanly here instead means it just never posts (same as any other "not due
+    // yet" no-op) - loud enough to notice via a stuck balance, not a crash loop nobody sees.
+    if (typeof group.price !== 'number' || !Number.isFinite(group.price) || group.price < 0) return null
 
     const today = dateOnlyUTC(new Date())
     // enrolledAt only ever affects the very FIRST period (recognizedThrough not set yet) - once a
@@ -225,7 +232,7 @@ export const recognizeEnrollmentDebt = async (student, course, createdBy, enroll
 // the one this reverses, prorated by the days strictly after today (today itself still counts as
 // attended). Safe to call unconditionally: no-ops if there's no currently-open period, or if today
 // is already the period's last day (nothing left to return).
-export const reverseUnusedPeriod = async (student, course, group, createdBy = null) => {
+export const reverseUnusedPeriod = async (student, course, group, createdBy = null, reason = 'Removed from group') => {
     const studentAccount = await getOrCreateAccount('student', student._id)
     const today = dateOnlyUTC(new Date())
 
@@ -244,7 +251,7 @@ export const reverseUnusedPeriod = async (student, course, group, createdBy = nu
     const reversalAmount = Math.round(currentDebt.amount * unusedDays / totalDays)
     if (reversalAmount <= 0) return null
 
-    return postEntry({
+    const entry = await postEntry({
         accountId: studentAccount._id,
         direction: 'decrease',
         amount: reversalAmount,
@@ -254,10 +261,21 @@ export const reverseUnusedPeriod = async (student, course, group, createdBy = nu
             teacherId: group.teacherId, periodStart: currentDebt.periodStart, periodEnd: currentDebt.periodEnd,
             sourceType: 'ledgerEntry', sourceId: currentDebt._id,
         },
-        description: `Removed from group ${today.toISOString().slice(0, 10)} - ${unusedDays}/${totalDays} unused days of ${currentDebt.amount.toLocaleString()} returned = ${reversalAmount.toLocaleString()}`,
+        description: `${reason} ${today.toISOString().slice(0, 10)} - ${unusedDays}/${totalDays} unused days of ${currentDebt.amount.toLocaleString()} returned = ${reversalAmount.toLocaleString()}`,
         createdBy,
         date: today,
     })
+
+    // confirmed real bug (found live, on production data): course.recognizedThrough was left pointing
+    // at the END of the now-partially-reversed period, so re-adding this student to a group for the
+    // same language later THIS SAME MONTH saw "already recognized through end of month" and silently
+    // skipped billing them for the rest of it entirely - a free ride. Clearing it here (the one place
+    // both removeStudentFromGroup and setStudentFreeze route through) makes recognizeNextPeriod treat
+    // the next call exactly like a fresh mid-month enrollment - it re-prorates from whatever day
+    // they're actually re-added/unfrozen on, instead of jumping straight to next month.
+    if (entry) course.recognizedThrough = null
+
+    return entry
 }
 
 // cash-basis on purpose (confirmed): a teacher's revenue share is only ever earned on a period
@@ -317,15 +335,26 @@ export const computeCoveredDebtPeriodsBatch = async (studentIds, languageId) => 
 // gives each one a chance to recognize its next chunk. Each call is independently safe/idempotent
 // (see recognizeNextPeriod's own due-date guard), so running this twice in a day, or missing a day
 // and catching up the next, both self-correct with no special-casing needed here.
+// Each course is wrapped in its own try/catch (confirmed real incident: one bad course/group used to
+// throw and abort the WHOLE run - every OTHER student across every branch silently got skipped for
+// the rest of that day, with no trace beyond a console.log line nobody was watching). One student's
+// bad data can no longer take the entire platform's billing down for the day - it's logged and
+// skipped, everyone else still gets processed normally.
 export const runDailyBillingCycle = async () => {
     const students = await User.find({ role: 'student', 'courses.groupId': { $ne: null }, 'courses.courseCompleted': false })
     let recognized = 0
+    const failures = []
     for (const student of students) {
         for (const course of student.courses) {
             if (!course.groupId || course.courseCompleted) continue
-            const entry = await recognizeNextPeriod(student, course, {})
-            if (entry) recognized++
+            try {
+                const entry = await recognizeNextPeriod(student, course, {})
+                if (entry) recognized++
+            } catch (error) {
+                console.log('runDailyBillingCycle: failed for student', student._id, 'course', course._id, error)
+                failures.push({ studentId: student._id, courseId: course._id, error: error.message })
+            }
         }
     }
-    return { studentsChecked: students.length, entriesRecognized: recognized }
+    return { studentsChecked: students.length, entriesRecognized: recognized, failures }
 }

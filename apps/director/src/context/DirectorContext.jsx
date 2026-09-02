@@ -223,7 +223,8 @@ const DirectorContextProvider = (props) => {
             toast.success(t('teacherRemoved'))
             getTeachers()
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotRemoveTeacher'))
+            const code = error.response?.data?.error
+            toast.error(code === 'teacher_has_active_groups' ? t('teacherHasActiveGroupsError') : (code || t('couldNotRemoveTeacher')))
         }
     }
 

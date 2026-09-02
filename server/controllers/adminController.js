@@ -701,12 +701,12 @@ export const setStudentFreeze = async (req, res) => {
             const group = await Group.findById(course.groupId)
             if (!group) continue
             if (frozen) {
-                const reversal = await reverseUnusedPeriod(student, course, group, req.auth.userId)
-                // only un-recognize the period if there was actually something to reverse - if the
-                // student was already caught up with no period in progress, freezing just blocks the
-                // next one from being recognized (the existing student.frozen guard in
-                // recognizeNextPeriod already does that), there's nothing to prorate here
-                if (reversal) course.recognizedThrough = null
+                // reverseUnusedPeriod itself clears course.recognizedThrough when it actually reverses
+                // something - no-ops (leaves it alone) if the student was already caught up with no
+                // period in progress, which is correct: freezing then just blocks the next one from
+                // being recognized (the existing student.frozen guard in recognizeNextPeriod already
+                // does that), there's nothing to prorate here
+                await reverseUnusedPeriod(student, course, group, req.auth.userId, 'Frozen')
             } else {
                 // re-bills today's remaining days of the month right now instead of waiting for
                 // tomorrow's cron - matches how a fresh enrollment charges immediately too
@@ -818,7 +818,10 @@ export const createPayment = async (req, res) => {
         await recomputeEnrollmentStatus(student)
         await student.save()
 
-        res.status(201).json({ payment, accountBalance: studentAccount.balance })
+        // studentAccount was fetched BEFORE postTransfer applied this payment - its own .balance is
+        // stale (pre-payment). studentEntry.balanceAfter is the actual post-payment figure (the same
+        // number postTransfer just wrote to the account), so that's what the response reports.
+        res.status(201).json({ payment, accountBalance: studentEntry?.balanceAfter ?? studentAccount.balance })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -1055,6 +1058,11 @@ export const updatePayment = async (req, res) => {
         if (!payment) return res.status(404).json({ error: 'not_found' })
         if (!isEditableToday(payment)) return res.status(403).json({ error: 'payment_locked' })
         if (payment.refundedAmount > 0) return res.status(400).json({ error: 'already_refunded' })
+        // matches createPayment's own guard - without it, a zero/negative/NaN "corrected" amount
+        // sailed straight through: postTransfer would move real money based on the delta, and the
+        // Payment document itself would end up stored with a zero or negative amount forever,
+        // corrupting every later refund/statement calculation that assumes payment.amount > 0
+        if (amount !== undefined && !(Number(amount) > 0)) return res.status(400).json({ error: 'invalid_amount' })
 
         if (amount !== undefined && Number(amount) !== payment.amount) {
             const delta = Number(amount) - payment.amount

@@ -162,20 +162,25 @@ export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
         paidByTeacher[key].payments.push({ amount: e.amount, date: e.date, method: e.method, category: e.category })
     }
 
-    const results = []
-    for (const teacher of teachers) {
+    // each teacher's computation only reads shared inputs (rates/groups) and writes to its own
+    // result - fully independent of every other teacher's, so they're run concurrently instead of
+    // one-at-a-time. This used to be the single biggest latency cost on the Salary page (confirmed
+    // live: ~1.7s to calculate on a branch with almost no data at all, purely from awaiting each
+    // teacher's percent_of_revenue/per_lesson DB round-trips back-to-back) - now they all fire at
+    // once and the page waits for the SLOWEST teacher instead of the SUM of every teacher.
+    const perTeacher = await Promise.all(teachers.map(async (teacher) => {
         const teacherGroups = groups.filter(g => String(g.teacherId) === String(teacher._id))
-        if (teacherGroups.length === 0) continue
+        if (teacherGroups.length === 0) return null
 
         const { total, groupBreakdown, rateType, rateValue } = await computeTeacherAcrossGroups(teacher, teacherGroups, rates, dateFrom, dateTo)
-        if (groupBreakdown.length === 0) continue // not one of this teacher's groups resolved any rate at all
+        if (groupBreakdown.length === 0) return null // not one of this teacher's groups resolved any rate at all
 
         const uniqueStudents = new Set()
         teacherGroups.forEach(g => g.studentIds.forEach(id => uniqueStudents.add(String(id))))
 
         const paidInfo = paidByTeacher[String(teacher._id)] || { amount: 0, payments: [] }
 
-        results.push({
+        return {
             teacherId: teacher._id, name: teacher.name, groupCount: teacherGroups.length, studentCount: uniqueStudents.size,
             rateType, rateValue, total,
             paidAmount: paidInfo.amount,
@@ -183,10 +188,10 @@ export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
             // already happened for this period, the next Hisoblang just shows the new gap directly
             remaining: Math.max(0, total - paidInfo.amount),
             payments: paidInfo.payments,
-        })
-    }
+        }
+    }))
 
-    return results
+    return perTeacher.filter(Boolean)
 }
 
 // itemized breakdown for one teacher - backs the Salary page's "Details" button, so an admin can

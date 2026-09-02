@@ -233,6 +233,7 @@ const AdminContextProvider = (props) => {
         } catch (error) {
             const code = error.response?.data?.error
             if (code === 'invalid_payment_method') toast.error(t('invalidPaymentMethodError'))
+            else if (code === 'invalid_amount') toast.error(t('invalidAmountError'))
             else toast.error(code || t('couldNotRecordPayment'))
             return false
         }
@@ -295,7 +296,9 @@ const AdminContextProvider = (props) => {
             return true
         } catch (error) {
             const code = error.response?.data?.error
-            toast.error(code === 'payment_locked' ? t('paymentLockedError') : (code || t('couldNotUpdatePayment')))
+            if (code === 'payment_locked') toast.error(t('paymentLockedError'))
+            else if (code === 'invalid_amount') toast.error(t('invalidAmountError'))
+            else toast.error(code || t('couldNotUpdatePayment'))
             return false
         }
     }

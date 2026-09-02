@@ -485,6 +485,15 @@ export const deleteTeacher = async (req, res) => {
         const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' }).lean()
         if (!teacher) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && !teacherBelongsToBranch(teacher, req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
+        // confirmed real gap (found live): hardDeleteTeacher only cleans up the teacher's OWN records
+        // (account/pay rates/attendance) - it never touches Group.teacherId. Deleting a teacher who
+        // still runs active groups left those groups pointing at a now-nonexistent user forever, AND
+        // silently dropped them out of every future salary calculation entirely (calculateSalaries
+        // only ever looks at CURRENTLY EXISTING teacher Users, so an orphaned group's revenue just
+        // stopped being credited to anyone) while the group itself kept billing students normally -
+        // tuition collected, nobody paid to teach it. Reassign or archive their groups first.
+        const hasActiveGroups = await Group.exists({ teacherId: teacher._id, status: 'active' })
+        if (hasActiveGroups) return res.status(400).json({ error: 'teacher_has_active_groups' })
         await hardDeleteTeacher(teacher._id)
         res.json({ deleted: true })
     } catch (error) {
