@@ -122,11 +122,10 @@ export const getFinanceOverview = async (branchIdRaw, query) => {
     // handed over 300,000 THIS month - that's this month's revenue in full. The extra two months'
     // worth just sits as credit and silently cancels out each future month's debt with no new
     // revenue event then, since no new payment actually happened that month.
-    // A discount counts as revenue too, with no special-casing needed here at all: applying one
-    // creates a real Payment (discountApplication.service.js posts it exactly like a cash payment,
-    // since as far as "did this debt get settled" is concerned, it did) alongside its own real
-    // Chegirma Expense - so it's already included once in the payment sum below (as if received)
-    // and once in totalExpenses (as its real cost), netting to exactly the discount's own size.
+    // A discount is deliberately invisible here (confirmed spec, see discountApplication.service.js):
+    // it's a single ledger entry on the student's own account only, never a Payment or Expense
+    // document, so it never touches totalAmount/totalExpenses/netProfit below at all - the only place
+    // it's ever visible is the "Chegirma" line on the student's own profile.
     const totalAgg = await Payment.aggregate([{ $match: match }, { $group: { _id: null, total: { $sum: '$amount' } } }])
     const totalAmount = totalAgg[0]?.total || 0
 
