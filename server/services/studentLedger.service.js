@@ -8,7 +8,7 @@ import Group from "../models/Group.js"
 import LedgerEntry from "../models/LedgerEntry.js"
 import { getOrCreateAccount } from "./ledger.service.js"
 import Account from "../models/Account.js"
-import { computeCoveredDebtPeriodsBatch, computeAccountAllocation, computeCourseOwed } from "./billingCycle.service.js"
+import { computeCoveredDebtPeriodsBatch, computeAccountAllocation, computeCourseOwed, foldReversalsAndAllocate, ALLOCATION_KINDS } from "./billingCycle.service.js"
 import { prorateByDateOverlap } from "./attribution.service.js"
 
 // one course's full statement: every Credit (payment received / refund reversed) and Debit (period
@@ -104,9 +104,14 @@ export const computeReconciliation = async (studentIds, dateFrom, dateTo) => {
     const accountByStudent = new Map(accounts.map(a => [String(a.ownerId), a]))
 
     const accountIds = accounts.map(a => a._id)
+    // ALLOCATION_KINDS (not a hand-picked subset) - this used to leave out 'debt_reversal' entirely,
+    // a real bug found live: a student removed from a group (or frozen) mid-period had money
+    // returned to their balance, but this report never even fetched the entry that recorded it, so
+    // it kept reporting them as owing the FULL original charge - "Акт сверки" overstated debt by
+    // exactly however much had already been given back.
     const allEntries = accountIds.length
-        ? await LedgerEntry.find({ accountId: { $in: accountIds }, kind: { $in: ['debt', 'payment', 'refund', 'expense', 'discount'] } })
-            .select('accountId languageId direction amount date kind').sort({ date: 1, _id: 1 }).lean()
+        ? await LedgerEntry.find({ accountId: { $in: accountIds }, kind: { $in: ALLOCATION_KINDS } })
+            .select('accountId languageId direction amount date kind sourceType sourceId').sort({ date: 1, _id: 1 }).lean()
         : []
     const entriesByAccount = new Map()
     for (const e of allEntries) {
@@ -120,34 +125,26 @@ export const computeReconciliation = async (studentIds, dateFrom, dateTo) => {
         const account = accountByStudent.get(String(student._id))
         const accountEntries = account ? (entriesByAccount.get(String(account._id)) || []) : []
 
-        // one shared-wallet FIFO walk per student (same algorithm as billingCycle.service.js's
-        // computeAccountAllocation) - the only correct source for "how much of THIS course's debt is
-        // actually still owed" now, since a payment/refund/discount is never earmarked for one
-        // specific course (confirmed spec: one wallet) - a debt is the only thing still genuinely
-        // course-tagged, so owed/discrepancy below can't just sum this course's own entries anymore.
-        let cashAvailable = 0
-        for (const e of accountEntries) {
-            if (e.kind === 'payment' || e.kind === 'expense' || e.kind === 'discount') cashAvailable += e.amount
-            else if (e.kind === 'refund') cashAvailable -= e.amount
-        }
-        const coveredByEntryId = new Map()
-        for (const e of accountEntries) {
-            if (e.kind !== 'debt') continue
-            const take = Math.min(e.amount, Math.max(0, cashAvailable))
-            cashAvailable -= take
-            coveredByEntryId.set(String(e._id), take)
-        }
+        // one shared-wallet FIFO walk per student, THE SAME shared implementation
+        // computeAccountAllocation/computeCoveredDebtPeriodsBatch use (see billingCycle.service.js) -
+        // the only correct source for "how much of THIS course's debt is actually still owed" now,
+        // since a payment/refund/discount is never earmarked for one specific course (confirmed spec:
+        // one wallet), and a debt_reversal has to fold into the exact debt entry it corrects before
+        // any of this FIFO math runs at all.
+        const allocations = foldReversalsAndAllocate(accountEntries)
+        const owedByEntryId = new Map(allocations.map(a => [String(a.entry._id), a.entry.amount - a.covered]))
 
         for (const course of student.courses) {
             const courseEntries = accountEntries.filter(e => String(e.languageId) === String(course.languageId))
-            const debtEntries = courseEntries.filter(e => e.kind === 'debt')
-            const owed = debtEntries.reduce((sum, e) => sum + e.amount - (coveredByEntryId.get(String(e._id)) || 0), 0)
+            const debtEntries = allocations.filter(a => String(a.entry.languageId) === String(course.languageId) && a.entry.kind === 'debt')
+            const owed = debtEntries.reduce((sum, a) => sum + (owedByEntryId.get(String(a.entry._id)) || 0), 0)
             const status = owed > 0 ? 'owes' : 'settled'
 
-            // opening/charges/payments in range still reflect only this course's own genuinely-tagged
-            // entries (debt always is; a payment/refund only is on legacy rows predating the wallet
-            // rework) - the closing owed figure above is the one this report's "does this student
-            // still owe money" signal actually relies on, and that one IS wallet-correct
+            // opening/charges/payments in range are a plain raw sum over this course's own
+            // genuinely-tagged entries (debt and debt_reversal always are; a payment/refund only is
+            // on legacy rows predating the wallet rework) - deliberately NOT the FIFO-folded view the
+            // owed figure above uses, since a debt_reversal's own direction/amount already nets
+            // against its debt correctly here on its own, without needing to be folded into it first
             const openingBalance = courseEntries
                 .filter(e => e.date < dateFrom)
                 .reduce((sum, e) => sum + (e.direction === 'increase' ? -e.amount : e.amount), 0)

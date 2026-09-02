@@ -5,9 +5,9 @@ import Account from "../models/Account.js"
 import LedgerEntry from "../models/LedgerEntry.js"
 import { getOrCreateAccount, postEntry, computePeriodCost, dateOnlyUTC, startOfNextMonthUTC } from "./ledger.service.js"
 
-// the kinds computeAccountAllocation/computeCoveredDebtPeriodsBatch both need fetched, in one place
-// so neither can silently drift out of sync with what the other reads
-const ALLOCATION_KINDS = ['debt', 'payment', 'refund', 'expense', 'discount', 'debt_reversal']
+// the kinds computeAccountAllocation/computeCoveredDebtPeriodsBatch/computeReconciliation all need
+// fetched, in one place so none of them can silently drift out of sync with what the others read
+export const ALLOCATION_KINDS = ['debt', 'payment', 'refund', 'expense', 'discount', 'debt_reversal']
 
 // the actual fold+FIFO math, given an already-fetched list of one account's entries (any kind in
 // ALLOCATION_KINDS) - factored out so computeAccountAllocation (one account) and
@@ -15,8 +15,12 @@ const ALLOCATION_KINDS = ['debt', 'payment', 'refund', 'expense', 'discount', 'd
 // instead of two copies that already drifted apart once (computeCoveredDebtPeriodsBatch's own
 // predecessor never learned about debt_reversal at all, so a group's revenue calc kept crediting a
 // teacher for days a student was refunded for after leaving - a real bug, caught by the reversal
-// feature's own verification test, not by inspection).
-const foldReversalsAndAllocate = (entries) => {
+// feature's own verification test, not by inspection). Exported so studentLedger.service.js's
+// computeReconciliation can share it too, instead of the THIRD separate inline copy it used to carry
+// (confirmed real bug, found live: that copy's own query never included 'debt_reversal' at all, so
+// the "Акт сверки" report overstated what a removed/frozen student owed by exactly however much had
+// been returned to them).
+export const foldReversalsAndAllocate = (entries) => {
     // a debt_reversal (posted when a student is removed from a group mid-period - see
     // removeStudentFromGroup) directly shrinks the exact debt entry it corrects (sourceId points at
     // it), folded in right here before either pass below runs - so the rest of this function, and
