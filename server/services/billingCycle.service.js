@@ -341,7 +341,15 @@ export const computeCoveredDebtPeriodsBatch = async (studentIds, languageId) => 
 // bad data can no longer take the entire platform's billing down for the day - it's logged and
 // skipped, everyone else still gets processed normally.
 export const runDailyBillingCycle = async () => {
-    const students = await User.find({ role: 'student', 'courses.groupId': { $ne: null }, 'courses.courseCompleted': false })
+    // confirmed real incident (found live, on production data): { 'courses.groupId': { $ne: null } }
+    // looks like "at least one course has a group", but MongoDB's $ne on an ARRAY field actually
+    // means "NO element equals the value" - so this only matched students whose EVERY course had a
+    // group. A student with even one group-less course (removed from a group, never placed in one
+    // yet - an extremely common, completely normal state) was excluded from this query ENTIRELY,
+    // silently skipping billing for ALL their other, perfectly valid, group-assigned courses too,
+    // forever, with zero visible symptom besides a balance that quietly stopped updating. $elemMatch
+    // is the correct way to ask "does at least one array element satisfy this" in MongoDB.
+    const students = await User.find({ role: 'student', courses: { $elemMatch: { groupId: { $ne: null }, courseCompleted: false } } })
     let recognized = 0
     const failures = []
     for (const student of students) {
