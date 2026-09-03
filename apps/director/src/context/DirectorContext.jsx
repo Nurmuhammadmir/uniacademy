@@ -244,7 +244,8 @@ const DirectorContextProvider = (props) => {
             getPricing()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotSavePricing'))
+            const code = error.response?.data?.error
+            toast.error(code === 'invalid_price' ? t('invalidPriceError') : (code || t('couldNotSavePricing')))
             return false
         }
     }
@@ -335,7 +336,8 @@ const DirectorContextProvider = (props) => {
             getPayRates(branchId)
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotSavePayRate'))
+            const code = error.response?.data?.error
+            toast.error(code === 'invalid_rate_value' ? t('invalidRateValueError') : (code || t('couldNotSavePayRate')))
             return false
         }
     }

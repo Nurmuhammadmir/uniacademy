@@ -153,7 +153,9 @@ export const getExpenseDetail = async (req, res) => {
 export const createExpense = async (req, res) => {
     try {
         const { name, category, amount, date, recipient, method } = req.body
-        if (!amount) return res.status(400).json({ error: 'amount_required' })
+        // !amount let a negative amount straight through (only 0/null/undefined/NaN are falsy) -
+        // same class of bug already fixed on createPayment/updatePayment this session
+        if (!(amount > 0)) return res.status(400).json({ error: 'amount_required' })
         if (method && !EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
         const expenseDate = date ? new Date(date) : new Date()
@@ -184,6 +186,10 @@ export const updateExpense = async (req, res) => {
         const expense = await Expense.findOne({ _id: req.params.id, branchId: req.auth.branchId })
         if (!expense) return res.status(404).json({ error: 'not_found' })
         if (!isEditableToday(expense)) return res.status(403).json({ error: 'expense_locked' })
+        // matches createExpense's own guard - without it, a zero/negative corrected amount stored
+        // straight onto the expense document while the ledger delta posted against the OLD amount,
+        // leaving the two permanently disagreeing about this expense's real size
+        if (amount !== undefined && !(Number(amount) > 0)) return res.status(400).json({ error: 'amount_required' })
 
         if (amount !== undefined && Number(amount) !== expense.amount) {
             const delta = Number(amount) - expense.amount

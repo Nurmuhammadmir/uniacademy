@@ -508,6 +508,11 @@ export const deleteTeacher = async (req, res) => {
 export const upsertPricing = async (req, res) => {
     try {
         const { languageId, monthlyPrice } = req.body
+        // a zero/negative price here silently breaks billing for every group of this course from
+        // then on - computePeriodCost/recognizeNextPeriod both correctly refuse to post a debt of
+        // 0 or less, so nothing crashes, but nobody using this course ever gets billed again either,
+        // with no error surfaced anywhere to explain why
+        if (!(monthlyPrice > 0)) return res.status(400).json({ error: 'invalid_price' })
         const pricing = await Pricing.findOneAndUpdate({ languageId }, { monthlyPrice }, { upsert: true, new: true })
         res.json({ pricing })
     } catch (error) {
@@ -1035,6 +1040,11 @@ export const setPayRate = async (req, res) => {
         const { branchId, teacherId, groupId, languageId, rateType, rateValue } = req.body
         if (!branchId) return res.status(400).json({ error: 'branch_required' })
         if (!PAY_RATE_TYPES.includes(rateType)) return res.status(400).json({ error: 'invalid_rate_type' })
+        // the model's own comment claims this validation lives here, but it never actually did - a
+        // negative rateValue flows straight into calculateSalaries' total (a percent_of_revenue rate
+        // of -30 pays a teacher negative money for real revenue), only saved from an actual payout by
+        // paySalary being a separate manual action with its own amount field
+        if (!(rateValue > 0)) return res.status(400).json({ error: 'invalid_rate_value' })
         if (groupId && !teacherId) return res.status(400).json({ error: 'teacher_required_for_group_rate' })
         // three independent override axes (by teacher / by course / by group) - a course-wide rate
         // is never combined with a specific teacher or group, and vice versa (confirmed spec: these
@@ -1110,7 +1120,10 @@ export const paySalary = async (req, res) => {
     try {
         const { branchId, teacherId, amount, dateFrom, dateTo, method } = req.body
         if (!branchId) return res.status(400).json({ error: 'branch_required' })
-        if (!teacherId || !amount) return res.status(400).json({ error: 'missing_fields' })
+        if (!teacherId) return res.status(400).json({ error: 'missing_fields' })
+        // !amount alone let a negative payout amount straight through (only 0/null/undefined/NaN
+        // are falsy) - same class of bug already fixed on the admin app's own copy of this
+        if (!(amount > 0)) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
         const teacher = await User.findById(teacherId).select('name').lean()
@@ -1156,7 +1169,10 @@ export const prepaySalary = async (req, res) => {
     try {
         const { branchId, teacherId, amount, dateFrom, dateTo, method } = req.body
         if (!branchId) return res.status(400).json({ error: 'branch_required' })
-        if (!teacherId || !amount) return res.status(400).json({ error: 'missing_fields' })
+        if (!teacherId) return res.status(400).json({ error: 'missing_fields' })
+        // !amount alone let a negative payout amount straight through (only 0/null/undefined/NaN
+        // are falsy) - same class of bug already fixed on the admin app's own copy of this
+        if (!(amount > 0)) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
         const teacher = await User.findById(teacherId).select('name').lean()

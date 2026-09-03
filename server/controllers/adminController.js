@@ -1570,7 +1570,10 @@ export const getSalaryDetail = async (req, res) => {
 export const paySalary = async (req, res) => {
     try {
         const { teacherId, amount, dateFrom, dateTo, method } = req.body
-        if (!teacherId || !amount) return res.status(400).json({ error: 'missing_fields' })
+        if (!teacherId) return res.status(400).json({ error: 'missing_fields' })
+        // !amount alone let a negative payout amount straight through (only 0/null/undefined/NaN
+        // are falsy) - same class of bug already fixed on createPayment/updatePayment/expenses
+        if (!(amount > 0)) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
         const teacher = await User.findById(teacherId).select('name').lean()
@@ -1629,7 +1632,8 @@ export const paySalary = async (req, res) => {
 export const prepaySalary = async (req, res) => {
     try {
         const { teacherId, amount, dateFrom, dateTo, method } = req.body
-        if (!teacherId || !amount) return res.status(400).json({ error: 'missing_fields' })
+        if (!teacherId) return res.status(400).json({ error: 'missing_fields' })
+        if (!(amount > 0)) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
         const teacher = await User.findById(teacherId).select('name').lean()
