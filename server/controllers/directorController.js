@@ -775,6 +775,15 @@ export const deleteLanguage = async (req, res) => {
         const language = await Language.findById(req.params.id).lean()
         if (!language) return res.status(404).json({ error: 'not_found' })
 
+        // confirmed real gap (same class already found on deleteTeacher this session): nothing here
+        // checked whether any group still actually runs this course before wiping every level,
+        // every piece of homework content, and the language itself - real students in an active
+        // group would be left pointing at levelId/languageId values that no longer exist anywhere,
+        // breaking billing's own Level lookups (durationDays, courseHasLevels) and every populated
+        // language/level name across the whole platform for them, silently, with no error anywhere.
+        const hasActiveGroups = await Group.exists({ languageId: language._id, status: 'active' })
+        if (hasActiveGroups) return res.status(400).json({ error: 'language_has_active_groups' })
+
         const levelsToRemove = await Level.find({ languageId: language._id }).lean()
         for (const level of levelsToRemove) {
             await deleteLevelContent(language._id, level._id)
@@ -848,6 +857,11 @@ export const deleteLevel = async (req, res) => {
     try {
         const level = await Level.findById(req.params.id).lean()
         if (!level) return res.status(404).json({ error: 'not_found' })
+
+        // same gap just found and fixed on deleteLanguage - a group still actively running this
+        // exact level would be left pointing at a levelId that no longer resolves to anything
+        const hasActiveGroups = await Group.exists({ levelId: level._id, status: 'active' })
+        if (hasActiveGroups) return res.status(400).json({ error: 'level_has_active_groups' })
 
         await deleteLevelContent(level.languageId, level._id)
         await Level.findByIdAndDelete(level._id)

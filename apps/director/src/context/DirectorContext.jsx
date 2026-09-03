@@ -513,7 +513,8 @@ const DirectorContextProvider = (props) => {
             getLevels()
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotDeleteCourse'))
+            const code = error.response?.data?.error
+            toast.error(code === 'language_has_active_groups' ? t('languageHasActiveGroupsError') : (code || t('couldNotDeleteCourse')))
             return false
         }
     }
@@ -602,7 +603,8 @@ const DirectorContextProvider = (props) => {
             getLevels(languageId)
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotDeleteLevel'))
+            const code = error.response?.data?.error
+            toast.error(code === 'level_has_active_groups' ? t('levelHasActiveGroupsError') : (code || t('couldNotDeleteLevel')))
             return false
         }
     }
