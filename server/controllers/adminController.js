@@ -970,6 +970,16 @@ export const refundPayment = async (req, res) => {
     try {
         const payment = await Payment.findById(req.params.id)
         if (!payment) return res.status(404).json({ error: 'not_found' })
+        // confirmed real gap: nothing here checked this payment actually belongs to the admin's own
+        // branch - an admin could refund ANY payment platform-wide, moving real cash out of THEIR
+        // OWN branch's account into an unrelated student's balance while booking a bogus refund
+        // expense in their own branch's books for a transaction that never touched it. Same
+        // Payment.branchId-with-student-fallback getPaymentDetail/getFinanceOverview already use
+        // (Payment only carries its own branchId as of the attribution rework - older rows predate
+        // it) - a separate lookup rather than .populate('studentId') so payment.studentId stays the
+        // plain id every other line below already expects it to be.
+        const paymentBranchId = payment.branchId || (await User.findById(payment.studentId).select('branchId').lean())?.branchId
+        if (String(paymentBranchId) !== String(req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
         // confirmed spec: same same-day rule as editing/deleting a payment outright (see
         // updatePayment/deletePayment below) - once the day it happened has passed, it's locked
         // history and can't be refunded through this endpoint either.
@@ -1067,6 +1077,11 @@ export const updatePayment = async (req, res) => {
         const { amount, method } = req.body
         const payment = await Payment.findById(req.params.id)
         if (!payment) return res.status(404).json({ error: 'not_found' })
+        // confirmed real gap (same one just fixed on refundPayment): without this, an admin could
+        // correct ANY payment platform-wide, moving real money between their own branch's account
+        // and an unrelated student's balance in a completely different branch
+        const paymentBranchId = payment.branchId || (await User.findById(payment.studentId).select('branchId').lean())?.branchId
+        if (String(paymentBranchId) !== String(req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
         if (!isEditableToday(payment)) return res.status(403).json({ error: 'payment_locked' })
         if (payment.refundedAmount > 0) return res.status(400).json({ error: 'already_refunded' })
         // matches createPayment's own guard - without it, a zero/negative/NaN "corrected" amount
