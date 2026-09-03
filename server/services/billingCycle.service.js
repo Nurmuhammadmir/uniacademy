@@ -218,14 +218,37 @@ export const recomputeEnrollmentStatus = async (student) => {
     }
 }
 
+// recognizeNextPeriod only ever posts ONE chunk per call (its own due-date guard already makes that
+// safe to call as often as you like - it simply no-ops once nothing is due yet). This loops it until
+// there's genuinely nothing left to catch up, instead of relying on the daily cron to trickle a
+// backlog in one month at a time. Confirmed real incident: backdating a student's enrollment to
+// several months ago used to post just that FIRST month immediately - the rest only arrived one
+// month per day as the cron happened to run, so a student backdated 6 months would take 5 more days
+// to actually show their real balance. Safe to loop everywhere this is called (enrollment AND the
+// daily cron below) since the guard means it can never recognize something not actually due yet.
+export const recognizeAllDuePeriods = async (student, course, opts = {}) => {
+    const entries = []
+    let entry = await recognizeNextPeriod(student, course, opts)
+    while (entry) {
+        entries.push(entry)
+        // enrolledAt only ever matters for the very first call (recognizeNextPeriod's own
+        // firstWindowStart branch only fires while recognizedThrough is still unset) - every
+        // following iteration already has it set, so it takes the normal recurring path on its own
+        entry = await recognizeNextPeriod(student, course, { createdBy: opts.createdBy })
+    }
+    return entries
+}
+
 // called once, immediately, when an admin assigns a student to a group (see adminController's
-// addStudentToGroup) - posts the first (day-prorated) debt right away rather than waiting for the
-// daily job, per the confirmed "debt recorded at enrollment, not lazily after payment" requirement.
-// enrolledAt is optional - confirmed spec: an admin can backdate WHEN a student actually joined (they
-// really joined weeks ago, only being entered into the system now), and the first period's debt is
-// prorated from that real date instead of always from today.
+// addStudentToGroup) - posts every due debt right away (not just the first month) rather than
+// waiting for the daily job, per the confirmed "debt recorded at enrollment, not lazily after
+// payment" requirement. enrolledAt is optional - confirmed spec: an admin can backdate WHEN a
+// student actually joined (they really joined weeks/months ago, only being entered into the system
+// now), and every period's debt between then and today is prorated/posted immediately instead of
+// trickling in one month per day.
 export const recognizeEnrollmentDebt = async (student, course, createdBy, enrolledAt = null) => {
-    return recognizeNextPeriod(student, course, { createdBy, enrolledAt })
+    const entries = await recognizeAllDuePeriods(student, course, { createdBy, enrolledAt })
+    return entries[0] || null
 }
 
 // called when an admin removes a student from a group (see adminController's removeStudentFromGroup)
@@ -360,8 +383,12 @@ export const runDailyBillingCycle = async () => {
         for (const course of student.courses) {
             if (!course.groupId || course.courseCompleted) continue
             try {
-                const entry = await recognizeNextPeriod(student, course, {})
-                if (entry) recognized++
+                // catches up EVERY overdue period in one pass, not just the next one - so any
+                // backlog (a past outage, a bug like the two just fixed above, a backdated add that
+                // bypassed the immediate catch-up) heals itself on the very next run instead of
+                // trickling in one month per day forever
+                const entries = await recognizeAllDuePeriods(student, course, {})
+                recognized += entries.length
             } catch (error) {
                 console.log('runDailyBillingCycle: failed for student', student._id, 'course', course._id, error)
                 failures.push({ studentId: student._id, courseId: course._id, error: error.message })
