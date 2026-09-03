@@ -1437,7 +1437,10 @@ export const retakeExam = async (req, res) => {
         const exam = await Exam.findById(examId).lean()
         if (!exam) return res.status(404).json({ error: 'not_found' })
 
-        const student = await User.findById(studentId)
+        // confirmed real gap: every other student lookup in this file scopes by branchId - this one
+        // didn't, letting an admin record (or overwrite the outcome of) an exam retake for a student
+        // in a COMPLETELY DIFFERENT branch, as long as they knew/guessed the studentId
+        const student = await User.findOne({ _id: studentId, branchId: req.auth.branchId, role: 'student' })
         if (!student) return res.status(404).json({ error: 'not_found' })
 
         const attemptCount = await ExamAttempt.countDocuments({ studentId, examId })
@@ -1576,7 +1579,17 @@ export const paySalary = async (req, res) => {
         if (!(amount > 0)) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
-        const teacher = await User.findById(teacherId).select('name').lean()
+        // confirmed real gap: nothing here checked the teacher actually belongs to (or is
+        // additionally assigned to) this admin's own branch - teacherId is a plain request body
+        // value, so without this an admin could pay out branch money to any teacher at all, moving
+        // real cash into a completely different branch's teacher's account with zero authorization.
+        // Same $or a teacher legitimately working across several branches already matches in
+        // calculateSalaries/listBranchTeachers.
+        const teacher = await User.findOne({
+            _id: teacherId, role: 'teacher',
+            $or: [{ branchId: req.auth.branchId }, { additionalBranchIds: req.auth.branchId }],
+        }).select('name').lean()
+        if (!teacher) return res.status(404).json({ error: 'not_found' })
         // guarantees a real "Ish haqi MENTOR" category exists (correct name/color) whether this is a
         // brand new branch (ensureDefaultCategories seeds its whole starter set) or one that was
         // already active before this category existed under this exact name (ensureCategoryExists
@@ -1636,7 +1649,14 @@ export const prepaySalary = async (req, res) => {
         if (!(amount > 0)) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
-        const teacher = await User.findById(teacherId).select('name').lean()
+        // same real gap just fixed on paySalary - teacherId is a plain request body value, so
+        // without this an admin could send branch money to any teacher at all, not just one
+        // actually belonging to (or additionally assigned to) their own branch
+        const teacher = await User.findOne({
+            _id: teacherId, role: 'teacher',
+            $or: [{ branchId: req.auth.branchId }, { additionalBranchIds: req.auth.branchId }],
+        }).select('name').lean()
+        if (!teacher) return res.status(404).json({ error: 'not_found' })
         await ensureCategoryExists(req.auth.branchId, PREPAYMENT_CATEGORY, '#E67E22')
         const expense = await Expense.create({
             branchId: req.auth.branchId, category: PREPAYMENT_CATEGORY, amount, teacherId,

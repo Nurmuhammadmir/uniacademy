@@ -1140,7 +1140,14 @@ export const paySalary = async (req, res) => {
         if (!(amount > 0)) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
-        const teacher = await User.findById(teacherId).select('name').lean()
+        // confirmed real gap (same one already fixed on the admin app's own copy): nothing here
+        // checked the teacher actually belongs to (or is additionally assigned to) the branch this
+        // payout is being booked against - without it a director could book a payout to a teacher
+        // who never worked at this branch at all, corrupting that branch's own expense history
+        const teacher = await User.findOne({
+            _id: teacherId, role: 'teacher', $or: [{ branchId }, { additionalBranchIds: branchId }],
+        }).select('name').lean()
+        if (!teacher) return res.status(404).json({ error: 'not_found' })
         await ensureDefaultCategories(branchId)
         await ensureCategoryExists(branchId, SALARY_CATEGORY, '#3E7CB1')
         const expenseDate = new Date()
@@ -1189,7 +1196,11 @@ export const prepaySalary = async (req, res) => {
         if (!(amount > 0)) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
-        const teacher = await User.findById(teacherId).select('name').lean()
+        // same real gap just fixed on this file's own paySalary
+        const teacher = await User.findOne({
+            _id: teacherId, role: 'teacher', $or: [{ branchId }, { additionalBranchIds: branchId }],
+        }).select('name').lean()
+        if (!teacher) return res.status(404).json({ error: 'not_found' })
         await ensureCategoryExists(branchId, PREPAYMENT_CATEGORY, '#E67E22')
         const expenseDate = new Date()
         const expense = await Expense.create({
