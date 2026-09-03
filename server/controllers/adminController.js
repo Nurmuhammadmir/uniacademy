@@ -1444,19 +1444,17 @@ export const retakeExam = async (req, res) => {
         const passed = score >= exam.passScore
         const attempt = await ExamAttempt.create({ studentId, examId, score, passed, attemptNumber: attemptCount + 1, source: 'admin_retake' })
 
-        const courseEntry = student.courses.find(c => String(c.languageId) === String(exam.languageId))
-        let outcome = passed ? 'course_completed' : 'failed_final'
-
+        // confirmed spec: which level/group a student is in is always the admin's own manual
+        // decision (same rule groupPromotion.service.js now follows) - this only ever records the
+        // retake attempt, it never touches courseEntry.levelId itself. An admin who sees "passed"
+        // decides separately whether/when to actually move this student up.
+        let outcome = passed ? 'passed' : 'failed_final'
         if (passed) {
             const currentLevel = await Level.findById(exam.levelId).lean()
             const nextLevel = currentLevel
                 ? await Level.findOne({ languageId: exam.languageId, order: { $gt: currentLevel.order } }).sort({ order: 1 }).lean()
                 : null
-            if (nextLevel && courseEntry) {
-                courseEntry.levelId = nextLevel._id
-                await student.save()
-                outcome = 'promoted_manual'
-            }
+            outcome = nextLevel ? 'passed' : 'course_completed'
         }
 
         res.json({ attempt, outcome })
