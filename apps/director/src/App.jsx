@@ -30,6 +30,7 @@ const Timetable = lazy(() => import('./pages/Timetable.jsx'))
 const Settings = lazy(() => import('./pages/Settings.jsx'))
 const Finance = lazy(() => import('./pages/Finance.jsx'))
 const TransactionDetail = lazy(() => import('./pages/TransactionDetail.jsx'))
+const Leads = lazy(() => import('./pages/Leads.jsx'))
 
 // centered, minimal - shown only for the brief moment a route's own chunk is still downloading
 const PageFallback = () => (
@@ -75,6 +76,7 @@ const App = () => {
                   <Route path='/timetable' element={<Timetable />} />
                   <Route path='/finance' element={<Finance />} />
                   <Route path='/finance/payments/:id' element={<TransactionDetail />} />
+                  <Route path='/leads' element={<Leads />} />
                   <Route path='/settings' element={<Settings />} />
                   <Route path='*' element={<Navigate to='/' />} />
                 </Routes>

@@ -15,6 +15,13 @@ import {
 } from "../controllers/directorController.js"
 import { listLanguages, listLevels, listBranches, getSettings } from "../controllers/catalogController.js"
 import {
+    getLeadsBoard, createColumn, updateColumn, deleteColumn,
+    createSubgroup, updateSubgroup, deleteSubgroup,
+    createLead, updateLead, deleteLead,
+    listLeadSources, createLeadSource, updateLeadSource, deleteLeadSource,
+    listLeadForms, getLeadForm, createLeadForm, updateLeadForm, deleteLeadForm,
+} from "../controllers/leadsController.js"
+import {
     getDayContent, saveVocab, saveGrammar, saveReading, getLevelContentSummary,
     fillVocabWordBank, fillGrammarBank, fillReadingBank,
 } from "../controllers/contentController.js"
@@ -120,5 +127,29 @@ directorRouter.delete('/teachers/:id', deleteTeacher)
 directorRouter.get('/pricing', listPricing)
 directorRouter.post('/pricing', upsertPricing)
 directorRouter.delete('/pricing/:id', deletePricing)
+
+// Leads - sub_director-reachable too (same branch-picker pattern as Finance above: the frontend
+// only ever offers branches listBranches already scoped them to). Unlike adminRoute.js, a lead here
+// CAN be permanently deleted - confirmed spec: a director needs full management including cleanup,
+// only admin is locked out of ever deleting one.
+directorRouter.get('/leads/board', getLeadsBoard)
+directorRouter.post('/leads/columns', createColumn)
+directorRouter.put('/leads/columns/:id', updateColumn)
+directorRouter.delete('/leads/columns/:id', deleteColumn)
+directorRouter.post('/leads/columns/:columnId/subgroups', createSubgroup)
+directorRouter.put('/leads/subgroups/:id', updateSubgroup)
+directorRouter.delete('/leads/subgroups/:id', deleteSubgroup)
+directorRouter.post('/leads', createLead)
+directorRouter.put('/leads/:id', updateLead)
+directorRouter.delete('/leads/:id', deleteLead)
+directorRouter.get('/leads/sources', listLeadSources)
+directorRouter.post('/leads/sources', createLeadSource)
+directorRouter.put('/leads/sources/:id', updateLeadSource)
+directorRouter.delete('/leads/sources/:id', deleteLeadSource)
+directorRouter.get('/leads/forms', listLeadForms)
+directorRouter.get('/leads/forms/:id', getLeadForm)
+directorRouter.post('/leads/forms', createLeadForm)
+directorRouter.put('/leads/forms/:id', updateLeadForm)
+directorRouter.delete('/leads/forms/:id', deleteLeadForm)
 
 export default directorRouter

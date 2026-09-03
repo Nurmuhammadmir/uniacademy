@@ -819,6 +819,223 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // ==== Leads (Kanban CRM) - a director has no home branch, so every call here takes the branch
+    // being VIEWED as its own explicit branchId param (same pattern getFinanceOverview/calculateSalary
+    // above already use), rather than relying on req.auth.branchId the way the admin app can. Unlike
+    // admin, a director CAN permanently delete a lead (deleteLead below) - confirmed spec. ====
+    const [leadSources, setLeadSources] = useState([])
+
+    const getLeadsBoard = async (branchId) => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/director/leads/board', { params: { branchId }, ...authHeader })
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadLeadsBoard'))
+            return null
+        }
+    }
+
+    const createLeadColumn = async (branchId, name) => {
+        try {
+            const { data } = await axios.post(backendUrl + '/api/director/leads/columns', { name, branchId }, authHeader)
+            return data.column
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotCreateColumn'))
+            return null
+        }
+    }
+
+    const updateLeadColumn = async (branchId, id, payload) => {
+        try {
+            await axios.put(backendUrl + '/api/director/leads/columns/' + id, { ...payload, branchId }, authHeader)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotUpdateColumn'))
+            return false
+        }
+    }
+
+    const deleteLeadColumn = async (branchId, id) => {
+        if (!(await confirm(t('confirmDeleteColumn')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/leads/columns/' + id, { params: { branchId }, ...authHeader })
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteColumn'))
+            return false
+        }
+    }
+
+    const createLeadSubgroup = async (branchId, columnId, name) => {
+        try {
+            const { data } = await axios.post(backendUrl + `/api/director/leads/columns/${columnId}/subgroups`, { name, branchId }, authHeader)
+            return data.subgroup
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotCreateSubgroup'))
+            return null
+        }
+    }
+
+    const updateLeadSubgroup = async (branchId, id, payload) => {
+        try {
+            await axios.put(backendUrl + '/api/director/leads/subgroups/' + id, { ...payload, branchId }, authHeader)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotUpdateSubgroup'))
+            return false
+        }
+    }
+
+    const deleteLeadSubgroup = async (branchId, id) => {
+        if (!(await confirm(t('confirmDeleteSubgroup')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/leads/subgroups/' + id, { params: { branchId }, ...authHeader })
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteSubgroup'))
+            return false
+        }
+    }
+
+    const createLead = async (branchId, payload) => {
+        try {
+            const { data } = await axios.post(backendUrl + '/api/director/leads', { ...payload, branchId }, authHeader)
+            return data.lead
+        } catch (error) {
+            const code = error.response?.data?.error
+            if (code === 'column_locked') toast.error(t('columnLockedError'))
+            else toast.error(code || t('couldNotCreateLead'))
+            return null
+        }
+    }
+
+    const updateLead = async (branchId, id, payload) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/leads/' + id, { ...payload, branchId }, authHeader)
+            return data.lead
+        } catch (error) {
+            const code = error.response?.data?.error
+            if (code === 'column_locked') toast.error(t('columnLockedError'))
+            else toast.error(code || t('couldNotUpdateLead'))
+            return null
+        }
+    }
+
+    // permanent, unlike everything above - confirmed spec: only a director/sub_director ever gets
+    // this button at all, admin never does (see leadsController.js's own comment on deleteLead)
+    const deleteLead = async (branchId, id) => {
+        if (!(await confirm(t('confirmDeleteLead')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/leads/' + id, { params: { branchId }, ...authHeader })
+            toast.success(t('leadDeleted'))
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteLead'))
+            return false
+        }
+    }
+
+    const getLeadSources = async (branchId) => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/director/leads/sources', { params: { branchId }, ...authHeader })
+            setLeadSources(data.sources)
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadSources'))
+        }
+    }
+
+    const createLeadSource = async (branchId, payload) => {
+        try {
+            await axios.post(backendUrl + '/api/director/leads/sources', { ...payload, branchId }, authHeader)
+            getLeadSources(branchId)
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            if (code === 'source_already_exists') toast.error(t('sourceAlreadyExistsError'))
+            else toast.error(code || t('couldNotSaveSource'))
+            return false
+        }
+    }
+
+    const updateLeadSource = async (branchId, id, payload) => {
+        try {
+            await axios.put(backendUrl + '/api/director/leads/sources/' + id, { ...payload, branchId }, authHeader)
+            getLeadSources(branchId)
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            if (code === 'source_already_exists') toast.error(t('sourceAlreadyExistsError'))
+            else toast.error(code || t('couldNotSaveSource'))
+            return false
+        }
+    }
+
+    const deleteLeadSource = async (branchId, id) => {
+        if (!(await confirm(t('confirmDeleteSource')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/leads/sources/' + id, { params: { branchId }, ...authHeader })
+            getLeadSources(branchId)
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            if (code === 'cannot_delete_other') toast.error(t('cannotDeleteOtherSourceError'))
+            else toast.error(code || t('couldNotDeleteSource'))
+            return false
+        }
+    }
+
+    const getLeadForms = async (branchId) => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/director/leads/forms', { params: { branchId }, ...authHeader })
+            return data.forms
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadForms'))
+            return []
+        }
+    }
+
+    const getLeadForm = async (branchId, id) => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/director/leads/forms/' + id, { params: { branchId }, ...authHeader })
+            return data.form
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadForm'))
+            return null
+        }
+    }
+
+    const createLeadForm = async (branchId, payload) => {
+        try {
+            const { data } = await axios.post(backendUrl + '/api/director/leads/forms', { ...payload, branchId }, authHeader)
+            return data.form
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotCreateForm'))
+            return null
+        }
+    }
+
+    const updateLeadForm = async (branchId, id, payload) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/leads/forms/' + id, { ...payload, branchId }, authHeader)
+            toast.success(t('formSaved'))
+            return data.form
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotSaveForm'))
+            return null
+        }
+    }
+
+    const deleteLeadForm = async (branchId, id) => {
+        if (!(await confirm(t('confirmDeleteForm')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/leads/forms/' + id, { params: { branchId }, ...authHeader })
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteForm'))
+            return false
+        }
+    }
+
     const value = {
         token, login, logout,
         stats, getStats,
@@ -841,6 +1058,11 @@ const DirectorContextProvider = (props) => {
         getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage,
         fillVocabWordBank, fillGrammarBank, fillReadingBank,
         getExamConfig, saveExamConfig,
+        getLeadsBoard, createLeadColumn, updateLeadColumn, deleteLeadColumn,
+        createLeadSubgroup, updateLeadSubgroup, deleteLeadSubgroup,
+        createLead, updateLead, deleteLead,
+        leadSources, getLeadSources, createLeadSource, updateLeadSource, deleteLeadSource,
+        getLeadForms, getLeadForm, createLeadForm, updateLeadForm, deleteLeadForm,
     }
 
     useEffect(() => {

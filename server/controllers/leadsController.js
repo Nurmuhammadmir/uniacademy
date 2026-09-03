@@ -3,6 +3,12 @@
 // an optional bucket within a column (e.g. split "New" by which platform a lead came from), leads
 // are the actual cards. A locked column can't have cards dragged into or out of it - protects a
 // finalized stage (Won/Lost) from being disturbed by an accidental drag.
+//
+// Shared by both adminRoute.js (an admin always has req.auth.branchId from their own JWT) and
+// directorRoute.js (a director/sub_director has no home branch - they pass whichever branch they're
+// currently viewing as ?branchId=/body.branchId, same pattern getFinanceOverview already uses). This
+// is the ONE controller both roles hit - never a second, branch-selection-flavored copy that could
+// drift out of sync with this one.
 import crypto from "crypto"
 import LeadColumn from "../models/LeadColumn.js"
 import LeadSubgroup from "../models/LeadSubgroup.js"
@@ -11,10 +17,14 @@ import LeadSource from "../models/LeadSource.js"
 import LeadForm from "../models/LeadForm.js"
 import { ensureDefaultLeadSources } from "../services/leadSources.service.js"
 
+const resolveBranchId = (req) => req.auth.branchId || req.query.branchId || req.body.branchId
+
 // single call backing the whole board - flat arrays, the frontend assembles the tree client-side
 export const getLeadsBoard = async (req, res) => {
     try {
-        const columns = await LeadColumn.find({ branchId: req.auth.branchId }).sort({ order: 1 }).lean()
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const columns = await LeadColumn.find({ branchId }).sort({ order: 1 }).lean()
         const columnIds = columns.map(c => c._id)
         const subgroups = await LeadSubgroup.find({ columnId: { $in: columnIds } }).sort({ order: 1 }).lean()
         const leads = await Lead.find({ columnId: { $in: columnIds } }).sort({ order: 1 }).lean()
@@ -29,9 +39,11 @@ export const getLeadsBoard = async (req, res) => {
 
 export const createColumn = async (req, res) => {
     try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
         const { name } = req.body
-        const maxOrder = await LeadColumn.findOne({ branchId: req.auth.branchId }).sort({ order: -1 }).lean()
-        const column = await LeadColumn.create({ branchId: req.auth.branchId, name, order: (maxOrder?.order ?? -1) + 1 })
+        const maxOrder = await LeadColumn.findOne({ branchId }).sort({ order: -1 }).lean()
+        const column = await LeadColumn.create({ branchId, name, order: (maxOrder?.order ?? -1) + 1 })
         res.status(201).json({ column })
     } catch (error) {
         console.log(error)
@@ -41,12 +53,14 @@ export const createColumn = async (req, res) => {
 
 export const updateColumn = async (req, res) => {
     try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
         const { name, order, locked } = req.body
         const patch = {}
         if (name !== undefined) patch.name = name
         if (order !== undefined) patch.order = order
         if (locked !== undefined) patch.locked = locked
-        const column = await LeadColumn.findOneAndUpdate({ _id: req.params.id, branchId: req.auth.branchId }, patch, { new: true })
+        const column = await LeadColumn.findOneAndUpdate({ _id: req.params.id, branchId }, patch, { new: true })
         if (!column) return res.status(404).json({ error: 'not_found' })
         res.json({ column })
     } catch (error) {
@@ -57,7 +71,9 @@ export const updateColumn = async (req, res) => {
 
 export const deleteColumn = async (req, res) => {
     try {
-        const column = await LeadColumn.findOneAndDelete({ _id: req.params.id, branchId: req.auth.branchId })
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const column = await LeadColumn.findOneAndDelete({ _id: req.params.id, branchId })
         if (!column) return res.status(404).json({ error: 'not_found' })
         await LeadSubgroup.deleteMany({ columnId: column._id })
         await Lead.deleteMany({ columnId: column._id })
@@ -73,11 +89,13 @@ export const deleteColumn = async (req, res) => {
 
 export const createSubgroup = async (req, res) => {
     try {
-        const column = await LeadColumn.findOne({ _id: req.params.columnId, branchId: req.auth.branchId }).lean()
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const column = await LeadColumn.findOne({ _id: req.params.columnId, branchId }).lean()
         if (!column) return res.status(404).json({ error: 'not_found' })
         const { name } = req.body
         const maxOrder = await LeadSubgroup.findOne({ columnId: column._id }).sort({ order: -1 }).lean()
-        const subgroup = await LeadSubgroup.create({ branchId: req.auth.branchId, columnId: column._id, name, order: (maxOrder?.order ?? -1) + 1 })
+        const subgroup = await LeadSubgroup.create({ branchId, columnId: column._id, name, order: (maxOrder?.order ?? -1) + 1 })
         res.status(201).json({ subgroup })
     } catch (error) {
         console.log(error)
@@ -87,12 +105,14 @@ export const createSubgroup = async (req, res) => {
 
 export const updateSubgroup = async (req, res) => {
     try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
         const { name, order, autoIntakeSourceNames } = req.body
         const patch = {}
         if (name !== undefined) patch.name = name
         if (order !== undefined) patch.order = order
         if (autoIntakeSourceNames !== undefined) patch.autoIntakeSourceNames = autoIntakeSourceNames
-        const subgroup = await LeadSubgroup.findOneAndUpdate({ _id: req.params.id, branchId: req.auth.branchId }, patch, { new: true })
+        const subgroup = await LeadSubgroup.findOneAndUpdate({ _id: req.params.id, branchId }, patch, { new: true })
         if (!subgroup) return res.status(404).json({ error: 'not_found' })
         res.json({ subgroup })
     } catch (error) {
@@ -105,7 +125,9 @@ export const updateSubgroup = async (req, res) => {
 // label shouldn't destroy its data. Leads just fall back to "no subgroup" within the same column.
 export const deleteSubgroup = async (req, res) => {
     try {
-        const subgroup = await LeadSubgroup.findOneAndDelete({ _id: req.params.id, branchId: req.auth.branchId })
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const subgroup = await LeadSubgroup.findOneAndDelete({ _id: req.params.id, branchId })
         if (!subgroup) return res.status(404).json({ error: 'not_found' })
         await Lead.updateMany({ subgroupId: subgroup._id }, { subgroupId: null })
         await LeadForm.updateMany({ subgroupId: subgroup._id }, { subgroupId: null })
@@ -120,8 +142,10 @@ export const deleteSubgroup = async (req, res) => {
 
 export const listLeadSources = async (req, res) => {
     try {
-        await ensureDefaultLeadSources(req.auth.branchId)
-        const sources = await LeadSource.find({ branchId: req.auth.branchId }).sort({ name: 1 }).lean()
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        await ensureDefaultLeadSources(branchId)
+        const sources = await LeadSource.find({ branchId }).sort({ name: 1 }).lean()
         res.json({ sources })
     } catch (error) {
         console.log(error)
@@ -131,9 +155,11 @@ export const listLeadSources = async (req, res) => {
 
 export const createLeadSource = async (req, res) => {
     try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
         const { name, color } = req.body
         if (!name?.trim()) return res.status(400).json({ error: 'name_required' })
-        const source = await LeadSource.create({ branchId: req.auth.branchId, name: name.trim(), color: color || '#7A7266' })
+        const source = await LeadSource.create({ branchId, name: name.trim(), color: color || '#7A7266' })
         res.status(201).json({ source })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'source_already_exists' })
@@ -144,8 +170,10 @@ export const createLeadSource = async (req, res) => {
 
 export const updateLeadSource = async (req, res) => {
     try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
         const { name, color } = req.body
-        const source = await LeadSource.findOne({ _id: req.params.id, branchId: req.auth.branchId })
+        const source = await LeadSource.findOne({ _id: req.params.id, branchId })
         if (!source) return res.status(404).json({ error: 'not_found' })
 
         const oldName = source.name
@@ -156,10 +184,10 @@ export const updateLeadSource = async (req, res) => {
         // cascade the rename everywhere a source NAME is stored as a plain string, so nothing
         // silently becomes "unknown" just because the label changed
         if (source.name !== oldName) {
-            await Lead.updateMany({ branchId: req.auth.branchId, source: oldName }, { source: source.name })
-            await LeadForm.updateMany({ branchId: req.auth.branchId, sourceName: oldName }, { sourceName: source.name })
+            await Lead.updateMany({ branchId, source: oldName }, { source: source.name })
+            await LeadForm.updateMany({ branchId, sourceName: oldName }, { sourceName: source.name })
             await LeadSubgroup.updateMany(
-                { branchId: req.auth.branchId, autoIntakeSourceNames: oldName },
+                { branchId, autoIntakeSourceNames: oldName },
                 { $set: { 'autoIntakeSourceNames.$': source.name } }
             )
         }
@@ -173,15 +201,17 @@ export const updateLeadSource = async (req, res) => {
 
 export const deleteLeadSource = async (req, res) => {
     try {
-        const source = await LeadSource.findOne({ _id: req.params.id, branchId: req.auth.branchId })
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const source = await LeadSource.findOne({ _id: req.params.id, branchId })
         if (!source) return res.status(404).json({ error: 'not_found' })
         if (source.name === 'Other') return res.status(400).json({ error: 'cannot_delete_other' })
 
-        await ensureDefaultLeadSources(req.auth.branchId)
-        await Lead.updateMany({ branchId: req.auth.branchId, source: source.name }, { source: 'Other' })
-        await LeadForm.updateMany({ branchId: req.auth.branchId, sourceName: source.name }, { sourceName: 'Other' })
+        await ensureDefaultLeadSources(branchId)
+        await Lead.updateMany({ branchId, source: source.name }, { source: 'Other' })
+        await LeadForm.updateMany({ branchId, sourceName: source.name }, { sourceName: 'Other' })
         await LeadSubgroup.updateMany(
-            { branchId: req.auth.branchId, autoIntakeSourceNames: source.name },
+            { branchId, autoIntakeSourceNames: source.name },
             { $pull: { autoIntakeSourceNames: source.name } }
         )
         await source.deleteOne()
@@ -196,8 +226,10 @@ export const deleteLeadSource = async (req, res) => {
 
 export const createLead = async (req, res) => {
     try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
         const { name, phone, source, comment, columnId, subgroupId } = req.body
-        const column = await LeadColumn.findOne({ _id: columnId, branchId: req.auth.branchId }).lean()
+        const column = await LeadColumn.findOne({ _id: columnId, branchId }).lean()
         if (!column) return res.status(400).json({ error: 'invalid_column' })
         if (column.locked) return res.status(400).json({ error: 'column_locked' })
 
@@ -211,7 +243,7 @@ export const createLead = async (req, res) => {
 
         const maxOrder = await Lead.findOne({ columnId, subgroupId: resolvedSubgroupId }).sort({ order: -1 }).lean()
         const lead = await Lead.create({
-            branchId: req.auth.branchId, columnId, subgroupId: resolvedSubgroupId,
+            branchId, columnId, subgroupId: resolvedSubgroupId,
             name, phone, source: source || 'Other', comment: comment || '',
             order: (maxOrder?.order ?? -1) + 1,
         })
@@ -226,7 +258,9 @@ export const createLead = async (req, res) => {
 // (columnId/subgroupId/order) through the same endpoint - a move is just a partial update
 export const updateLead = async (req, res) => {
     try {
-        const lead = await Lead.findOne({ _id: req.params.id, branchId: req.auth.branchId })
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const lead = await Lead.findOne({ _id: req.params.id, branchId })
         if (!lead) return res.status(404).json({ error: 'not_found' })
 
         const { name, phone, source, comment, columnId, subgroupId, order } = req.body
@@ -235,7 +269,7 @@ export const updateLead = async (req, res) => {
         if (isMoving) {
             // lock only restricts creating/editing leads directly IN a column (see createLead) - it
             // never blocks moving an existing lead into/out of one by drag-and-drop
-            const toColumn = await LeadColumn.findOne({ _id: columnId, branchId: req.auth.branchId }).lean()
+            const toColumn = await LeadColumn.findOne({ _id: columnId, branchId }).lean()
             if (!toColumn) return res.status(400).json({ error: 'invalid_column' })
             lead.columnId = columnId
         }
@@ -255,13 +289,29 @@ export const updateLead = async (req, res) => {
     }
 }
 
-// confirmed spec: a lead is never permanently deletable - no deleteLead exists here at all
+// confirmed spec: admin can never permanently delete a lead - no DELETE route is mounted on
+// adminRoute.js at all. A director/sub_director CAN (confirmed spec: director needs full management
+// including cleanup) - directorRoute.js is the only place this function is ever mounted.
+export const deleteLead = async (req, res) => {
+    try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const lead = await Lead.findOneAndDelete({ _id: req.params.id, branchId })
+        if (!lead) return res.status(404).json({ error: 'not_found' })
+        res.json({ deleted: true })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
 
 // ==== Lead intake forms ====
 
 export const listLeadForms = async (req, res) => {
     try {
-        const forms = await LeadForm.find({ branchId: req.auth.branchId }).sort({ createdAt: -1 }).lean()
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const forms = await LeadForm.find({ branchId }).sort({ createdAt: -1 }).lean()
         res.json({ forms })
     } catch (error) {
         console.log(error)
@@ -271,7 +321,9 @@ export const listLeadForms = async (req, res) => {
 
 export const getLeadForm = async (req, res) => {
     try {
-        const form = await LeadForm.findOne({ _id: req.params.id, branchId: req.auth.branchId }).lean()
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const form = await LeadForm.findOne({ _id: req.params.id, branchId }).lean()
         if (!form) return res.status(404).json({ error: 'not_found' })
         res.json({ form })
     } catch (error) {
@@ -282,12 +334,14 @@ export const getLeadForm = async (req, res) => {
 
 export const createLeadForm = async (req, res) => {
     try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
         const { name, columnId, subgroupId, sourceName, fields } = req.body
-        const column = await LeadColumn.findOne({ _id: columnId, branchId: req.auth.branchId }).lean()
+        const column = await LeadColumn.findOne({ _id: columnId, branchId }).lean()
         if (!column) return res.status(400).json({ error: 'invalid_column' })
 
         const form = await LeadForm.create({
-            branchId: req.auth.branchId, name: name || '', columnId, subgroupId: subgroupId || null,
+            branchId, name: name || '', columnId, subgroupId: subgroupId || null,
             sourceName: sourceName || 'Other',
             ...(fields ? { fields } : {}),
             slug: crypto.randomBytes(9).toString('base64url'),
@@ -301,6 +355,8 @@ export const createLeadForm = async (req, res) => {
 
 export const updateLeadForm = async (req, res) => {
     try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
         const { name, columnId, subgroupId, sourceName, fields } = req.body
         const patch = {}
         if (name !== undefined) patch.name = name
@@ -309,7 +365,7 @@ export const updateLeadForm = async (req, res) => {
         if (sourceName !== undefined) patch.sourceName = sourceName
         if (fields !== undefined) patch.fields = fields
 
-        const form = await LeadForm.findOneAndUpdate({ _id: req.params.id, branchId: req.auth.branchId }, patch, { new: true })
+        const form = await LeadForm.findOneAndUpdate({ _id: req.params.id, branchId }, patch, { new: true })
         if (!form) return res.status(404).json({ error: 'not_found' })
         res.json({ form })
     } catch (error) {
@@ -320,7 +376,9 @@ export const updateLeadForm = async (req, res) => {
 
 export const deleteLeadForm = async (req, res) => {
     try {
-        await LeadForm.findOneAndDelete({ _id: req.params.id, branchId: req.auth.branchId })
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        await LeadForm.findOneAndDelete({ _id: req.params.id, branchId })
         res.json({ deleted: true })
     } catch (error) {
         console.log(error)

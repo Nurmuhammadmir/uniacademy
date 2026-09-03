@@ -27,6 +27,7 @@ const Sidebar = ({ open, onClose }) => {
     { to: '/attendance', label: t('navAttendance') },
     { to: '/timetable', label: t('navTimetable') },
     { to: '/finance', label: t('navFinance') },
+    { to: '/leads', label: t('navLeads') },
     { to: '/pricing', label: t('navPricing') },
     { to: '/settings', label: t('navSettings') },
   ]
