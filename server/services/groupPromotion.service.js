@@ -116,29 +116,49 @@ export const promoteGroupIfLevelComplete = async (group, durationDays) => {
     const nextGroup = await findOrCreateNextGroup(claimed, nextLevel, studentIds.length)
     const nextGroupDayNow = computeDayCounter(nextGroup, nextLevel.durationDays || 30)
 
+    // the group's own levelCompletedAt claim above is one-shot (its findOneAndUpdate guard means
+    // this exact promotion can never be retried) - so if ONE student in the cohort threw here
+    // uncaught, everyone processed before them stayed promoted while everyone after them was
+    // permanently stuck on the old group/level with no automatic retry ever picking them back up.
+    // Each student is now isolated in its own try/catch, matching the same fix already applied to
+    // the daily billing cron for the identical class of problem.
     for (const studentId of studentIds) {
-        const student = await User.findById(studentId)
-        if (!student) continue // don't re-add a deleted user to the new group
+        try {
+            const student = await User.findById(studentId)
+            if (!student) continue // don't re-add a deleted user to the new group
 
-        nextGroup.studentIds.push(studentId)
-        await closeMembership(studentId, claimed._id)
-        await openMembership(studentId, nextGroup)
+            // guards against double-counting a student who (rare, but possible - see
+            // findOrCreateNextGroup's "reuse an existing same-day group" path) is somehow already on
+            // the destination group's roster
+            if (!nextGroup.studentIds.some(id => String(id) === String(studentId))) nextGroup.studentIds.push(studentId)
+            await closeMembership(studentId, claimed._id)
+            await openMembership(studentId, nextGroup)
 
-        const courseEntry = student.courses.find(c => String(c.languageId) === String(claimed.languageId))
-        if (courseEntry) {
-            courseEntry.levelId = nextLevel._id
-            courseEntry.groupId = nextGroup._id
-            // promotion is never gated on payment - an unpaid student still moves up with their
-            // cohort. Posts the new level's price as a fresh debt right away (same as any other
-            // group enrollment - see billingCycle.service.js), so an unpaid student's course
-            // honestly shows as owing/inactive rather than silently carrying over a stale status.
-            await recognizeEnrollmentDebt(student, courseEntry, null)
+            const courseEntry = student.courses.find(c => String(c.languageId) === String(claimed.languageId))
+            if (courseEntry) {
+                courseEntry.levelId = nextLevel._id
+                courseEntry.groupId = nextGroup._id
+                // promotion is never gated on payment - an unpaid student still moves up with their
+                // cohort. Posts the new level's price as a fresh debt right away (same as any other
+                // group enrollment - see billingCycle.service.js), so an unpaid student's course
+                // honestly shows as owing/inactive rather than silently carrying over a stale status.
+                await recognizeEnrollmentDebt(student, courseEntry, null)
+            }
+
+            // seed at the DESTINATION group's real current day, not a hardcoded day 1 - a brand new
+            // group's real day IS 1, but a group formed earlier today from a different origin cohort
+            // may already be a little further along. Upsert (not a plain create) for the same reason
+            // enrollMidCycle.service.js's own version is one - the "reuse an existing group" path
+            // above can land two different origin cohorts' students in the same destination group on
+            // the same day, and this doesn't need to be a fresh row if one already exists.
+            await StudentProgress.findOneAndUpdate(
+                { studentId, groupId: nextGroup._id, day: nextGroupDayNow },
+                { $setOnInsert: { studentId, groupId: nextGroup._id, day: nextGroupDayNow, status: 'open' } },
+                { upsert: true },
+            )
+        } catch (error) {
+            console.log('promoteGroupIfLevelComplete: failed for student', studentId, 'group', claimed._id, error)
         }
-
-        // seed at the DESTINATION group's real current day, not a hardcoded day 1 - a brand new
-        // group's real day IS 1, but a group formed earlier today from a different origin cohort
-        // may already be a little further along
-        await StudentProgress.create({ studentId, groupId: nextGroup._id, day: nextGroupDayNow, status: 'open' })
     }
     await nextGroup.save()
 }
