@@ -21,6 +21,7 @@ import Room from "../models/Room.js"
 import Account from "../models/Account.js"
 import LedgerEntry from "../models/LedgerEntry.js"
 import AdminNote from "../models/AdminNote.js"
+import GroupMembership from "../models/GroupMembership.js"
 import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
 import { assertNoScheduleConflict } from "../services/scheduleConflict.service.js"
 import { suggestLeastLoadedGroup } from "../services/loadBalance.service.js"
@@ -549,6 +550,16 @@ export const getStudentProfile = async (req, res) => {
             .populate('levelId', 'name')
             .populate('teacherId', 'name')
             .lean()
+        // Guruhlar tarixi shows WHEN they joined each currently-active membership - that date only
+        // lives on GroupMembership (a group itself has no per-student join date, it just has a flat
+        // studentIds array), so it's a separate fetch merged in here by groupId. Sorted oldest-first
+        // so if a stale, never-closed membership somehow duplicates for the same group (confirmed
+        // real possibility this session - switching a student to a different group for the same
+        // language used to leave the old one open), the MOST RECENT joinedAt wins, matching what
+        // "when did they join" should actually mean.
+        const openMemberships = await GroupMembership.find({ studentId: student._id, leftAt: null }).sort({ joinedAt: 1 }).lean()
+        const joinedAtByGroup = Object.fromEntries(openMemberships.map(m => [String(m.groupId), m.joinedAt]))
+        const groupsWithJoinedAt = groups.map(g => ({ ...g, joinedAt: joinedAtByGroup[String(g._id)] || null }))
         res.json({
             student,
             courses: coursesWithPrice,
@@ -557,7 +568,7 @@ export const getStudentProfile = async (req, res) => {
             // net of refunds - refunded:true always means 0, even for legacy rows recorded before
             // refundedAmount existed (theirs stayed 0 and was never backfilled)
             totalPaid: payments.reduce((sum, p) => sum + (p.refunded ? 0 : p.amount - (p.refundedAmount || 0)), 0),
-            groups,
+            groups: groupsWithJoinedAt,
         })
     } catch (error) {
         console.log(error)

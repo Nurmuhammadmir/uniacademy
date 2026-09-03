@@ -464,7 +464,7 @@ const StudentProfile = () => {
                   <div key={g._id} className='flex justify-between items-center text-sm bg-[#f5f5f7] rounded-xl px-3.5 py-2.5 dark:bg-slate-800/40'>
                     <div className='min-w-0'>
                       <p className='text-[#1D1D1F] font-medium truncate dark:text-[#F8FAFC]'>{g.name ? `${g.name} · ` : ''}{g.languageId?.name}{g.levelId?.name ? ` · ${g.levelId.name}` : ''}</p>
-                      <p className='text-slate-400 text-xs mt-0.5 dark:text-slate-600'>{g.teacherId?.name}</p>
+                      <p className='text-slate-400 text-xs mt-0.5 dark:text-slate-600'>{g.teacherId?.name}{g.joinedAt ? ` · ${t('joinedGroupOnLabel')} ${formatUTCDate(g.joinedAt)}` : ''}</p>
                     </div>
                     <span className='flex items-center gap-2.5 flex-shrink-0'>
                       <span className='flex items-center gap-1.5 text-muted text-xs capitalize'>
