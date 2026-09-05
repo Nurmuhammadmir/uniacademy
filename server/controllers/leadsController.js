@@ -289,6 +289,44 @@ export const updateLead = async (req, res) => {
     }
 }
 
+// moves every lead in leadIds into one target column/subgroup in a single request - backs the
+// board's bulk-select ("select a whole column/subgroup, move them all") instead of one PUT per
+// lead. Silently skips any id that isn't actually one of this branch's own leads (no error, no
+// partial-failure reporting needed - the response's movedCount already tells the caller how many
+// really moved).
+export const bulkMoveLeads = async (req, res) => {
+    try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const { leadIds, columnId, subgroupId } = req.body
+        if (!Array.isArray(leadIds) || leadIds.length === 0) return res.status(400).json({ error: 'lead_ids_required' })
+        const toColumn = await LeadColumn.findOne({ _id: columnId, branchId }).lean()
+        if (!toColumn) return res.status(400).json({ error: 'invalid_column' })
+        if (subgroupId) {
+            const toSubgroup = await LeadSubgroup.findOne({ _id: subgroupId, columnId, branchId }).lean()
+            if (!toSubgroup) return res.status(400).json({ error: 'invalid_subgroup' })
+        }
+
+        // append after whatever's already in the target bucket, in the order they were selected -
+        // matches how a normal drag-to-end-of-column already orders things. Plain per-document
+        // updateOne calls (not an aggregation-pipeline updateMany) so Mongoose's own schema casting
+        // applies normally to columnId/subgroupId - a bulk selection is realistically tens of leads,
+        // not thousands, so N parallel updates costs nothing noticeable here.
+        const existingCount = await Lead.countDocuments({ branchId, columnId, subgroupId: subgroupId || null })
+        const results = await Promise.all(leadIds.map((leadId, i) =>
+            Lead.updateOne(
+                { _id: leadId, branchId },
+                { columnId, subgroupId: subgroupId || null, order: existingCount + i },
+            )
+        ))
+        const movedCount = results.reduce((sum, r) => sum + r.modifiedCount, 0)
+        res.json({ movedCount })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 // confirmed spec: admin can never permanently delete a lead - no DELETE route is mounted on
 // adminRoute.js at all. A director/sub_director CAN (confirmed spec: director needs full management
 // including cleanup) - directorRoute.js is the only place this function is ever mounted.

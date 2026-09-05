@@ -1127,6 +1127,18 @@ const AdminContextProvider = (props) => {
         }
     }
 
+    // bulk-select ("move this whole column/subgroup, or whatever's checked, to another column") -
+    // one request instead of one PUT per lead
+    const bulkMoveLeads = async (leadIds, columnId, subgroupId) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/admin/leads/bulk-move', { leadIds, columnId, subgroupId }, authHeader)
+            return data.movedCount
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotUpdateLead'))
+            return 0
+        }
+    }
+
     // ==== Lead sources (manageable list, used by the board filter, subgroup auto-intake, and forms) ====
     const [leadSources, setLeadSources] = useState([])
 
@@ -1256,7 +1268,7 @@ const AdminContextProvider = (props) => {
         getGroupExamsTab, getTimetable,
         getLeadsBoard, createLeadColumn, updateLeadColumn, deleteLeadColumn,
         createLeadSubgroup, updateLeadSubgroup, deleteLeadSubgroup,
-        createLead, updateLead,
+        createLead, updateLead, bulkMoveLeads,
         getTeacherAttendanceGrid, getStudentAttendanceGrid, getLessonDetail, setLessonTeacherStatus,
         expenseCategories, getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
         getExpensesOverview, createExpense, updateExpense, deleteExpense, getExpenseDetail,

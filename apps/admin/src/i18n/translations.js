@@ -219,6 +219,10 @@ export const TRANSLATIONS = {
 
     // Leads (Kanban CRM)
     searchLeadsPlaceholder: 'Search name or phone…', anySource: 'Any source',
+    totalLeadsCountLabel: '{count} leads total', dateAddedFilterBtn: 'Date added', clearFilterBtn: 'Clear',
+    selectLeadsBtn: 'Select', exitSelectModeBtn: 'Cancel selection', leadsSelectedCountLabel: '{count} selected',
+    moveToColumnPlaceholder: 'Move to column…', moveSelectedBtn: 'Move', clearSelectionBtn: 'Clear selection',
+    selectAllInColumnHint: 'Select all in this column', selectAllInSubgroupHint: 'Select all in this subgroup',
     source_instagram: 'Instagram', source_telegram: 'Telegram', source_referral: 'Referral', source_walk_in: 'Walk-in', source_call: 'Call', source_other: 'Other',
     addColumnBtn: 'Add column', columnNamePlaceholder: 'Column name', addSubgroupBtn: 'Add subgroup', subgroupNamePlaceholder: 'Subgroup name', addLeadBtn: 'Add lead',
     leadNamePlaceholder: 'Name', leadPhonePlaceholder: 'Phone', commentPlaceholder: 'Comment…',
@@ -518,6 +522,10 @@ export const TRANSLATIONS = {
     salaryHistoryTitle: 'Финансовая история', noSalaryHistoryYet: 'Истории зарплаты пока нет', salaryAccruedBadge: 'Начислено', salaryPaidOutBadge: 'Выплачено',
 
     searchLeadsPlaceholder: 'Поиск по имени или телефону…', anySource: 'Любой источник',
+    totalLeadsCountLabel: 'Всего лидов: {count}', dateAddedFilterBtn: 'Дата добавления', clearFilterBtn: 'Сбросить',
+    selectLeadsBtn: 'Выбрать', exitSelectModeBtn: 'Отменить выбор', leadsSelectedCountLabel: 'Выбрано: {count}',
+    moveToColumnPlaceholder: 'Перенести в колонку…', moveSelectedBtn: 'Перенести', clearSelectionBtn: 'Снять выбор',
+    selectAllInColumnHint: 'Выбрать все в этой колонке', selectAllInSubgroupHint: 'Выбрать все в этой мини-колонке',
     source_instagram: 'Instagram', source_telegram: 'Telegram', source_referral: 'Рекомендация', source_walk_in: 'Пришёл сам', source_call: 'Звонок', source_other: 'Другое',
     addColumnBtn: 'Добавить колонку', columnNamePlaceholder: 'Название колонки', addSubgroupBtn: 'Добавить подгруппу', subgroupNamePlaceholder: 'Название подгруппы', addLeadBtn: 'Добавить лид',
     leadNamePlaceholder: 'Имя', leadPhonePlaceholder: 'Телефон', commentPlaceholder: 'Комментарий…',
@@ -815,6 +823,10 @@ export const TRANSLATIONS = {
     salaryHistoryTitle: 'Moliyaviy tarix', noSalaryHistoryYet: "Hali ish haqi tarixi yo'q", salaryAccruedBadge: 'Hisoblandi', salaryPaidOutBadge: "To'landi",
 
     searchLeadsPlaceholder: 'Ism yoki telefon bo\'yicha qidirish…', anySource: 'Har qanday manba',
+    totalLeadsCountLabel: 'Jami lidlar: {count}', dateAddedFilterBtn: "Qo'shilgan sana", clearFilterBtn: 'Tozalash',
+    selectLeadsBtn: 'Tanlash', exitSelectModeBtn: 'Tanlashni bekor qilish', leadsSelectedCountLabel: 'Tanlangan: {count}',
+    moveToColumnPlaceholder: "Ustunga ko'chirish…", moveSelectedBtn: "Ko'chirish", clearSelectionBtn: 'Tanlovni tozalash',
+    selectAllInColumnHint: "Bu ustundagi hammasini tanlash", selectAllInSubgroupHint: "Bu kichik guruhdagi hammasini tanlash",
     source_instagram: 'Instagram', source_telegram: 'Telegram', source_referral: 'Tavsiya', source_walk_in: "O'zi kelgan", source_call: "Qo'ng'iroq", source_other: 'Boshqa',
     addColumnBtn: "Ustun qo'shish", columnNamePlaceholder: 'Ustun nomi', addSubgroupBtn: "Kichik guruh qo'shish", subgroupNamePlaceholder: 'Kichik guruh nomi', addLeadBtn: "Lid qo'shish",
     leadNamePlaceholder: 'Ism', leadPhonePlaceholder: 'Telefon', commentPlaceholder: 'Izoh…',
@@ -1112,6 +1124,10 @@ export const TRANSLATIONS = {
     salaryHistoryTitle: 'Financelik tariyx', noSalaryHistoryYet: "Ele aylıq tariyxı joq", salaryAccruedBadge: 'Esaplandı', salaryPaidOutBadge: "Tólendi",
 
     searchLeadsPlaceholder: 'At yamasa telefon boyınsha izlew…', anySource: 'Kez-kelgen dárek',
+    totalLeadsCountLabel: 'Jámi lidler: {count}', dateAddedFilterBtn: "Qosılǵan sáne", clearFilterBtn: 'Tazalaw',
+    selectLeadsBtn: 'Tańlaw', exitSelectModeBtn: 'Tańlawdı biykarlaw', leadsSelectedCountLabel: 'Tańlanǵan: {count}',
+    moveToColumnPlaceholder: "Ustınǵa kóshiriw…", moveSelectedBtn: "Kóshiriw", clearSelectionBtn: 'Tańlawdı tazalaw',
+    selectAllInColumnHint: "Bul ustındaǵınıń hámmesin tańlaw", selectAllInSubgroupHint: "Bul kishi gruppadaǵınıń hámmesin tańlaw",
     source_instagram: 'Instagram', source_telegram: 'Telegram', source_referral: 'Usınıs', source_walk_in: 'Ózi kelgen', source_call: 'Qońıraw', source_other: 'Basqa',
     addColumnBtn: "Ustun qosıw", columnNamePlaceholder: 'Ustun atı', addSubgroupBtn: "Kishi gruppa qosıw", subgroupNamePlaceholder: 'Kishi gruppa atı', addLeadBtn: "Lid qosıw",
     leadNamePlaceholder: 'Atı', leadPhonePlaceholder: 'Telefon', commentPlaceholder: 'Pikir…',

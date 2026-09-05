@@ -5,11 +5,12 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Lock, Unlock, Trash2, FileText, Settings, Zap, X, Plus } from 'lucide-react'
+import { GripVertical, Lock, Unlock, Trash2, FileText, Settings, Zap, X, Plus, CheckSquare, Calendar } from 'lucide-react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Select from '../components/Select.jsx'
 import Logo from '../components/Logo.jsx'
+import DatePicker from '../components/DatePicker.jsx'
 import SourceManagerModal from '../components/leads/SourceManagerModal.jsx'
 import AutoIntakeModal from '../components/leads/AutoIntakeModal.jsx'
 import FormModal from '../components/leads/FormModal.jsx'
@@ -66,13 +67,21 @@ const LeadEditModal = ({ lead, sources, onSave, onEditForm, onClose, t }) => {
 
 const DEFAULT_DOT_COLOR = '#94A3B8'
 
-const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, t, isCompact }) => {
+const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, t, isCompact, selectMode, selected, onToggleSelect }) => {
   const [editing, setEditing] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: 'lead-' + lead._id, data: { type: 'lead', leadId: lead._id, columnId, subgroupId },
+    id: 'lead-' + lead._id, data: { type: 'lead', leadId: lead._id, columnId, subgroupId }, disabled: selectMode,
   })
   const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.4 : 1 }
   const dotColor = sources.find(s => s.name === lead.source)?.color || DEFAULT_DOT_COLOR
+
+  // select mode replaces the drag handle / open-on-click behavior with a plain checkbox - dragging
+  // is disabled above (via useSortable's own `disabled`) so a click here can never be misread as
+  // the start of a drag gesture
+  const checkbox = selectMode && (
+    <input type='checkbox' checked={selected} onChange={() => onToggleSelect(lead._id)} onClick={e => e.stopPropagation()}
+      className='w-4 h-4 flex-shrink-0 accent-accent' />
+  )
 
   // compact mode is a straight conditional render, not an animated collapse - a grid-template-rows
   // tween looked "smooth" but silently depended on `min-h-0` sizing quirks that didn't hold up once
@@ -80,12 +89,13 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, t, 
   // anyway, not a transition - so there's nothing left for that trick to buy us.
   if (isCompact) {
     return (
-      <div ref={setNodeRef} style={style} {...attributes} {...listeners}
-        className='bg-white border border-slate-100 dark:bg-[#1E293B] dark:border-slate-800 rounded-xl py-1.5 px-3 mb-1 cursor-grab'>
+      <div ref={setNodeRef} style={style} {...(selectMode ? {} : { ...attributes, ...listeners })}
+        className={`bg-white border dark:bg-[#1E293B] rounded-xl py-1.5 px-3 mb-1 flex items-center gap-2 ${selectMode ? 'border-slate-100 dark:border-slate-800' : 'border-slate-100 dark:border-slate-800 cursor-grab'} ${selected ? 'ring-2 ring-accent' : ''}`}>
+        {checkbox}
         {/* attributes/listeners live on this outer div (no separate grip handle in compact mode) -
             the sortable PointerSensor's activationConstraint (5px) still lets a plain tap open the
             edit modal below; only a real drag gesture past that threshold hijacks the pointer */}
-        <button onClick={() => setEditing(true)} className='plain w-full text-left flex items-center justify-between gap-2'>
+        <button onClick={() => selectMode ? onToggleSelect(lead._id) : setEditing(true)} className='plain flex-1 min-w-0 text-left flex items-center justify-between gap-2'>
           <p className='font-semibold text-slate-700 dark:text-slate-300 text-xs truncate'>{lead.name}</p>
           <span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: dotColor }} />
         </button>
@@ -98,10 +108,12 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, t, 
 
   return (
     <div ref={setNodeRef} style={style}
-      className='bg-white border border-slate-200/60 shadow-sm dark:bg-[#1E293B] dark:border-slate-800 rounded-2xl p-3 mb-2.5'>
+      className={`bg-white border shadow-sm dark:bg-[#1E293B] rounded-2xl p-3 mb-2.5 ${selected ? 'border-accent ring-2 ring-accent' : 'border-slate-200/60 dark:border-slate-800'}`}>
       <div className='flex items-start gap-2'>
-        <button {...attributes} {...listeners} className='plain text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-[#94A3B8] transition-colors cursor-grab pt-0.5 flex-shrink-0'><GripVertical size={16} strokeWidth={ICON_STROKE} /></button>
-        <button onClick={() => setEditing(true)} className='plain flex-1 text-left min-w-0'>
+        {selectMode ? checkbox : (
+          <button {...attributes} {...listeners} className='plain text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-[#94A3B8] transition-colors cursor-grab pt-0.5 flex-shrink-0'><GripVertical size={16} strokeWidth={ICON_STROKE} /></button>
+        )}
+        <button onClick={() => selectMode ? onToggleSelect(lead._id) : setEditing(true)} className='plain flex-1 text-left min-w-0'>
           <div className='flex justify-between items-start gap-2'>
             <p className='text-[#1D1D1F] dark:text-[#F8FAFC] text-sm font-semibold tracking-tight truncate'>{lead.name}</p>
             <span className='text-slate-400 dark:text-slate-600 text-[10px] whitespace-nowrap'>{new Date(lead.createdAt).toLocaleDateString('en-GB')}</span>
@@ -120,7 +132,7 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, t, 
   )
 }
 
-const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, onAddLead, onEditForm, isCompact }) => {
+const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, onAddLead, onEditForm, isCompact, selectMode, selectedIds, onToggleSelect }) => {
   const { setNodeRef } = useDroppable({ id: bucketKey(columnId, subgroupId), data: { type: 'bucket', columnId, subgroupId } })
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', source: sources[0]?.name || 'Other', comment: '' })
@@ -136,7 +148,8 @@ const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, o
       <SortableContext items={leads.map(l => 'lead-' + l._id)} strategy={verticalListSortingStrategy}>
         {leads.map(lead => (
           <LeadCard key={lead._id} lead={lead} columnId={columnId} subgroupId={subgroupId} sources={sources}
-            onSave={onSaveLead} onEditForm={onEditForm} t={t} isCompact={isCompact} />
+            onSave={onSaveLead} onEditForm={onEditForm} t={t} isCompact={isCompact}
+            selectMode={selectMode} selected={selectedIds?.has(lead._id)} onToggleSelect={onToggleSelect} />
         ))}
       </SortableContext>
       {!locked && (adding ? (
@@ -157,9 +170,9 @@ const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, o
   )
 }
 
-const SubgroupBlock = ({ subgroup, columnId, leads, locked, t, onRename, onDelete, onOpenAutoIntake, ...rest }) => {
+const SubgroupBlock = ({ subgroup, columnId, leads, locked, t, onRename, onDelete, onOpenAutoIntake, selectMode, selectedIds, onSelectMany, ...rest }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-    id: 'subgroup-' + subgroup._id, data: { type: 'subgroup', columnId, subgroupId: subgroup._id },
+    id: 'subgroup-' + subgroup._id, data: { type: 'subgroup', columnId, subgroupId: subgroup._id }, disabled: selectMode,
   })
   const style = { transform: CSS.Transform.toString(transform), transition }
   const [editingName, setEditingName] = useState(false)
@@ -170,10 +183,17 @@ const SubgroupBlock = ({ subgroup, columnId, leads, locked, t, onRename, onDelet
     if (name.trim() && name !== subgroup.name) await onRename(subgroup._id, name.trim())
   }
 
+  const allSelected = leads.length > 0 && leads.every(l => selectedIds?.has(l._id))
+
   return (
     <div ref={setNodeRef} style={style} className='mb-3'>
       <div className='flex items-center gap-1.5 mb-1.5 px-2 py-1.5 bg-slate-100/70 dark:bg-slate-800/40 rounded-lg'>
-        <button {...attributes} {...listeners} className={`${ICON_BTN} cursor-grab flex-shrink-0`}><GripVertical size={14} /></button>
+        {selectMode ? (
+          <input type='checkbox' checked={allSelected} onChange={() => onSelectMany(leads.map(l => l._id), !allSelected)}
+            title={t('selectAllInSubgroupHint')} className='w-4 h-4 flex-shrink-0 accent-accent' />
+        ) : (
+          <button {...attributes} {...listeners} className={`${ICON_BTN} cursor-grab flex-shrink-0`}><GripVertical size={14} /></button>
+        )}
         {editingName ? (
           <input autoFocus value={name} onChange={e => setName(e.target.value)} onBlur={saveName}
             onKeyDown={e => e.key === 'Enter' && saveName()}
@@ -188,17 +208,17 @@ const SubgroupBlock = ({ subgroup, columnId, leads, locked, t, onRename, onDelet
           </>
         )}
       </div>
-      <Bucket columnId={columnId} subgroupId={subgroup._id} leads={leads} locked={locked} t={t} {...rest} />
+      <Bucket columnId={columnId} subgroupId={subgroup._id} leads={leads} locked={locked} t={t} selectMode={selectMode} selectedIds={selectedIds} {...rest} />
     </div>
   )
 }
 
 const Column = ({
   column, subgroups, leads, sources, t, onRename, onToggleLock, onDelete, onAddSubgroup, onRenameSubgroup, onDeleteSubgroup,
-  onOpenAutoIntake, onOpenFormWizard, ...rest
+  onOpenAutoIntake, onOpenFormWizard, selectMode, selectedIds, onSelectMany, ...rest
 }) => {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
-    id: 'column-' + column._id, data: { type: 'column', columnId: column._id },
+    id: 'column-' + column._id, data: { type: 'column', columnId: column._id }, disabled: selectMode,
   })
   const style = { transform: CSS.Transform.toString(transform), transition }
   const [editingName, setEditingName] = useState(false)
@@ -208,6 +228,7 @@ const Column = ({
 
   const generalLeads = leads.filter(l => !l.subgroupId).sort((a, b) => a.order - b.order)
   const totalCount = leads.length
+  const allSelected = leads.length > 0 && leads.every(l => selectedIds?.has(l._id))
 
   const saveName = async () => {
     setEditingName(false)
@@ -224,7 +245,12 @@ const Column = ({
   return (
     <div ref={setNodeRef} style={style} className='bg-[#F1F5F9] dark:bg-[#1E293B]/40 rounded-xl p-4 w-[calc(100vw-32px)] md:w-80 flex flex-col max-h-[80vh]'>
       <div className='flex items-center gap-1.5 mb-3 px-1'>
-        <button {...attributes} {...listeners} className='plain text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-[#94A3B8] transition-colors cursor-grab flex-shrink-0'><GripVertical size={16} strokeWidth={ICON_STROKE} /></button>
+        {selectMode ? (
+          <input type='checkbox' checked={allSelected} onChange={() => onSelectMany(leads.map(l => l._id), !allSelected)}
+            title={t('selectAllInColumnHint')} className='w-4 h-4 flex-shrink-0 accent-accent' />
+        ) : (
+          <button {...attributes} {...listeners} className='plain text-slate-300 dark:text-slate-600 hover:text-slate-500 dark:hover:text-[#94A3B8] transition-colors cursor-grab flex-shrink-0'><GripVertical size={16} strokeWidth={ICON_STROKE} /></button>
+        )}
         {editingName ? (
           <input autoFocus value={name} onChange={e => setName(e.target.value)} onBlur={saveName}
             onKeyDown={e => e.key === 'Enter' && saveName()}
@@ -248,11 +274,13 @@ const Column = ({
         {subgroups.length > 0 && (
           <div className='mb-3'>
             <p className='text-slate-400 dark:text-slate-600 text-xs font-medium mb-1.5 px-1'>{t('generalBucketLabel')}</p>
-            <Bucket columnId={column._id} subgroupId={null} leads={generalLeads} locked={column.locked} sources={sources} t={t} {...rest} />
+            <Bucket columnId={column._id} subgroupId={null} leads={generalLeads} locked={column.locked} sources={sources} t={t}
+              selectMode={selectMode} selectedIds={selectedIds} {...rest} />
           </div>
         )}
         {subgroups.length === 0 && (
-          <Bucket columnId={column._id} subgroupId={null} leads={generalLeads} locked={column.locked} sources={sources} t={t} {...rest} />
+          <Bucket columnId={column._id} subgroupId={null} leads={generalLeads} locked={column.locked} sources={sources} t={t}
+            selectMode={selectMode} selectedIds={selectedIds} {...rest} />
         )}
 
         <SortableContext items={subgroups.map(s => 'subgroup-' + s._id)} strategy={verticalListSortingStrategy}>
@@ -260,7 +288,7 @@ const Column = ({
             <SubgroupBlock key={sg._id} subgroup={sg} columnId={column._id}
               leads={leads.filter(l => String(l.subgroupId) === String(sg._id)).sort((a, b) => a.order - b.order)}
               locked={column.locked} sources={sources} t={t} onRename={onRenameSubgroup} onDelete={onDeleteSubgroup}
-              onOpenAutoIntake={onOpenAutoIntake} {...rest} />
+              onOpenAutoIntake={onOpenAutoIntake} selectMode={selectMode} selectedIds={selectedIds} onSelectMany={onSelectMany} {...rest} />
           ))}
         </SortableContext>
       </div>
@@ -284,7 +312,7 @@ const Leads = () => {
   const {
     getLeadsBoard, createLeadColumn, updateLeadColumn, deleteLeadColumn,
     createLeadSubgroup, updateLeadSubgroup, deleteLeadSubgroup,
-    createLead, updateLead, leadSources, getLeadSources,
+    createLead, updateLead, bulkMoveLeads, leadSources, getLeadSources,
   } = useContext(AdminContext)
   const { t } = useLanguage()
 
@@ -301,6 +329,54 @@ const Leads = () => {
   const [formWizard, setFormWizard] = useState(null) // { columnId } or { formId } or null
   const [isCompact, setIsCompact] = useState(false)
   const columnRefs = useRef({})
+
+  // bulk select/move - plain component state only, never persisted, so leaving the page or
+  // reloading always comes back with nothing selected and select mode off
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkTargetColumn, setBulkTargetColumn] = useState('')
+  const [bulkMoving, setBulkMoving] = useState(false)
+
+  // date-added filter - deliberately plain useState with no persistence (sessionStorage/localStorage)
+  // at all, per confirmed spec: it must always start OFF on a fresh page load/reload and only ever
+  // turn on when the admin explicitly opens it and picks a range - never silently carried over
+  const [showDateFilter, setShowDateFilter] = useState(false)
+  const [dateFilterFrom, setDateFilterFrom] = useState('')
+  const [dateFilterTo, setDateFilterTo] = useState('')
+
+  const toggleSelectMode = () => {
+    setSelectMode(v => !v)
+    setSelectedIds(new Set())
+  }
+
+  const onToggleSelect = (leadId) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(leadId)) next.delete(leadId)
+      else next.add(leadId)
+      return next
+    })
+  }
+
+  const onSelectMany = (leadIds, checked) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      leadIds.forEach(id => checked ? next.add(id) : next.delete(id))
+      return next
+    })
+  }
+
+  const submitBulkMove = async () => {
+    if (!bulkTargetColumn || selectedIds.size === 0 || bulkMoving) return
+    setBulkMoving(true)
+    const movedCount = await bulkMoveLeads([...selectedIds], bulkTargetColumn, null)
+    setBulkMoving(false)
+    if (movedCount > 0) {
+      setLeads(ls => ls.map(l => selectedIds.has(l._id) ? { ...l, columnId: bulkTargetColumn, subgroupId: null } : l))
+      setSelectedIds(new Set())
+      setBulkTargetColumn('')
+    }
+  }
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -348,7 +424,13 @@ const Leads = () => {
   const filteredLeads = leads.filter(l => {
     const matchesSearch = !search || l.name.toLowerCase().includes(search.toLowerCase()) || l.phone.includes(search)
     const matchesSource = !sourceFilter || l.source === sourceFilter
-    return matchesSearch && matchesSource
+    // strictly optional - showDateFilter defaults to false and dateFilterFrom/To default to '',
+    // so a fresh/reloaded page always shows every lead regardless of date until the admin turns
+    // this on themselves
+    const createdDate = l.createdAt.slice(0, 10)
+    const matchesDateFrom = !dateFilterFrom || createdDate >= dateFilterFrom
+    const matchesDateTo = !dateFilterTo || createdDate <= dateFilterTo
+    return matchesSearch && matchesSource && matchesDateFrom && matchesDateTo
   })
 
   const onRename = async (id, name) => {
@@ -488,14 +570,19 @@ const Leads = () => {
   return (
     <div>
       <div className='sticky top-0 z-20 bg-bg pb-4 mb-2 border-b border-hairline'>
-        <div className='flex items-center gap-2.5 mb-3'>
+        <div className='flex items-center gap-2.5 mb-3 flex-wrap'>
           <Logo size={28} withWordmark={false} />
           <p className='font-display text-2xl text-ink'>{t('navLeads')}</p>
+          <span className='text-sm font-medium text-muted'>{t('totalLeadsCountLabel', { count: leads.length })}</span>
         </div>
         <div className='flex flex-col md:flex-row gap-2'>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('searchLeadsPlaceholder')} className={`${FIELD} w-full md:max-w-xs`} />
           <Select className='w-full md:w-40' value={sourceFilter} onChange={setSourceFilter} placeholder={t('anySource')}
             options={[{ value: '', label: t('anySource') }, ...leadSources.map(s => ({ value: s.name, label: s.name }))]} />
+          <button onClick={() => setShowDateFilter(v => !v)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${showDateFilter || dateFilterFrom || dateFilterTo ? 'bg-accent text-white dark:bg-[#4F46E5]' : 'bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200'}`}>
+            <Calendar size={14} strokeWidth={ICON_STROKE} /> {t('dateAddedFilterBtn')}
+          </button>
           <button onClick={() => setShowSourceManager(true)} className='px-3 py-2 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200 dark:border-none text-sm font-medium flex items-center justify-center gap-1.5 transition-colors'>
             <Settings size={14} /> {t('manageSourcesBtn')}
           </button>
@@ -503,7 +590,42 @@ const Leads = () => {
             className='px-3 py-2 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200 dark:border-none text-sm font-medium flex items-center justify-center gap-1.5 transition-colors'>
             {isCompact ? <Lock size={14} strokeWidth={ICON_STROKE} /> : <Unlock size={14} strokeWidth={ICON_STROKE} />} {t('compactViewBtn')}
           </button>
+          <button onClick={toggleSelectMode}
+            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${selectMode ? 'bg-accent text-white dark:bg-[#4F46E5]' : 'bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200'}`}>
+            <CheckSquare size={14} strokeWidth={ICON_STROKE} /> {selectMode ? t('exitSelectModeBtn') : t('selectLeadsBtn')}
+          </button>
         </div>
+
+        {showDateFilter && (
+          <div className='flex flex-wrap items-end gap-2 mt-2'>
+            <div>
+              <p className='text-xs text-muted mb-1'>{t('dateFromLabel')}</p>
+              <DatePicker value={dateFilterFrom} onChange={setDateFilterFrom} />
+            </div>
+            <div>
+              <p className='text-xs text-muted mb-1'>{t('dateToLabel')}</p>
+              <DatePicker value={dateFilterTo} onChange={setDateFilterTo} />
+            </div>
+            {(dateFilterFrom || dateFilterTo) && (
+              <button onClick={() => { setDateFilterFrom(''); setDateFilterTo('') }} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-muted text-sm font-medium'>{t('clearFilterBtn')}</button>
+            )}
+          </div>
+        )}
+
+        {selectMode && (
+          <div className='flex flex-wrap items-center gap-2 mt-2 bg-accent-soft dark:bg-[#1E1B4B] rounded-xl p-2.5'>
+            <span className='text-sm font-medium text-ink px-1'>{t('leadsSelectedCountLabel', { count: selectedIds.size })}</span>
+            <Select className='w-48' value={bulkTargetColumn} onChange={setBulkTargetColumn} placeholder={t('moveToColumnPlaceholder')}
+              options={columns.map(c => ({ value: c._id, label: c.name }))} />
+            <button onClick={submitBulkMove} disabled={!bulkTargetColumn || selectedIds.size === 0 || bulkMoving}
+              className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium disabled:opacity-50 dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA]'>
+              {bulkMoving ? t('applyingDiscountBtn') : t('moveSelectedBtn')}
+            </button>
+            {selectedIds.size > 0 && (
+              <button onClick={() => setSelectedIds(new Set())} className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-muted text-sm font-medium'>{t('clearSelectionBtn')}</button>
+            )}
+          </div>
+        )}
 
         {/* jump-to-column tabs, mobile only - the board itself scrolls one full-width column at a
             time (snap-x below), so these give a sense of "which column, how many" without needing
@@ -534,7 +656,8 @@ const Leads = () => {
                   onAddSubgroup={onAddSubgroup} onRenameSubgroup={onRenameSubgroup} onDeleteSubgroup={onDeleteSubgroup}
                   onOpenAutoIntake={setAutoIntakeSubgroup} onOpenFormWizard={(columnId) => setFormWizard({ columnId })}
                   onSaveLead={onSaveLead} onAddLead={onAddLead}
-                  onEditForm={(formId) => setFormWizard({ formId })} isCompact={isCompact} />
+                  onEditForm={(formId) => setFormWizard({ formId })} isCompact={isCompact}
+                  selectMode={selectMode} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onSelectMany={onSelectMany} />
               </div>
             ))}
           </SortableContext>

@@ -23,7 +23,7 @@ import {
 import {
     getLeadsBoard, createColumn, updateColumn, deleteColumn,
     createSubgroup, updateSubgroup, deleteSubgroup,
-    createLead, updateLead,
+    createLead, updateLead, bulkMoveLeads,
     listLeadSources, createLeadSource, updateLeadSource, deleteLeadSource,
     listLeadForms, getLeadForm, createLeadForm, updateLeadForm, deleteLeadForm,
 } from "../controllers/leadsController.js"
@@ -123,6 +123,9 @@ adminRouter.post('/leads/columns/:columnId/subgroups', createSubgroup)
 adminRouter.put('/leads/subgroups/:id', updateSubgroup)
 adminRouter.delete('/leads/subgroups/:id', deleteSubgroup)
 adminRouter.post('/leads', createLead)
+// must be registered before the generic '/leads/:id' below - Express matches routes in
+// registration order, and :id would otherwise greedily match the literal "bulk-move" segment
+adminRouter.put('/leads/bulk-move', bulkMoveLeads)
 adminRouter.put('/leads/:id', updateLead)
 // confirmed spec: a lead is never permanently deletable, only moved through the board or edited -
 // no DELETE route exists for a single lead at all (unlike columns/subgroups/sources/forms, which
