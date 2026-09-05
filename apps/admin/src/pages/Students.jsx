@@ -512,6 +512,7 @@ const Students = () => {
               {applyingDiscount ? t('applyingDiscountBtn') : t('applyDiscountBtn')}
             </button>
             <p className='text-muted text-xs w-full'>{t('discountImmediateNote')}</p>
+            <p className='text-amber-600 dark:text-amber-400 text-xs w-full font-medium'>{t('discountDoesNotAffectSalaryNote')}</p>
           </form>
         )}
 
