@@ -684,6 +684,27 @@ export const deleteDiscount = async (req, res) => {
     }
 }
 
+// "who got a discount, how much" summary for the Discount section - every discount ever applied to
+// a student in this branch, newest first, so admin can see the total given out and delete any one
+// of them (same reversal deleteDiscount above already does) without having to open each student's
+// own profile one at a time.
+export const listDiscounts = async (req, res) => {
+    try {
+        const branchStudents = await User.find({ branchId: req.auth.branchId, role: 'student' }).select('_id').lean()
+        const entries = await LedgerEntry.find({ kind: 'discount', studentId: { $in: branchStudents.map(s => s._id) } })
+            .sort({ date: -1 })
+            .populate('studentId', 'name phone')
+            .populate('languageId', 'name')
+            .populate('createdBy', 'name')
+            .lean()
+        const totalAmount = entries.reduce((sum, e) => sum + e.amount, 0)
+        res.json({ discounts: entries, totalAmount, count: entries.length })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 // freeze/unfreeze a student's WHOLE account - for when they can't come for a while (e.g. travelling
 // abroad). Whole-account, not per-course/per-group (confirmed spec).
 // Freezing immediately returns the UNUSED tail of whatever period is currently in progress on each
@@ -699,12 +720,23 @@ export const deleteDiscount = async (req, res) => {
 // an entirely separate system. Toggled from the student's profile.
 export const setStudentFreeze = async (req, res) => {
     try {
-        const { frozen, reason } = req.body
+        const { frozen, reason, frozenAt } = req.body
         const student = await User.findOne({ _id: req.params.id, branchId: req.auth.branchId })
         if (!student) return res.status(404).json({ error: 'not_found' })
 
+        // confirmed spec: freezing doesn't have to be pinned to the moment the admin clicks the
+        // button - an optional backdated date lets them record "he actually stopped coming last
+        // Tuesday", and the unused-days refund/debt recalculation uses THAT date, not today's
+        let effectiveFrozenAt = new Date()
+        if (frozen && frozenAt) {
+            const parsed = new Date(frozenAt)
+            if (isNaN(parsed.getTime())) return res.status(400).json({ error: 'invalid_date' })
+            if (parsed > new Date()) return res.status(400).json({ error: 'freeze_date_in_future' })
+            effectiveFrozenAt = parsed
+        }
+
         student.frozen = !!frozen
-        student.frozenAt = frozen ? new Date() : null
+        student.frozenAt = frozen ? effectiveFrozenAt : null
         student.frozenReason = frozen ? (reason || '') : ''
 
         for (const course of student.courses) {
@@ -717,7 +749,7 @@ export const setStudentFreeze = async (req, res) => {
                 // period in progress, which is correct: freezing then just blocks the next one from
                 // being recognized (the existing student.frozen guard in recognizeNextPeriod already
                 // does that), there's nothing to prorate here
-                await reverseUnusedPeriod(student, course, group, req.auth.userId, 'Frozen')
+                await reverseUnusedPeriod(student, course, group, req.auth.userId, 'Frozen', effectiveFrozenAt)
             } else {
                 // re-bills today's remaining days of the month right now instead of waiting for
                 // tomorrow's cron - matches how a fresh enrollment charges immediately too

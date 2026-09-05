@@ -192,16 +192,29 @@ const AdminContextProvider = (props) => {
         }
     }
 
+    // "who got a discount, how much" summary backing the Discount section's history list
+    const getDiscountHistory = async () => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/admin/discounts', authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadPricing'))
+            return null
+        }
+    }
+
     // freeze pauses billing for the STUDENT'S WHOLE ACCOUNT (not per-course, not per-group) - no new
     // debt accrues on any of their courses while frozen. Toggled from the student's profile when
     // they say they can't come for a while.
-    const setStudentFreeze = async (studentId, frozen, reason) => {
+    const setStudentFreeze = async (studentId, frozen, reason, frozenAt) => {
         try {
-            const { data } = await axios.put(backendUrl + `/api/admin/students/${studentId}/freeze`, { frozen, reason }, authHeader)
+            const { data } = await axios.put(backendUrl + `/api/admin/students/${studentId}/freeze`, { frozen, reason, frozenAt }, authHeader)
             toast.success(frozen ? t('studentFrozenNotice') : t('studentUnfrozenNotice'))
             return data.student
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotUpdateFreeze'))
+            const code = error.response?.data?.error
+            if (code === 'freeze_date_in_future') toast.error(t('freezeDateInFutureError'))
+            else toast.error(code || t('couldNotUpdateFreeze'))
             return null
         }
     }
@@ -1222,7 +1235,7 @@ const AdminContextProvider = (props) => {
     const value = {
         token, login, logout, initialLoading,
         students, getStudents, createStudent, updateStudent, deleteStudent, unarchiveStudent, getStudentProfile, linkParent,
-        applyDiscount, deleteDiscount, setStudentFreeze, pricingList, getPricingList,
+        applyDiscount, deleteDiscount, getDiscountHistory, setStudentFreeze, pricingList, getPricingList,
         createPayment, refundPayment, updatePayment, getFinanceOverview, getPaymentDetail,
         getStudentStatement, getReconciliation, deletePayment, getBusinessLedger,
         calculateSalary, paySalary, prepaySalary, getSalaryDetail,

@@ -36,7 +36,7 @@ const Chevron = ({ orientation, ...props }) => {
 // just navigates via the existing prev/next arrows, no separate month dropdown - confirmed spec:
 // only the year needs to be pickable directly, and a second dropdown was overflowing the popover's
 // width anyway), bounded to a century back (comfortably covers any real birth date) through today.
-const DatePicker = ({ value, onChange, className = '', withYearSelect = false }) => {
+const DatePicker = ({ value, onChange, className = '', withYearSelect = false, maxDate = null }) => {
   const { lang } = useLanguage()
   const selected = value ? new Date(value + 'T00:00:00') : undefined
   const formatted = selected ? formatDMY(selected) : ''
@@ -61,6 +61,7 @@ const DatePicker = ({ value, onChange, className = '', withYearSelect = false })
         {({ close }) => (
           <DayPicker mode='single' selected={selected} locale={LOCALES[lang] || enUS} components={{ Chevron }}
             {...(withYearSelect ? { captionLayout: 'dropdown-years', startMonth: new Date(today.getFullYear() - 100, 0), endMonth: today } : {})}
+            {...(maxDate ? { disabled: { after: new Date(maxDate + 'T00:00:00') } } : {})}
             onSelect={(d) => { onChange(d ? toISODate(d) : ''); close() }} />
         )}
       </Popover.Panel>

@@ -7,7 +7,7 @@ import {
     retakeExam, listBranchTeachers, createTeacher, updateTeacher, getTeacherProfile, getTeacherAttendanceGrid, getStudentAttendanceGrid, getLessonDetail, setLessonTeacherStatus,
     getMe, createTeacherAttendanceQR, listTeacherAttendanceQRs, getAttendanceOverview,
     calculateSalary, paySalary, prepaySalary, getSalaryDetail,
-    getStudentStatement, getReconciliation, getBusinessLedger, applyDiscount, deleteDiscount, setStudentFreeze,
+    getStudentStatement, getReconciliation, getBusinessLedger, applyDiscount, deleteDiscount, listDiscounts, setStudentFreeze,
     listPricingForAdmin,
     listMyNotes, createMyNote, deleteMyNote,
 } from "../controllers/adminController.js"
@@ -65,6 +65,7 @@ adminRouter.post('/students/:id/unarchive', unarchiveStudent)
 adminRouter.post('/students/:id/parent', linkParent)
 adminRouter.put('/students/:id/freeze', setStudentFreeze)
 adminRouter.post('/discounts', applyDiscount)
+adminRouter.get('/discounts', listDiscounts)
 adminRouter.delete('/discounts/:id', deleteDiscount)
 adminRouter.get('/pricing', listPricingForAdmin)
 

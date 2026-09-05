@@ -12,7 +12,7 @@ import Spinner from '../components/Spinner.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
 import { formatMoney, groupLabel } from '../lib/format.js'
-import { todayISO } from '../lib/date.js'
+import { todayISO, formatDateTime } from '../lib/date.js'
 
 // mapbox-gl alone is well over a megabyte - pulling it in as a normal top-level import would bloat
 // THIS page's chunk even though the map only ever renders inside the add/edit-student modals. Lazy
@@ -168,7 +168,7 @@ const SwipeableStudentCard = ({ student, statusTab, owed, courseTags, selecting,
 }
 
 const Students = () => {
-  const { students, createStudent, updateStudent, deleteStudent, unarchiveStudent, createPayment, applyDiscount, languages, settings, groups } = useContext(AdminContext)
+  const { students, createStudent, updateStudent, deleteStudent, unarchiveStudent, createPayment, applyDiscount, deleteDiscount, getDiscountHistory, languages, settings, groups } = useContext(AdminContext)
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -191,7 +191,30 @@ const Students = () => {
   const [selectedGroupsForDiscount, setSelectedGroupsForDiscount] = useState([])
   const [discountForm, setDiscountForm] = useState({ languageId: '', type: 'percent', value: '' })
   const [applyingDiscount, setApplyingDiscount] = useState(false)
+  const [showDiscountHistory, setShowDiscountHistory] = useState(false)
+  const [discountHistory, setDiscountHistory] = useState(null)
+  const [loadingDiscountHistory, setLoadingDiscountHistory] = useState(false)
   const scrollRestoredRef = useRef(false)
+
+  // "who got a discount, how much" summary inside the Discount section - fetched lazily the first
+  // time it's opened, refetched after any delete so the total/list stay accurate
+  const loadDiscountHistory = async () => {
+    setLoadingDiscountHistory(true)
+    const data = await getDiscountHistory()
+    if (data) setDiscountHistory(data)
+    setLoadingDiscountHistory(false)
+  }
+
+  const toggleDiscountHistory = () => {
+    if (showDiscountHistory) { setShowDiscountHistory(false); return }
+    setShowDiscountHistory(true)
+    if (!discountHistory) loadDiscountHistory()
+  }
+
+  const onDeleteDiscountFromHistory = async (entryId) => {
+    const ok = await deleteDiscount(entryId)
+    if (ok) loadDiscountHistory()
+  }
 
   // confirmed real annoyance: with 100+ students, opening student #70's profile then going back
   // used to always land back at the very top of the list, forcing a long re-scroll to find where
@@ -490,6 +513,41 @@ const Students = () => {
             </button>
             <p className='text-muted text-xs w-full'>{t('discountImmediateNote')}</p>
           </form>
+        )}
+
+        {discountMode && (
+          <div className='mt-3'>
+            <button type='button' onClick={toggleDiscountHistory} className='text-accent dark:text-[#818CF8] text-sm font-medium'>
+              {showDiscountHistory ? t('hideDiscountHistoryBtn') : t('showDiscountHistoryBtn')}
+            </button>
+            {showDiscountHistory && (
+              <div className='mt-3 bg-bg-elevated border border-hairline rounded-xl p-4'>
+                {loadingDiscountHistory ? (
+                  <p className='text-muted text-sm'>{t('loading')}</p>
+                ) : discountHistory && discountHistory.count > 0 ? (
+                  <>
+                    <p className='text-ink font-medium text-sm mb-3'>{t('totalDiscountGivenLabel', { count: discountHistory.count, amount: formatMoney(discountHistory.totalAmount) })}</p>
+                    <div className='flex flex-col gap-2 max-h-80 overflow-y-auto'>
+                      {discountHistory.discounts.map(d => (
+                        <div key={d._id} className='flex justify-between items-center bg-bg rounded-lg px-3 py-2 text-sm'>
+                          <div className='min-w-0'>
+                            <p className='text-ink truncate'>{d.studentId?.name || '—'} <span className='text-muted text-xs'>· {d.languageId?.name}</span></p>
+                            <p className='text-muted text-xs'>{formatDateTime(d.date)}{d.createdBy?.name ? ` · ${d.createdBy.name}` : ''}</p>
+                          </div>
+                          <div className='flex items-center gap-2 flex-shrink-0'>
+                            <span className='font-mono text-accent dark:text-[#818CF8]'>-{formatMoney(d.amount)}</span>
+                            <button onClick={() => onDeleteDiscountFromHistory(d._id)} className='text-muted text-xs font-medium'>{t('deleteBtn')}</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className='text-muted text-sm'>{t('noDiscountsYetPlain')}</p>
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

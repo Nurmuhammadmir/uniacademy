@@ -284,9 +284,14 @@ export const recognizeEnrollmentDebt = async (student, course, createdBy, enroll
 // the one this reverses, prorated by the days strictly after today (today itself still counts as
 // attended). Safe to call unconditionally: no-ops if there's no currently-open period, or if today
 // is already the period's last day (nothing left to return).
-export const reverseUnusedPeriod = async (student, course, group, createdBy = null, reason = 'Removed from group') => {
+// asOf lets a freeze be backdated (confirmed spec: "freeze as of last Tuesday", not just "freeze
+// starting right now") - every date this function would otherwise call "today" (which period counts
+// as currently open, how many days are unused, what date the reversal itself is dated) uses asOf
+// instead when given. Defaults to the real today, so every other caller (removeStudentFromGroup,
+// a same-day freeze) is completely unaffected.
+export const reverseUnusedPeriod = async (student, course, group, createdBy = null, reason = 'Removed from group', asOf = null) => {
     const studentAccount = await getOrCreateAccount('student', student._id)
-    const today = dateOnlyUTC(new Date())
+    const today = asOf ? dateOnlyUTC(asOf) : dateOnlyUTC(new Date())
 
     const currentDebt = await LedgerEntry.findOne({
         accountId: studentAccount._id, languageId: course.languageId, kind: 'debt',

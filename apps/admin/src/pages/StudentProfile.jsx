@@ -51,6 +51,8 @@ const StudentProfile = () => {
   const [payForm, setPayForm] = useState({ amount: '', method: '', date: todayISO(), comment: '' })
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [printingPaymentId, setPrintingPaymentId] = useState(null)
+  const [showFreezeModal, setShowFreezeModal] = useState(false)
+  const [freezeForm, setFreezeForm] = useState({ reason: '', frozenAt: todayISO() })
 
   const reload = () => getStudentProfile(studentId).then(d => { if (d) { setData(d); setNotes(d.student.notes || '') } })
   useEffect(() => { reload() }, [studentId])
@@ -219,11 +221,22 @@ const StudentProfile = () => {
   }
 
   // whole-account freeze (not per-course, not per-group, confirmed) - pauses billing on every one
-  // of the student's courses at once
+  // of the student's courses at once. Freezing opens a small modal (reason + optional backdated
+  // start date); unfreezing needs neither, so it fires immediately.
   const toggleFreeze = async () => {
-    const reason = data.student.frozen ? undefined : (window.prompt(t('freezeReasonPlaceholder')) || '')
-    const ok = await setStudentFreeze(studentId, !data.student.frozen, reason)
-    if (ok) reload()
+    if (data.student.frozen) {
+      const ok = await setStudentFreeze(studentId, false)
+      if (ok) reload()
+      return
+    }
+    setFreezeForm({ reason: '', frozenAt: todayISO() })
+    setShowFreezeModal(true)
+  }
+
+  const submitFreeze = async (e) => {
+    e.preventDefault()
+    const ok = await setStudentFreeze(studentId, true, freezeForm.reason, freezeForm.frozenAt)
+    if (ok) { setShowFreezeModal(false); reload() }
   }
 
   return (
@@ -554,6 +567,31 @@ const StudentProfile = () => {
               <button type='submit' disabled={submittingPayment}
                 className='w-full bg-[#4F46E5] hover:bg-[#5D55FA] text-white font-semibold py-2.5 rounded-xl text-sm transition-all mt-4 text-center block disabled:opacity-50 flex items-center justify-center gap-2'>
                 {submittingPayment && <Spinner size={14} />} {t('save')}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showFreezeModal && (
+        <div className='fixed inset-0 z-50 bg-slate-900/20 backdrop-blur-md dark:bg-[#0B0F19]/60 dark:backdrop-blur-lg transition-all duration-300 flex items-center justify-center p-4' onClick={() => setShowFreezeModal(false)}>
+          <div className='max-w-sm w-full bg-white dark:bg-[#161F30] rounded-2xl shadow-2xl p-6 border border-slate-100 dark:border-slate-800' onClick={e => e.stopPropagation()}>
+            <p className='font-display text-lg text-[#1D1D1F] dark:text-[#F8FAFC] mb-1'>{t('freezeBtn')}</p>
+            <p className='text-muted text-sm mb-4'>{data.student.name}</p>
+            <form onSubmit={submitFreeze} className='flex flex-col gap-3'>
+              <div>
+                <p className='text-xs text-muted mb-1'>{t('freezeSinceDateLabel')}</p>
+                <DatePicker value={freezeForm.frozenAt} maxDate={todayISO()} onChange={(v) => setFreezeForm({ ...freezeForm, frozenAt: v })} />
+                <p className='text-[11px] text-muted mt-1'>{t('freezeSinceDateHint')}</p>
+              </div>
+              <div>
+                <p className='text-xs text-muted mb-1'>{t('freezeReasonPlaceholder')}</p>
+                <textarea value={freezeForm.reason} onChange={e => setFreezeForm({ ...freezeForm, reason: e.target.value })}
+                  rows={2} className='w-full px-3 py-2.5 rounded-lg bg-bg border border-hairline text-sm' />
+              </div>
+              <button type='submit'
+                className='w-full bg-[#4F46E5] hover:bg-[#5D55FA] text-white font-semibold py-2.5 rounded-xl text-sm transition-all mt-2'>
+                {t('freezeBtn')}
               </button>
             </form>
           </div>
