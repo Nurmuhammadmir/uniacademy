@@ -66,25 +66,6 @@ export const getNextLessonDate = (group, from = new Date()) => {
     return null
 }
 
-// the last real calendar date this group meets on or before `to` (never earlier than the group's
-// own startDate), walking backward - the tail-end counterpart to getNextLessonDate, used to stop a
-// course's final partial-month charge at the actual last lesson instead of an arbitrary calendar
-// cutoff that might land on a non-lesson day. Returns null if there's no lesson at all in range.
-export const getPreviousLessonDate = (group, to) => {
-    const days = getScheduleDays(group)
-    if (days.length === 0) return null
-    const toUTC = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()))
-    const start = new Date(group.startDate)
-    const startUTC = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()))
-    for (let offset = 0; offset <= 13; offset++) {
-        const cursor = new Date(toUTC)
-        cursor.setUTCDate(cursor.getUTCDate() - offset)
-        if (cursor < startUTC) break
-        if (days.includes(cursor.getUTCDay())) return cursor
-    }
-    return null
-}
-
 // the earliest group time this teacher is actually scheduled to teach on `date` - used to judge
 // whether their check-in was "on time" or "late". Only counts groups whose active window
 // (startDate..endDate) actually covers `date` and whose schedule includes that weekday; a group
