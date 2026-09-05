@@ -221,6 +221,8 @@ export const TRANSLATIONS = {
     // Leads (Kanban CRM)
     searchLeadsPlaceholder: 'Search name or phone…', anySource: 'Any source',
     totalLeadsCountLabel: '{count} leads total', dateAddedFilterBtn: 'Date added', clearFilterBtn: 'Clear',
+    convertToStudentBtn: 'Add as student', viewConvertedStudentBtn: 'View student profile', convertedBadge: 'Student',
+    convertedLeadsCountLabel: '{count} became students', convertLeadModalTitle: 'Add as a new student',
     selectLeadsBtn: 'Select', exitSelectModeBtn: 'Cancel selection', leadsSelectedCountLabel: '{count} selected',
     moveToColumnPlaceholder: 'Move to column…', moveSelectedBtn: 'Move', clearSelectionBtn: 'Clear selection',
     selectAllInColumnHint: 'Select all in this column', selectAllInSubgroupHint: 'Select all in this subgroup',
@@ -526,6 +528,8 @@ export const TRANSLATIONS = {
 
     searchLeadsPlaceholder: 'Поиск по имени или телефону…', anySource: 'Любой источник',
     totalLeadsCountLabel: 'Всего лидов: {count}', dateAddedFilterBtn: 'Дата добавления', clearFilterBtn: 'Сбросить',
+    convertToStudentBtn: 'Добавить как студента', viewConvertedStudentBtn: 'Открыть профиль студента', convertedBadge: 'Студент',
+    convertedLeadsCountLabel: 'Стали студентами: {count}', convertLeadModalTitle: 'Добавить как нового студента',
     selectLeadsBtn: 'Выбрать', exitSelectModeBtn: 'Отменить выбор', leadsSelectedCountLabel: 'Выбрано: {count}',
     moveToColumnPlaceholder: 'Перенести в колонку…', moveSelectedBtn: 'Перенести', clearSelectionBtn: 'Снять выбор',
     selectAllInColumnHint: 'Выбрать все в этой колонке', selectAllInSubgroupHint: 'Выбрать все в этой мини-колонке',
@@ -829,6 +833,8 @@ export const TRANSLATIONS = {
 
     searchLeadsPlaceholder: 'Ism yoki telefon bo\'yicha qidirish…', anySource: 'Har qanday manba',
     totalLeadsCountLabel: 'Jami lidlar: {count}', dateAddedFilterBtn: "Qo'shilgan sana", clearFilterBtn: 'Tozalash',
+    convertToStudentBtn: "Talaba sifatida qo'shish", viewConvertedStudentBtn: "Talaba profilini ochish", convertedBadge: 'Talaba',
+    convertedLeadsCountLabel: "Talaba bo'lganlar: {count}", convertLeadModalTitle: "Yangi talaba sifatida qo'shish",
     selectLeadsBtn: 'Tanlash', exitSelectModeBtn: 'Tanlashni bekor qilish', leadsSelectedCountLabel: 'Tanlangan: {count}',
     moveToColumnPlaceholder: "Ustunga ko'chirish…", moveSelectedBtn: "Ko'chirish", clearSelectionBtn: 'Tanlovni tozalash',
     selectAllInColumnHint: "Bu ustundagi hammasini tanlash", selectAllInSubgroupHint: "Bu kichik guruhdagi hammasini tanlash",
@@ -1132,6 +1138,8 @@ export const TRANSLATIONS = {
 
     searchLeadsPlaceholder: 'At yamasa telefon boyınsha izlew…', anySource: 'Kez-kelgen dárek',
     totalLeadsCountLabel: 'Jámi lidler: {count}', dateAddedFilterBtn: "Qosılǵan sáne", clearFilterBtn: 'Tazalaw',
+    convertToStudentBtn: "Student sıpatında qosıw", viewConvertedStudentBtn: "Student profilin ashıw", convertedBadge: 'Student',
+    convertedLeadsCountLabel: "Student bolǵanlar: {count}", convertLeadModalTitle: "Jańa student sıpatında qosıw",
     selectLeadsBtn: 'Tańlaw', exitSelectModeBtn: 'Tańlawdı biykarlaw', leadsSelectedCountLabel: 'Tańlanǵan: {count}',
     moveToColumnPlaceholder: "Ustınǵa kóshiriw…", moveSelectedBtn: "Kóshiriw", clearSelectionBtn: 'Tańlawdı tazalaw',
     selectAllInColumnHint: "Bul ustındaǵınıń hámmesin tańlaw", selectAllInSubgroupHint: "Bul kishi gruppadaǵınıń hámmesin tańlaw",

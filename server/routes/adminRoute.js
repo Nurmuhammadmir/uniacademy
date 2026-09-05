@@ -23,7 +23,7 @@ import {
 import {
     getLeadsBoard, createColumn, updateColumn, deleteColumn,
     createSubgroup, updateSubgroup, deleteSubgroup,
-    createLead, updateLead, bulkMoveLeads,
+    createLead, updateLead, bulkMoveLeads, convertLead,
     listLeadSources, createLeadSource, updateLeadSource, deleteLeadSource,
     listLeadForms, getLeadForm, createLeadForm, updateLeadForm, deleteLeadForm,
 } from "../controllers/leadsController.js"
@@ -127,6 +127,7 @@ adminRouter.post('/leads', createLead)
 // registration order, and :id would otherwise greedily match the literal "bulk-move" segment
 adminRouter.put('/leads/bulk-move', bulkMoveLeads)
 adminRouter.put('/leads/:id', updateLead)
+adminRouter.put('/leads/:id/convert', convertLead)
 // confirmed spec: a lead is never permanently deletable, only moved through the board or edited -
 // no DELETE route exists for a single lead at all (unlike columns/subgroups/sources/forms, which
 // are just board structure, not customer records)

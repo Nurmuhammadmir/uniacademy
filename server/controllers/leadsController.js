@@ -15,6 +15,7 @@ import LeadSubgroup from "../models/LeadSubgroup.js"
 import Lead from "../models/Lead.js"
 import LeadSource from "../models/LeadSource.js"
 import LeadForm from "../models/LeadForm.js"
+import User from "../models/User.js"
 import { ensureDefaultLeadSources } from "../services/leadSources.service.js"
 
 const resolveBranchId = (req) => req.auth.branchId || req.query.branchId || req.body.branchId
@@ -295,6 +296,32 @@ export const updateLead = async (req, res) => {
         if (subgroupId !== undefined) lead.subgroupId = subgroupId || null
         if (order !== undefined) lead.order = order
 
+        await lead.save()
+        res.json({ lead })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// tags a lead as having become a real student, once the admin has actually created that student
+// (via the normal /students endpoint - this never creates a student itself). The lead stays exactly
+// where it is on the board; this just lets the board show "already a student" instead of that
+// context disappearing the moment the two records exist separately with nothing linking them.
+export const convertLead = async (req, res) => {
+    try {
+        const branchId = resolveBranchId(req)
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const { studentId } = req.body
+        if (!studentId) return res.status(400).json({ error: 'student_id_required' })
+        const lead = await Lead.findOne({ _id: req.params.id, branchId })
+        if (!lead) return res.status(404).json({ error: 'not_found' })
+        // the student must actually belong to this same branch - otherwise a lead could be marked
+        // "converted" against a student record it has nothing to do with
+        const student = await User.findOne({ _id: studentId, branchId, role: 'student' }).select('_id').lean()
+        if (!student) return res.status(400).json({ error: 'invalid_student' })
+        lead.convertedStudentId = studentId
+        lead.convertedAt = new Date()
         await lead.save()
         res.json({ lead })
     } catch (error) {

@@ -79,10 +79,14 @@ const AdminContextProvider = (props) => {
 
     const createStudent = async (payload) => {
         try {
-            await axios.post(backendUrl + '/api/admin/students', payload, authHeader)
+            const { data } = await axios.post(backendUrl + '/api/admin/students', payload, authHeader)
             toast.success(t('studentCreated'))
             getStudents()
-            return true
+            // the full student doc (not just true/false) - lets a caller that needs the new _id
+            // right away (e.g. converting a lead into this exact student) act on it without a
+            // separate lookup. Still just as truthy as the old `true` for every existing caller
+            // that only checks success/failure.
+            return data.student
         } catch (error) {
             const code = error.response?.data?.error
             if (code === 'passport_info_required') toast.error(t('passportRequiredError'))
@@ -1129,6 +1133,18 @@ const AdminContextProvider = (props) => {
         }
     }
 
+    // tags a lead as "already became a student" once the admin has actually created that student -
+    // this never creates the student itself, just links the two records together
+    const convertLead = async (leadId, studentId) => {
+        try {
+            const { data } = await axios.put(backendUrl + `/api/admin/leads/${leadId}/convert`, { studentId }, authHeader)
+            return data.lead
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotUpdateLead'))
+            return null
+        }
+    }
+
     // bulk-select ("move this whole column/subgroup, or whatever's checked, to another column") -
     // one request instead of one PUT per lead
     const bulkMoveLeads = async (leadIds, columnId, subgroupId) => {
@@ -1270,7 +1286,7 @@ const AdminContextProvider = (props) => {
         getGroupExamsTab, getTimetable,
         getLeadsBoard, createLeadColumn, updateLeadColumn, deleteLeadColumn,
         createLeadSubgroup, updateLeadSubgroup, deleteLeadSubgroup,
-        createLead, updateLead, bulkMoveLeads,
+        createLead, updateLead, bulkMoveLeads, convertLead,
         getTeacherAttendanceGrid, getStudentAttendanceGrid, getLessonDetail, setLessonTeacherStatus,
         expenseCategories, getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
         getExpensesOverview, createExpense, updateExpense, deleteExpense, getExpenseDetail,

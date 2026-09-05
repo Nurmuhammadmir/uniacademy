@@ -5,7 +5,8 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Lock, Unlock, Trash2, FileText, Settings, Zap, X, Plus, CheckSquare, Calendar } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { GripVertical, Lock, Unlock, Trash2, FileText, Settings, Zap, X, Plus, CheckSquare, Calendar, UserPlus, GraduationCap } from 'lucide-react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Select from '../components/Select.jsx'
@@ -14,6 +15,7 @@ import DatePicker from '../components/DatePicker.jsx'
 import SourceManagerModal from '../components/leads/SourceManagerModal.jsx'
 import AutoIntakeModal from '../components/leads/AutoIntakeModal.jsx'
 import FormModal from '../components/leads/FormModal.jsx'
+import ConvertLeadModal from '../components/leads/ConvertLeadModal.jsx'
 
 const GENERAL = 'general'
 // column-level action icons (lock, delete, add-form) stay near-invisible until hovered, Apple-style
@@ -28,7 +30,7 @@ const bucketKey = (columnId, subgroupId) => `bucket-${columnId}-${subgroupId || 
 // together and the delete button could end up scrolled off-screen once a card in a narrow column
 // grew tall enough. Editing now opens a proper centered modal instead; the card itself always stays
 // the plain, minimal display (name/phone/source/call) no matter what.
-const LeadEditModal = ({ lead, sources, onSave, onEditForm, onClose, t }) => {
+const LeadEditModal = ({ lead, sources, onSave, onEditForm, onConvert, onViewStudent, onClose, t }) => {
   const [form, setForm] = useState({ name: lead.name, phone: lead.phone, source: lead.source, comment: lead.comment })
 
   const save = async (e) => {
@@ -56,6 +58,17 @@ const LeadEditModal = ({ lead, sources, onSave, onEditForm, onClose, t }) => {
           {lead.formId && (
             <button type='button' onClick={() => onEditForm(lead.formId)} className='text-accent dark:text-[#818CF8] text-xs font-medium text-left'>{t('editFormBtn')}</button>
           )}
+          {lead.convertedStudentId ? (
+            <button type='button' onClick={() => onViewStudent(lead.convertedStudentId)}
+              className='flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 text-sm font-medium transition-colors'>
+              <GraduationCap size={15} strokeWidth={1.75} /> {t('viewConvertedStudentBtn')}
+            </button>
+          ) : (
+            <button type='button' onClick={() => onConvert(lead)}
+              className='flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200 text-sm font-medium transition-colors'>
+              <UserPlus size={15} strokeWidth={1.75} /> {t('convertToStudentBtn')}
+            </button>
+          )}
           {/* confirmed spec: a lead can never be deleted, only moved/edited - so there's no delete
               action here at all, not even hidden behind a confirm step */}
           <button type='submit' className='px-4 py-2.5 rounded-xl bg-accent text-white text-sm font-medium mt-2 dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 transition-colors'>{t('sendBtn')}</button>
@@ -67,7 +80,7 @@ const LeadEditModal = ({ lead, sources, onSave, onEditForm, onClose, t }) => {
 
 const DEFAULT_DOT_COLOR = '#94A3B8'
 
-const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, t, isCompact, selectMode, selected, onToggleSelect }) => {
+const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, onConvert, onViewStudent, t, isCompact, selectMode, selected, onToggleSelect }) => {
   const [editing, setEditing] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: 'lead-' + lead._id, data: { type: 'lead', leadId: lead._id, columnId, subgroupId }, disabled: selectMode,
@@ -97,10 +110,12 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, t, 
             edit modal below; only a real drag gesture past that threshold hijacks the pointer */}
         <button onClick={() => selectMode ? onToggleSelect(lead._id) : setEditing(true)} className='plain flex-1 min-w-0 text-left flex items-center justify-between gap-2'>
           <p className='font-semibold text-slate-700 dark:text-slate-300 text-xs truncate'>{lead.name}</p>
-          <span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: dotColor }} />
+          {lead.convertedStudentId ? <GraduationCap size={13} strokeWidth={2} className='flex-shrink-0 text-emerald-500 dark:text-emerald-400' /> : (
+            <span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: dotColor }} />
+          )}
         </button>
         {editing && (
-          <LeadEditModal lead={lead} sources={sources} onSave={onSave} onEditForm={onEditForm} onClose={() => setEditing(false)} t={t} />
+          <LeadEditModal lead={lead} sources={sources} onSave={onSave} onEditForm={onEditForm} onConvert={onConvert} onViewStudent={onViewStudent} onClose={() => setEditing(false)} t={t} />
         )}
       </div>
     )
@@ -120,19 +135,26 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, t, 
           </div>
           <div className='flex items-center justify-between gap-2 mt-0.5'>
             <p className='text-[#6E6E73] dark:text-[#94A3B8] text-xs truncate'>{lead.phone}</p>
-            <span className='inline-block flex-shrink-0 bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE] dark:bg-[#1E1B4B] dark:text-[#818CF8] dark:border-[#312E81] font-medium px-2 py-0.5 rounded-lg text-[11px]'>{lead.source}</span>
+            <span className='flex items-center gap-1 flex-shrink-0'>
+              {lead.convertedStudentId && (
+                <span className='inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 font-medium px-2 py-0.5 rounded-lg text-[11px]'>
+                  <GraduationCap size={11} strokeWidth={2} /> {t('convertedBadge')}
+                </span>
+              )}
+              <span className='inline-block bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE] dark:bg-[#1E1B4B] dark:text-[#818CF8] dark:border-[#312E81] font-medium px-2 py-0.5 rounded-lg text-[11px]'>{lead.source}</span>
+            </span>
           </div>
         </button>
       </div>
 
       {editing && (
-        <LeadEditModal lead={lead} sources={sources} onSave={onSave} onEditForm={onEditForm} onClose={() => setEditing(false)} t={t} />
+        <LeadEditModal lead={lead} sources={sources} onSave={onSave} onEditForm={onEditForm} onConvert={onConvert} onViewStudent={onViewStudent} onClose={() => setEditing(false)} t={t} />
       )}
     </div>
   )
 }
 
-const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, onAddLead, onEditForm, isCompact, selectMode, selectedIds, onToggleSelect }) => {
+const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, onAddLead, onEditForm, onConvert, onViewStudent, isCompact, selectMode, selectedIds, onToggleSelect }) => {
   const { setNodeRef } = useDroppable({ id: bucketKey(columnId, subgroupId), data: { type: 'bucket', columnId, subgroupId } })
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', source: sources[0]?.name || 'Other', comment: '' })
@@ -148,7 +170,7 @@ const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, o
       <SortableContext items={leads.map(l => 'lead-' + l._id)} strategy={verticalListSortingStrategy}>
         {leads.map(lead => (
           <LeadCard key={lead._id} lead={lead} columnId={columnId} subgroupId={subgroupId} sources={sources}
-            onSave={onSaveLead} onEditForm={onEditForm} t={t} isCompact={isCompact}
+            onSave={onSaveLead} onEditForm={onEditForm} onConvert={onConvert} onViewStudent={onViewStudent} t={t} isCompact={isCompact}
             selectMode={selectMode} selected={selectedIds?.has(lead._id)} onToggleSelect={onToggleSelect} />
         ))}
       </SortableContext>
@@ -297,11 +319,11 @@ const Column = ({
         addingSubgroup ? (
           <form onSubmit={submitSubgroup} className='flex gap-2 mt-2'>
             <input autoFocus value={subgroupName} onChange={e => setSubgroupName(e.target.value)} placeholder={t('subgroupNamePlaceholder')}
-              className='flex-1 px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-xs' />
-            <button type='submit' className='px-3 py-1.5 rounded-lg bg-accent text-white text-xs'>{t('add')}</button>
+              className='flex-1 px-2 py-1.5 rounded-lg bg-white border border-slate-200 dark:bg-[#1E293B] dark:border-none text-xs dark:text-slate-200' />
+            <button type='submit' className='px-3 py-1.5 rounded-lg bg-accent text-white text-xs dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA]'>{t('add')}</button>
           </form>
         ) : (
-          <button onClick={() => setAddingSubgroup(true)} className='mt-2 w-full text-left text-slate-400 text-xs px-3 py-2 hover:text-blue-600 transition-colors'>+ {t('addSubgroupBtn')}</button>
+          <button onClick={() => setAddingSubgroup(true)} className='mt-2 w-full text-left text-slate-400 dark:text-slate-600 text-xs px-3 py-2 hover:text-blue-600 dark:hover:text-blue-400 transition-colors'>+ {t('addSubgroupBtn')}</button>
         )
       )}
     </div>
@@ -315,6 +337,14 @@ const Leads = () => {
     createLead, updateLead, bulkMoveLeads, leadSources, getLeadSources,
   } = useContext(AdminContext)
   const { t } = useLanguage()
+  const navigate = useNavigate()
+  const [convertingLead, setConvertingLead] = useState(null)
+  const [showConvertedOnly, setShowConvertedOnly] = useState(false)
+
+  const handleConverted = (leadId, student) => {
+    setLeads(ls => ls.map(l => l._id === leadId ? { ...l, convertedStudentId: student._id } : l))
+    setConvertingLead(null)
+  }
 
   const [columns, setColumns] = useState([])
   const [subgroups, setSubgroups] = useState([])
@@ -430,8 +460,10 @@ const Leads = () => {
     const createdDate = l.createdAt.slice(0, 10)
     const matchesDateFrom = !dateFilterFrom || createdDate >= dateFilterFrom
     const matchesDateTo = !dateFilterTo || createdDate <= dateFilterTo
-    return matchesSearch && matchesSource && matchesDateFrom && matchesDateTo
+    const matchesConverted = !showConvertedOnly || !!l.convertedStudentId
+    return matchesSearch && matchesSource && matchesDateFrom && matchesDateTo && matchesConverted
   })
+  const convertedCount = leads.filter(l => l.convertedStudentId).length
 
   const onRename = async (id, name) => {
     setColumns(cols => cols.map(c => c._id === id ? { ...c, name } : c))
@@ -574,6 +606,10 @@ const Leads = () => {
           <Logo size={28} withWordmark={false} />
           <p className='font-display text-2xl text-ink'>{t('navLeads')}</p>
           <span className='text-sm font-medium text-muted'>{t('totalLeadsCountLabel', { count: leads.length })}</span>
+          <button onClick={() => setShowConvertedOnly(v => !v)}
+            className={`text-sm font-medium px-2.5 py-1 rounded-full flex items-center gap-1.5 transition-colors ${showConvertedOnly ? 'bg-emerald-500 text-white' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20'}`}>
+            <GraduationCap size={13} strokeWidth={2} /> {t('convertedLeadsCountLabel', { count: convertedCount })}
+          </button>
         </div>
         <div className='flex flex-col md:flex-row gap-2'>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('searchLeadsPlaceholder')} className={`${FIELD} w-full md:max-w-xs`} />
@@ -657,6 +693,7 @@ const Leads = () => {
                   onOpenAutoIntake={setAutoIntakeSubgroup} onOpenFormWizard={(columnId) => setFormWizard({ columnId })}
                   onSaveLead={onSaveLead} onAddLead={onAddLead}
                   onEditForm={(formId) => setFormWizard({ formId })} isCompact={isCompact}
+                  onConvert={setConvertingLead} onViewStudent={(studentId) => navigate('/students/' + studentId)}
                   selectMode={selectMode} selectedIds={selectedIds} onToggleSelect={onToggleSelect} onSelectMany={onSelectMany} />
               </div>
             ))}
@@ -664,15 +701,15 @@ const Leads = () => {
 
           <div className='w-[calc(100vw-32px)] md:w-80 flex-shrink-0 snap-center md:snap-align-none'>
             {addingColumn ? (
-              <form onSubmit={submitNewColumn} className='bg-[#F1F5F9] rounded-xl p-3 flex gap-2'>
+              <form onSubmit={submitNewColumn} className='bg-[#F1F5F9] dark:bg-[#1E293B]/40 rounded-xl p-3 flex gap-2'>
                 <input autoFocus value={newColumnName} onChange={e => setNewColumnName(e.target.value)} placeholder={t('columnNamePlaceholder')}
-                  className='flex-1 px-2 py-1.5 rounded-lg bg-white border border-slate-200 text-sm' />
-                <button type='submit' className='px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium'>
+                  className='flex-1 px-2 py-1.5 rounded-lg bg-white border border-slate-200 dark:bg-[#1E293B] dark:border-none text-sm dark:text-slate-200' />
+                <button type='submit' className='px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA]'>
                   <Plus size={14} />
                 </button>
               </form>
             ) : (
-              <button onClick={() => setAddingColumn(true)} className='w-full min-h-[100px] md:min-h-0 md:py-3 rounded-2xl md:rounded-xl border-2 md:border border-dashed border-slate-200 text-slate-400 text-sm hover:text-blue-600 hover:border-blue-300 transition-colors flex items-center justify-center gap-1.5'>
+              <button onClick={() => setAddingColumn(true)} className='w-full min-h-[100px] md:min-h-0 md:py-3 rounded-2xl md:rounded-xl border-2 md:border border-dashed border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 text-sm hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-800 transition-colors flex items-center justify-center gap-1.5'>
                 <Plus size={14} /> {t('addColumnBtn')}
               </button>
             )}
@@ -689,6 +726,10 @@ const Leads = () => {
       {formWizard && (
         <FormModal formId={formWizard.formId} defaultColumnId={formWizard.columnId} columns={columns} subgroups={subgroups}
           onClose={() => setFormWizard(null)} onSaved={() => {}} t={t} />
+      )}
+
+      {convertingLead && (
+        <ConvertLeadModal lead={convertingLead} onClose={() => setConvertingLead(null)} onConverted={handleConverted} t={t} />
       )}
     </div>
   )
