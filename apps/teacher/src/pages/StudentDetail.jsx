@@ -34,7 +34,7 @@ const StudentDetail = () => {
           <div className='flex flex-wrap gap-1.5 mb-6'>
             {(data.attendance || []).map((a, i) => (
               <span key={i} className={`text-xs font-mono px-2 py-1 rounded-lg ${attendanceColor[a.status]}`} title={attendanceLabel[a.status]}>
-                {new Date(a.date).toLocaleDateString()}
+                {new Date(a.date).toLocaleDateString('en-GB')}
               </span>
             ))}
             {(!data.attendance || data.attendance.length === 0) && <p className='text-muted text-sm'>No lessons have happened yet.</p>}
@@ -65,7 +65,7 @@ const StudentDetail = () => {
               <div key={a._id} className='bg-bg-card border border-hairline rounded-xl p-4 flex justify-between items-center'>
                 <div>
                   <p className='text-ink text-sm'>{a.examId?.languageId?.name} · {a.examId?.levelId?.name}</p>
-                  <p className='text-muted text-xs'>{new Date(a.date).toLocaleDateString()} · attempt #{a.attemptNumber}</p>
+                  <p className='text-muted text-xs'>{new Date(a.date).toLocaleDateString('en-GB')} · attempt #{a.attemptNumber}</p>
                 </div>
                 <span className={`text-xs font-medium px-2 py-1 rounded-full ${a.passed ? 'bg-accent-soft text-accent dark:bg-white/10' : 'bg-red-100 text-red-500 dark:bg-red-500/10 dark:text-rose-400'}`}>
                   {a.score}% · {a.passed ? 'Passed' : 'Failed'}

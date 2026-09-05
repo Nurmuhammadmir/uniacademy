@@ -89,7 +89,7 @@ const Ledger = ({ branchId }) => {
               <tbody>
                 {visibleEntries.map((e, i) => (
                   <tr key={i} className='border-b border-hairline last:border-0'>
-                    <td className='px-3 py-2.5 text-muted whitespace-nowrap'>{new Date(e.date).toLocaleDateString()}</td>
+                    <td className='px-3 py-2.5 text-muted whitespace-nowrap'>{new Date(e.date).toLocaleDateString('en-GB')}</td>
                     <td className='px-3 py-2.5'>
                       <span className={`text-xs font-medium px-2 py-1 rounded-full ${e.type === 'credit' ? 'bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]' : 'bg-hairline text-muted'}`}>
                         {e.type === 'credit' ? t('creditType') : t('debitType')}

@@ -364,7 +364,7 @@ const GroupDetails = () => {
                   {(extraLessons || []).map(el => (
                     <div key={el._id} className='flex justify-between items-center bg-slate-50 dark:bg-[#1E293B] rounded-xl px-3 py-2.5 text-sm'>
                       <div>
-                        <p className='text-slate-700 dark:text-slate-300'>{new Date(el.date).toLocaleDateString()} · {el.startTime}–{el.endTime} · {el.teacherId?.name}</p>
+                        <p className='text-slate-700 dark:text-slate-300'>{new Date(el.date).toLocaleDateString('en-GB')} · {el.startTime}–{el.endTime} · {el.teacherId?.name}</p>
                         <p className='text-muted text-xs'>{el.studentIds.map(s => s.name).join(', ')}{el.notes ? ` · ${el.notes}` : ''}</p>
                       </div>
                       <button onClick={() => handleDeleteExtraLesson(el._id)} className='px-2.5 py-1 rounded-lg bg-white dark:bg-[#161F30] border border-slate-200/60 dark:border-slate-800 text-muted text-xs font-medium'>{t('removeBtn')}</button>
@@ -419,10 +419,10 @@ const GroupDetails = () => {
 
             {tab === 'history' && (
               <div className='bg-slate-50 dark:bg-[#1E293B] rounded-2xl p-5'>
-                <p className='text-sm text-slate-700 dark:text-slate-300 mb-1'>{t('groupCreatedOn', { date: new Date(group.createdAt).toLocaleDateString() })}</p>
+                <p className='text-sm text-slate-700 dark:text-slate-300 mb-1'>{t('groupCreatedOn', { date: new Date(group.createdAt).toLocaleDateString('en-GB') })}</p>
                 <p className='text-sm text-muted mb-1'>{t('groupStatusLine', { status: group.status })}</p>
                 {group.startDate && group.endDate && (
-                  <p className='text-sm text-muted'>{new Date(group.startDate).toLocaleDateString()} — {new Date(group.endDate).toLocaleDateString()}</p>
+                  <p className='text-sm text-muted'>{new Date(group.startDate).toLocaleDateString('en-GB')} — {new Date(group.endDate).toLocaleDateString('en-GB')}</p>
                 )}
               </div>
             )}

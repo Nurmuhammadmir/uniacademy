@@ -33,7 +33,7 @@ const StudentProfile = () => {
         <div>
           <p className='font-display text-2xl text-ink'>{data.student.name}</p>
           <p className='text-muted text-sm font-mono'>{data.student.phone}</p>
-          <p className='text-muted text-xs mt-1'>{t('registeredOn', { date: new Date(data.student.createdAt).toLocaleDateString(), branch: data.student.branchId?.name })}</p>
+          <p className='text-muted text-xs mt-1'>{t('registeredOn', { date: new Date(data.student.createdAt).toLocaleDateString('en-GB'), branch: data.student.branchId?.name })}</p>
         </div>
 
         {data.student.passportInfo && (
@@ -75,7 +75,7 @@ const StudentProfile = () => {
           <div className='flex flex-col gap-3'>
             {data.payments.map(p => (
               <div key={p._id} className={`flex flex-wrap justify-between items-center gap-2 text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2 ${p.refunded ? 'opacity-50' : ''}`}>
-                <span className='text-muted'>{t('paymentLine', { date: new Date(p.date).toLocaleDateString(), admin: p.adminId?.name })}</span>
+                <span className='text-muted'>{t('paymentLine', { date: new Date(p.date).toLocaleDateString('en-GB'), admin: p.adminId?.name })}</span>
                 <span className='flex flex-wrap items-center gap-2'>
                   <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t(paymentMethodLabelKey(p.method))}</span>
                   <span className='font-mono text-accent'>+{formatMoney(p.amount)}</span>

@@ -43,7 +43,7 @@ const Profile = () => {
             </div>
           </div>
 
-          <p className='text-muted text-sm mb-6'>Working here since {new Date(me.employedSince).toLocaleDateString()}</p>
+          <p className='text-muted text-sm mb-6'>Working here since {new Date(me.employedSince).toLocaleDateString('en-GB')}</p>
 
           {me.todayAttendance?.checkedIn && (
             <div className={`rounded-2xl p-4 mb-4 ${me.todayAttendance.late ? 'bg-red-50 border border-red-200 dark:bg-red-500/10 dark:border-red-500/30' : 'bg-accent-soft dark:bg-white/10'}`}>

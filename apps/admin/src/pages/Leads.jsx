@@ -104,7 +104,7 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onEditForm, t, 
         <button onClick={() => setEditing(true)} className='plain flex-1 text-left min-w-0'>
           <div className='flex justify-between items-start gap-2'>
             <p className='text-[#1D1D1F] dark:text-[#F8FAFC] text-sm font-semibold tracking-tight truncate'>{lead.name}</p>
-            <span className='text-slate-400 dark:text-slate-600 text-[10px] whitespace-nowrap'>{new Date(lead.createdAt).toLocaleDateString()}</span>
+            <span className='text-slate-400 dark:text-slate-600 text-[10px] whitespace-nowrap'>{new Date(lead.createdAt).toLocaleDateString('en-GB')}</span>
           </div>
           <div className='flex items-center justify-between gap-2 mt-0.5'>
             <p className='text-[#6E6E73] dark:text-[#94A3B8] text-xs truncate'>{lead.phone}</p>

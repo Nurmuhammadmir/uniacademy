@@ -152,7 +152,7 @@ const FinancePayments = ({ branchId }) => {
             {(data?.payments || []).map((p, i) => (
               <tr key={p._id} onClick={() => navigate('/finance/payments/' + p._id)} className='border-b border-hairline last:border-0 cursor-pointer hover:bg-bg'>
                 <td className='px-4 py-4 text-muted'>{(data.page - 1) * data.pageSize + i + 1}</td>
-                <td className='px-4 py-4 text-muted'>{new Date(p.date).toLocaleDateString()}</td>
+                <td className='px-4 py-4 text-muted'>{new Date(p.date).toLocaleDateString('en-GB')}</td>
                 <td className='px-4 py-4 text-ink'>{p.studentId?.name || '—'}</td>
                 <td className='px-4 py-4 font-mono text-accent'>
                   +{formatMoney(p.amount)}
@@ -187,7 +187,7 @@ const FinancePayments = ({ branchId }) => {
             <div className='flex justify-between items-start gap-2'>
               <div className='min-w-0'>
                 <p className='text-ink font-medium text-sm truncate'>{p.studentId?.name || '—'}</p>
-                <p className='text-muted text-xs mt-0.5'>{new Date(p.date).toLocaleDateString()}</p>
+                <p className='text-muted text-xs mt-0.5'>{new Date(p.date).toLocaleDateString('en-GB')}</p>
               </div>
               <div className='text-right flex-shrink-0'>
                 <p className='font-mono text-accent text-sm'>+{formatMoney(p.amount)}</p>

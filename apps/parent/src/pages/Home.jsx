@@ -69,7 +69,7 @@ const Home = () => {
                 <div className='flex flex-wrap gap-1.5'>
                   {g.lessonHistory.map((l, i) => (
                     <span key={i} className={`text-xs font-mono px-2 py-1 rounded-lg ${STATUS_COLOR[l.status]}`} title={t(STATUS_KEY[l.status])}>
-                      {new Date(l.date).toLocaleDateString()}
+                      {new Date(l.date).toLocaleDateString('en-GB')}
                     </span>
                   ))}
                 </div>
@@ -89,7 +89,7 @@ const Home = () => {
               <div key={el._id} className='bg-bg-card border border-hairline rounded-2xl p-4'>
                 <div className='flex justify-between items-start mb-1'>
                   <p className='text-ink text-sm font-medium'>{el.groupId?.languageId?.name}{el.groupId?.levelId?.name ? ` · ${el.groupId.levelId.name}` : ''}</p>
-                  <span className='text-xs font-mono text-accent bg-accent-soft dark:bg-white/10 px-2 py-1 rounded-full'>{new Date(el.date).toLocaleDateString()}</span>
+                  <span className='text-xs font-mono text-accent bg-accent-soft dark:bg-white/10 px-2 py-1 rounded-full'>{new Date(el.date).toLocaleDateString('en-GB')}</span>
                 </div>
                 <p className='text-muted text-sm'>{el.startTime}–{el.endTime} · {el.teacherId?.name}</p>
                 {el.notes && <p className='text-muted text-xs mt-1'>{t('notesLabel')}: {el.notes}</p>}

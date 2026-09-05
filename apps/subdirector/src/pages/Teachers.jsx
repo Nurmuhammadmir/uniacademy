@@ -121,7 +121,7 @@ const Teachers = () => {
                 <td className='px-5 py-4 text-muted font-mono'>{tc.phone}</td>
                 <td className='px-5 py-4 text-muted'>{tc.branchId?.name}</td>
                 <td className='px-5 py-4 font-mono text-accent font-medium'>{tc.activeStudentCount ?? 0}</td>
-                <td className='px-5 py-4 text-muted text-xs'>{new Date(tc.createdAt).toLocaleDateString()}</td>
+                <td className='px-5 py-4 text-muted text-xs'>{new Date(tc.createdAt).toLocaleDateString('en-GB')}</td>
                 <td className='px-5 py-4 text-right whitespace-nowrap'>
                   <button onClick={() => openEdit(tc)} className='text-accent text-xs font-medium mr-3 hover:opacity-70 transition-opacity'>{t('edit')}</button>
                   <button onClick={() => deleteTeacherAccount(tc._id)} className='text-muted text-xs font-medium hover:text-rose-500 transition-colors'>{t('remove')}</button>
@@ -151,7 +151,7 @@ const Teachers = () => {
               </div>
               <p className='text-muted text-xs mt-0.5 font-mono'>{tc.phone}</p>
               <div className='flex justify-between items-center mt-1.5'>
-                <p className='text-muted text-xs'>{tc.branchId?.name} · {new Date(tc.createdAt).toLocaleDateString()}</p>
+                <p className='text-muted text-xs'>{tc.branchId?.name} · {new Date(tc.createdAt).toLocaleDateString('en-GB')}</p>
                 <div className='flex gap-3 flex-shrink-0'>
                   <button onClick={() => openEdit(tc)} className='text-accent text-xs font-medium'>{t('edit')}</button>
                   <button onClick={() => deleteTeacherAccount(tc._id)} className='text-muted text-xs font-medium'>{t('remove')}</button>

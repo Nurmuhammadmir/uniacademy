@@ -191,6 +191,27 @@ const Students = () => {
   const [selectedGroupsForDiscount, setSelectedGroupsForDiscount] = useState([])
   const [discountForm, setDiscountForm] = useState({ languageId: '', type: 'percent', value: '' })
   const [applyingDiscount, setApplyingDiscount] = useState(false)
+  const scrollRestoredRef = useRef(false)
+
+  // confirmed real annoyance: with 100+ students, opening student #70's profile then going back
+  // used to always land back at the very top of the list, forcing a long re-scroll to find where
+  // you were. Continuously remembers scroll position while on this page (sessionStorage, so it only
+  // survives this tab/session, not forever) and restores it once the list has something to scroll
+  // to - after coming back from a profile, or after a fresh page load/refresh.
+  useEffect(() => {
+    const handleScroll = () => sessionStorage.setItem('studentsListScrollY', String(window.scrollY))
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  useEffect(() => {
+    if (scrollRestoredRef.current || students.length === 0) return
+    const saved = sessionStorage.getItem('studentsListScrollY')
+    if (saved) {
+      scrollRestoredRef.current = true
+      requestAnimationFrame(() => window.scrollTo(0, Number(saved)))
+    }
+  }, [students.length])
 
   const submitCreate = async (e) => {
     e.preventDefault()
@@ -251,7 +272,7 @@ const Students = () => {
     const header = ['#', 'Name', 'Phone', 'Status', 'Courses', 'Total balance', 'Passport info', 'Registered on']
     const rows = filteredStudents.map((s, i) => [
       i + 1, s.name, s.phone, anyActive(s) ? t('active') : t('unpaid'),
-      courseSummary(s), -(s.owed || 0), s.passportInfo || '', new Date(s.createdAt).toLocaleDateString(),
+      courseSummary(s), -(s.owed || 0), s.passportInfo || '', new Date(s.createdAt).toLocaleDateString('en-GB'),
     ])
     // the leading "sep=," line is an Excel-only directive that forces it to use comma as the column
     // separator regardless of the machine's regional settings - without it, a Windows install whose

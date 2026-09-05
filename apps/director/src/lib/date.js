@@ -21,4 +21,7 @@ export const lastDayOfMonthISO = (monthStr) => {
 // renders that in the BROWSER's own timezone, so anyone west of UTC (Tashkent is UTC+5) sees it
 // silently roll over to the 1st of the next month. This forces the same Intl formatter to read the
 // date's UTC calendar fields instead of converting to local time first.
-export const formatUTCDate = (date) => new Intl.DateTimeFormat(undefined, { timeZone: 'UTC' }).format(new Date(date))
+// 'en-GB' forces day-before-month ordering (3/9/2026) regardless of the browser's own locale -
+// confirmed real confusion: a bare `undefined` locale rendered month-first (9/3/2026) on any
+// US-locale browser, easily misread as September 3rd instead of the intended March 9th.
+export const formatUTCDate = (date) => new Intl.DateTimeFormat('en-GB', { timeZone: 'UTC' }).format(new Date(date))

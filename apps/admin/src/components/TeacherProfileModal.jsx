@@ -18,7 +18,7 @@ const TeacherProfileModal = ({ teacherId, getTeacherProfile, onClose }) => {
           <div>
             <p className='font-display text-xl text-ink'>{data.teacher.name}</p>
             <p className='text-muted text-sm font-mono'>{data.teacher.phone}</p>
-            <p className='text-muted text-xs mt-1'>{t('workingSince', { date: new Date(data.employedSince).toLocaleDateString() })}</p>
+            <p className='text-muted text-xs mt-1'>{t('workingSince', { date: new Date(data.employedSince).toLocaleDateString('en-GB') })}</p>
           </div>
 
           <div className='grid grid-cols-2 gap-4'>

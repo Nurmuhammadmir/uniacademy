@@ -104,7 +104,7 @@ const TransactionDetail = ({ type }) => {
             <Row label={t('courseCol')} value={record.languageId ? `${record.languageId.name}${record.levelId?.name ? ' · ' + record.levelId.name : ''}` : '—'} />
             <Row label={t('groupCol')} value={record.groupId ? `${record.groupId.schedulePattern} · ${record.groupId.time}` : '—'} />
             <Row label={t('teacherCol')} value={record.teacherId?.name || '—'} />
-            <Row label={t('coveredThroughLabel')} value={record.subscriptionEnd ? new Date(record.subscriptionEnd).toLocaleDateString() : '—'} />
+            <Row label={t('coveredThroughLabel')} value={record.subscriptionEnd ? new Date(record.subscriptionEnd).toLocaleDateString('en-GB') : '—'} />
           </div>
 
           <div className='bg-bg-elevated border border-hairline rounded-2xl p-5'>

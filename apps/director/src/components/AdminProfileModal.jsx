@@ -17,7 +17,7 @@ const AdminProfileModal = ({ adminId, getAdminProfile, onClose }) => {
           <div>
             <p className='font-display text-xl text-ink'>{data.admin.name}</p>
             <p className='text-muted text-sm font-mono'>{data.admin.phone}</p>
-            <p className='text-muted text-xs mt-1'>{t('sinceDate', { branch: data.admin.branchId?.name, date: new Date(data.admin.createdAt).toLocaleDateString() })}</p>
+            <p className='text-muted text-xs mt-1'>{t('sinceDate', { branch: data.admin.branchId?.name, date: new Date(data.admin.createdAt).toLocaleDateString('en-GB') })}</p>
           </div>
 
           <div className='grid grid-cols-2 gap-4'>

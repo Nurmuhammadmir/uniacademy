@@ -167,7 +167,7 @@ const TeacherProfile = () => {
               </div>
               <div className='flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300'>
                 <Calendar size={15} strokeWidth={1.5} className='text-slate-400 dark:text-slate-500 flex-shrink-0' />
-                <span>{t('workingSince', { date: new Date(data.employedSince).toLocaleDateString() })}</span>
+                <span>{t('workingSince', { date: new Date(data.employedSince).toLocaleDateString('en-GB') })}</span>
               </div>
             </div>
             <div className='grid grid-cols-2 gap-3 mt-2'>
@@ -246,7 +246,7 @@ const TeacherProfile = () => {
                           {t(e.kind === 'salary_accrual' ? 'salaryAccruedBadge' : 'salaryPaidOutBadge')}
                         </span>
                         <p className='text-slate-500 dark:text-slate-400 text-xs truncate'>{e.description}</p>
-                        <p className='text-slate-400 dark:text-slate-600 text-[11px] mt-0.5'>{new Date(e.date).toLocaleDateString()}</p>
+                        <p className='text-slate-400 dark:text-slate-600 text-[11px] mt-0.5'>{new Date(e.date).toLocaleDateString('en-GB')}</p>
                       </div>
                       <span className={`font-mono text-sm flex-shrink-0 ${e.direction === 'increase' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                         {e.direction === 'increase' ? '+' : '-'}{formatMoney(e.amount)}

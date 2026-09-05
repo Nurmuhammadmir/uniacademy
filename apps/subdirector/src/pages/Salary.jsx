@@ -475,7 +475,7 @@ const Salary = ({ branchId }) => {
                     <p className='text-ink text-sm font-medium mb-2'>{t('lessonsCountedLabel')} ({detail.lessonEntries.length})</p>
                     <div className='flex flex-wrap gap-1.5 mb-2'>
                       {detail.lessonEntries.map((e, i) => (
-                        <span key={i} className='text-xs font-mono bg-bg px-2 py-1 rounded-lg text-muted'>{new Date(e.date).toLocaleDateString()} · {e.language}</span>
+                        <span key={i} className='text-xs font-mono bg-bg px-2 py-1 rounded-lg text-muted'>{new Date(e.date).toLocaleDateString('en-GB')} · {e.language}</span>
                       ))}
                     </div>
                   </>

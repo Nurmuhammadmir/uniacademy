@@ -246,7 +246,7 @@ const StudentProfile = () => {
                 )}
               </div>
               <p className='text-slate-600 font-medium text-sm flex items-center gap-1.5 mt-1.5 dark:text-slate-300'><Phone size={14} strokeWidth={1.5} /> {data.student.phone}</p>
-              <p className='text-slate-400 text-xs mt-1 dark:text-slate-600'>{t('registeredOn', { date: new Date(data.student.createdAt).toLocaleDateString() })}</p>
+              <p className='text-slate-400 text-xs mt-1 dark:text-slate-600'>{t('registeredOn', { date: new Date(data.student.createdAt).toLocaleDateString('en-GB') })}</p>
               {data.student.frozen && data.student.frozenReason && (
                 <p className='text-blue-600 dark:text-blue-400 text-xs mt-1'>{data.student.frozenReason}</p>
               )}
