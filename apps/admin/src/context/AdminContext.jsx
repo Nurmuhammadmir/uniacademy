@@ -1067,7 +1067,9 @@ const AdminContextProvider = (props) => {
             await axios.delete(backendUrl + '/api/admin/leads/columns/' + id, authHeader)
             return true
         } catch (error) {
-            toast.error(error.response?.data?.error || t('couldNotDeleteColumn'))
+            const code = error.response?.data?.error
+            if (code === 'column_has_leads') toast.error(t('columnHasLeadsError'))
+            else toast.error(code || t('couldNotDeleteColumn'))
             return false
         }
     }

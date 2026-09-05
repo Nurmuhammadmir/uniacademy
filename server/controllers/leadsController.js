@@ -73,8 +73,22 @@ export const deleteColumn = async (req, res) => {
     try {
         const branchId = resolveBranchId(req)
         if (!branchId) return res.status(400).json({ error: 'branch_required' })
-        const column = await LeadColumn.findOneAndDelete({ _id: req.params.id, branchId })
+        const column = await LeadColumn.findOne({ _id: req.params.id, branchId }).lean()
         if (!column) return res.status(404).json({ error: 'not_found' })
+
+        // confirmed real gap: admin can never delete a lead directly (no DELETE /leads/:id route is
+        // even mounted for admin), but deleting the COLUMN a lead sits in used to destroy it anyway,
+        // unconditionally, for anyone - a backdoor around a rule that's otherwise enforced by simply
+        // not exposing the endpoint. Only director/sub_director (who already have real per-lead
+        // delete rights, see deleteLead below) may still remove a column that still has leads in it -
+        // admin has to move every lead out first (e.g. the board's own bulk-move) before the column
+        // itself can go.
+        if (req.auth.role === 'admin') {
+            const leadCount = await Lead.countDocuments({ columnId: column._id })
+            if (leadCount > 0) return res.status(400).json({ error: 'column_has_leads' })
+        }
+
+        await LeadColumn.deleteOne({ _id: column._id })
         await LeadSubgroup.deleteMany({ columnId: column._id })
         await Lead.deleteMany({ columnId: column._id })
         await LeadForm.deleteMany({ columnId: column._id })
