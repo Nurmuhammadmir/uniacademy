@@ -4,6 +4,7 @@ import Group from "../models/Group.js"
 import Account from "../models/Account.js"
 import LedgerEntry from "../models/LedgerEntry.js"
 import { getOrCreateAccount, postEntry, computePeriodCost, dateOnlyUTC, startOfNextMonthUTC } from "./ledger.service.js"
+import { getNextLessonDate, getPreviousLessonDate } from "./scheduleDays.service.js"
 
 // the kinds computeAccountAllocation/computeCoveredDebtPeriodsBatch/computeReconciliation all need
 // fetched, in one place so none of them can silently drift out of sync with what the others read
@@ -139,8 +140,20 @@ export const recognizeNextPeriod = async (student, course, { createdBy = null, e
     // enrolledAt only ever affects the very FIRST period (recognizedThrough not set yet) - once a
     // course has a real billing history, every later period is always "the 1st of whatever month is
     // next", never backdated, so this can't retroactively touch anything already recognized.
-    const firstWindowStart = enrolledAt ? dateOnlyUTC(enrolledAt) : today
-    const windowStart = course.recognizedThrough ? startOfNextMonthUTC(course.recognizedThrough) : firstWindowStart
+    let windowStart
+    if (course.recognizedThrough) {
+        windowStart = startOfNextMonthUTC(course.recognizedThrough)
+    } else {
+        const rawFirstStart = enrolledAt ? dateOnlyUTC(enrolledAt) : today
+        // bill from the student's actual first lesson day, not the raw date they were added to the
+        // group - confirmed real incident: two students joined the same Mon/Wed/Fri group a day
+        // apart (Thu and Fri), both had their first real lesson on that same Friday, but the Thu
+        // joiner was charged for one extra calendar day that came with no lesson at all, ending up
+        // owing more than the Fri joiner despite receiving the identical set of lessons that month.
+        const nextLesson = getNextLessonDate(group, rawFirstStart)
+        if (!nextLesson) return null // no lesson left in this group's window from this date - nothing to bill
+        windowStart = dateOnlyUTC(nextLesson)
+    }
     if (windowStart > today) return null // not due yet
     if (windowStart > group.endDate) return null // course's billing window is over
     if (student.frozen) return null // freeze pauses billing only, whole-account - nothing posts, recognizedThrough does NOT advance, so the paused period is picked back up whenever unfrozen
@@ -159,9 +172,21 @@ export const recognizeNextPeriod = async (student, course, { createdBy = null, e
     // though it only actually runs 10 of September's days. Same day-proration formula as a partial
     // FIRST month (price * daysCharged / daysInMonth), just applied to the tail end instead.
     if (group.endDate && group.endDate < windowEnd) {
-        windowEnd = group.endDate
-        const daysCharged = Math.round((windowEnd - windowStart) / 86400000) + 1
-        cost = Math.round(group.price * daysCharged / natural.daysInMonth)
+        // same lesson-day snapping as the enrollment side, applied to the tail end - stop charging at
+        // the actual last lesson on/before endDate, not an arbitrary calendar cutoff that might fall
+        // on a non-lesson day and bill for a "membership day" with no class in it.
+        const lastLesson = getPreviousLessonDate(group, group.endDate)
+        if (!lastLesson || lastLesson < windowStart) {
+            // no lesson at all between windowStart and the course's end - nothing to charge for this
+            // final chunk, but recognizedThrough still needs to close out at endDate so this
+            // enrollment doesn't keep re-evaluating the same closed window forever
+            windowEnd = group.endDate
+            cost = 0
+        } else {
+            windowEnd = lastLesson
+            const daysCharged = Math.round((windowEnd - windowStart) / 86400000) + 1
+            cost = Math.round(group.price * daysCharged / natural.daysInMonth)
+        }
         isFullMonth = false
     }
 
