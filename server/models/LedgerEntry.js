@@ -24,7 +24,12 @@ const ledgerEntrySchema = new mongoose.Schema({
     // owe AND the teacher's revenue share for that period - see billingCycle.service.js's
     // computeAccountAllocation for how it folds into the debt it corrects, and sourceId below for
     // which debt entry that is.
-    kind: { type: String, enum: ['payment', 'debt', 'refund', 'expense', 'salary_accrual', 'salary_payout', 'discount', 'debt_reversal'], required: true },
+    // 'opening_balance' is a single-sided backfill row (no counterpart account, single-sided by
+    // convention like a real accounting "beginning balance" journal entry) - used only to document a
+    // balance an Account already carried before its own ledger history began (e.g. real cash a
+    // branch already had when it started using this system), so openingBalance/byMethod reads
+    // reconcile with the true balance instead of silently missing whatever came before entry #1.
+    kind: { type: String, enum: ['payment', 'debt', 'refund', 'expense', 'salary_accrual', 'salary_payout', 'discount', 'debt_reversal', 'opening_balance'], required: true },
     method: { type: String, default: null }, // payment/expense method (cash/card/click/bank_transfer/payme/apelsin) - carried here so a per-method branch balance is a simple grouped query instead of a live aggregate
     // metadata - which of these are set depends on `kind`; all optional so one schema covers every event type
     studentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
