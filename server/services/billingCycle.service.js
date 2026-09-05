@@ -294,6 +294,15 @@ export const reverseUnusedPeriod = async (student, course, group, createdBy = nu
     }).sort({ periodStart: -1 })
     if (!currentDebt) return null
 
+    // confirmed real bug, found live: freezing a student then also removing them from the group (or
+    // any other double call to this function before a new debt gets recognized for the same period)
+    // found this SAME still-open debt entry both times and reversed its unused tail twice, refunding
+    // the student for days they'd already been refunded for. The original debt entry is immutable so
+    // it can't record "already partially reversed" on itself - checking for an existing debt_reversal
+    // pointing back at it (sourceId, set below) is the only way to make this idempotent.
+    const alreadyReversed = await LedgerEntry.exists({ accountId: studentAccount._id, kind: 'debt_reversal', sourceId: currentDebt._id })
+    if (alreadyReversed) return null
+
     const periodStart = dateOnlyUTC(currentDebt.periodStart)
     const periodEnd = dateOnlyUTC(currentDebt.periodEnd)
     const totalDays = Math.round((periodEnd - periodStart) / 86400000) + 1
