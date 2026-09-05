@@ -40,7 +40,7 @@ const StudentProfile = () => {
   const [enrolledAt, setEnrolledAt] = useState(todayISO())
   const [showAddGroupModal, setShowAddGroupModal] = useState(false)
   const [editingPayment, setEditingPayment] = useState(null)
-  const [editPaymentForm, setEditPaymentForm] = useState({ amount: '', method: '' })
+  const [editPaymentForm, setEditPaymentForm] = useState({ amount: '', method: '', comment: '' })
   const [refundingPayment, setRefundingPayment] = useState(null)
   const [refundAmount, setRefundAmount] = useState('')
   const [parentForm, setParentForm] = useState({ parentPhone: '', parentPassword: '' })
@@ -48,7 +48,7 @@ const StudentProfile = () => {
   const [showEditStudent, setShowEditStudent] = useState(false)
   const [editStudentForm, setEditStudentForm] = useState({ name: '', phone: '', passportInfo: '' })
   const [showPayModal, setShowPayModal] = useState(false)
-  const [payForm, setPayForm] = useState({ amount: '', method: '', date: todayISO() })
+  const [payForm, setPayForm] = useState({ amount: '', method: '', date: todayISO(), comment: '' })
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [printingPaymentId, setPrintingPaymentId] = useState(null)
 
@@ -94,12 +94,12 @@ const StudentProfile = () => {
 
   const openEditPayment = (payment) => {
     setEditingPayment(payment)
-    setEditPaymentForm({ amount: payment.amount, method: payment.method || '' })
+    setEditPaymentForm({ amount: payment.amount, method: payment.method || '', comment: payment.comment || '' })
   }
 
   const submitEditPayment = async (e) => {
     e.preventDefault()
-    const ok = await updatePayment(editingPayment._id, { amount: Number(editPaymentForm.amount), method: editPaymentForm.method })
+    const ok = await updatePayment(editingPayment._id, { amount: Number(editPaymentForm.amount), method: editPaymentForm.method, comment: editPaymentForm.comment })
     if (ok) { setEditingPayment(null); reload() }
   }
 
@@ -203,7 +203,7 @@ const StudentProfile = () => {
   // student's one shared wallet. Defaults the amount to whatever the account currently owes overall
   // (nothing to suggest if they're already in credit), but the admin can freely type any amount.
   const openPayModal = () => {
-    setPayForm({ amount: owedTotal > 0 ? String(owedTotal) : '', method: '', date: todayISO() })
+    setPayForm({ amount: owedTotal > 0 ? String(owedTotal) : '', method: '', date: todayISO(), comment: '' })
     setShowPayModal(true)
   }
 
@@ -213,7 +213,7 @@ const StudentProfile = () => {
     if (!payForm.method) { toast.error(t('selectPaymentMethodWarning')); return }
     if (!payForm.amount) return
     setSubmittingPayment(true)
-    const paymentId = await createPayment(studentId, Number(payForm.amount), payForm.method, payForm.date)
+    const paymentId = await createPayment(studentId, Number(payForm.amount), payForm.method, payForm.date, payForm.comment)
     setSubmittingPayment(false)
     if (paymentId) { setShowPayModal(false); reload(); setPrintingPaymentId(paymentId) }
   }
@@ -415,24 +415,33 @@ const StudentProfile = () => {
                         {t('balanceAfterLine', { amount: formatSignedBalance(paymentBalanceAfterById.get(String(item.payment._id))) })}
                       </span>
                     )}
+                    {item.payment.comment && (
+                      <p className='text-xs text-muted whitespace-pre-wrap break-words'>{t('commentCol')}: {item.payment.comment}</p>
+                    )}
                   </div>
                 ))}
               </div>
             )}
             {editingPayment && (
-              <form onSubmit={submitEditPayment} className='flex gap-2 items-end bg-[#f5f5f7] rounded-xl p-3 mt-3 dark:bg-slate-800/40'>
-                <input placeholder={t('amountLabel')} type='number' value={editPaymentForm.amount} onChange={e => setEditPaymentForm({ ...editPaymentForm, amount: e.target.value })}
-                  className='flex-1 px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm dark:bg-[#1E293B] dark:border-none dark:text-slate-200' required />
-                <Select className='flex-1' value={editPaymentForm.method} onChange={(v) => setEditPaymentForm({ ...editPaymentForm, method: v })}
-                  options={[
-                    { value: 'cash', label: t('paymentMethodCash') },
-                    { value: 'bank_transfer', label: t('paymentMethodBankTransfer') },
-                    { value: 'card', label: t('paymentMethodCard') },
-                    { value: 'click', label: t('paymentMethodClick') },
-                    { value: 'payme', label: t('paymentMethodPayme') },
-                  ]} />
-                <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10'>{t('save')}</button>
-                <button type='button' onClick={() => setEditingPayment(null)} className='px-3 py-2 text-muted text-sm'>{t('cancel')}</button>
+              <form onSubmit={submitEditPayment} className='flex flex-col gap-2 bg-[#f5f5f7] rounded-xl p-3 mt-3 dark:bg-slate-800/40'>
+                <div className='flex gap-2 items-end'>
+                  <input placeholder={t('amountLabel')} type='number' value={editPaymentForm.amount} onChange={e => setEditPaymentForm({ ...editPaymentForm, amount: e.target.value })}
+                    className='flex-1 px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm dark:bg-[#1E293B] dark:border-none dark:text-slate-200' required />
+                  <Select className='flex-1' value={editPaymentForm.method} onChange={(v) => setEditPaymentForm({ ...editPaymentForm, method: v })}
+                    options={[
+                      { value: 'cash', label: t('paymentMethodCash') },
+                      { value: 'bank_transfer', label: t('paymentMethodBankTransfer') },
+                      { value: 'card', label: t('paymentMethodCard') },
+                      { value: 'click', label: t('paymentMethodClick') },
+                      { value: 'payme', label: t('paymentMethodPayme') },
+                    ]} />
+                </div>
+                <textarea placeholder={t('commentCol')} value={editPaymentForm.comment} onChange={e => setEditPaymentForm({ ...editPaymentForm, comment: e.target.value })}
+                  rows={2} className='w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm dark:bg-[#1E293B] dark:border-none dark:text-slate-200' />
+                <div className='flex gap-2'>
+                  <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10'>{t('save')}</button>
+                  <button type='button' onClick={() => setEditingPayment(null)} className='px-3 py-2 text-muted text-sm'>{t('cancel')}</button>
+                </div>
               </form>
             )}
             {refundingPayment && (
@@ -536,6 +545,11 @@ const StudentProfile = () => {
               <div>
                 <p className='text-xs text-muted mb-1'>{t('paymentDateLabel')}</p>
                 <DatePicker value={payForm.date} onChange={(v) => setPayForm({ ...payForm, date: v })} />
+              </div>
+              <div>
+                <p className='text-xs text-muted mb-1'>{t('commentCol')}</p>
+                <textarea value={payForm.comment} onChange={e => setPayForm({ ...payForm, comment: e.target.value })}
+                  rows={2} className='w-full px-3 py-2.5 rounded-lg bg-bg border border-hairline text-sm' />
               </div>
               <button type='submit' disabled={submittingPayment}
                 className='w-full bg-[#4F46E5] hover:bg-[#5D55FA] text-white font-semibold py-2.5 rounded-xl text-sm transition-all mt-4 text-center block disabled:opacity-50 flex items-center justify-center gap-2'>

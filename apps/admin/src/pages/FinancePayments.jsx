@@ -246,8 +246,8 @@ const FinancePayments = () => {
                   <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t(paymentMethodLabelKey(p.method))}</span>
                 </td>
                 <td className='px-4 py-4 text-muted'>{p.currentTeacherId?.name || p.teacherId?.name || '—'}</td>
-                <td className='px-4 py-4'>
-                  {p.groupId && <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]'>{p.languageId?.name}{p.levelId?.name ? ` · ${p.levelId.name}` : ''}</span>}
+                <td className='px-4 py-4 text-muted max-w-[200px]'>
+                  {p.comment ? <span className='block truncate' title={p.comment}>{p.comment}</span> : '—'}
                 </td>
                 <td className='px-4 py-4 text-muted text-xs'>{p.adminId?.name} · {new Date(p.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
                 <td className='px-4 py-4 text-right whitespace-nowrap'>

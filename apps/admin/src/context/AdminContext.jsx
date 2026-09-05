@@ -222,9 +222,9 @@ const AdminContextProvider = (props) => {
     // student's one shared wallet. No languageId/levelId is sent or asked for anymore; whichever
     // course(s) this money ends up settling is decided entirely by the account-wide FIFO walk on
     // the backend (see billingCycle.service.js), not by anything picked here.
-    const createPayment = async (studentId, amount, method, date) => {
+    const createPayment = async (studentId, amount, method, date, comment) => {
         try {
-            const { data } = await axios.post(backendUrl + '/api/admin/payments', { studentId, amount, method, date }, authHeader)
+            const { data } = await axios.post(backendUrl + '/api/admin/payments', { studentId, amount, method, date, comment }, authHeader)
             toast.success(t('paymentRecorded'))
             getStudents()
             // the id (not just true/false) - lets the caller pop the receipt for THIS exact payment

@@ -182,7 +182,7 @@ const Students = () => {
   const [payingStudent, setPayingStudent] = useState(null)
   const [form, setForm] = useState({ name: '', phone: '', password: '', address: '', dateOfBirth: '', geo: { lat: null, lng: null }, groupId: '', passportInfo: '', parentPhone: '', parentPassword: '', registeredAt: todayISO(), enrolledAt: todayISO() })
   const [editForm, setEditForm] = useState({ name: '', phone: '', password: '', address: '', dateOfBirth: '', geo: { lat: null, lng: null }, passportInfo: '' })
-  const [paymentForm, setPaymentForm] = useState({ amount: '', method: '' })
+  const [paymentForm, setPaymentForm] = useState({ amount: '', method: '', comment: '' })
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [printingPaymentId, setPrintingPaymentId] = useState(null)
   const [discountMode, setDiscountMode] = useState(false)
@@ -221,7 +221,7 @@ const Students = () => {
   // overall (student.owed, the real stored Account.balance - see adminController.listStudents).
   const openPay = (student) => {
     setPayingStudent(student)
-    setPaymentForm({ amount: student.owed > 0 ? String(student.owed) : '', method: '' })
+    setPaymentForm({ amount: student.owed > 0 ? String(student.owed) : '', method: '', comment: '' })
   }
 
   const submitPayment = async (e) => {
@@ -232,10 +232,10 @@ const Students = () => {
     if (submittingPayment) return
     if (!paymentForm.method) { toast.error(t('selectPaymentMethodWarning')); return }
     setSubmittingPayment(true)
-    const paymentId = await createPayment(payingStudent._id, Number(paymentForm.amount), paymentForm.method)
+    const paymentId = await createPayment(payingStudent._id, Number(paymentForm.amount), paymentForm.method, undefined, paymentForm.comment)
     setSubmittingPayment(false)
     if (paymentId) {
-      setPayingStudent(null); setPaymentForm({ amount: '', method: '' })
+      setPayingStudent(null); setPaymentForm({ amount: '', method: '', comment: '' })
       setPrintingPaymentId(paymentId)
     }
   }
@@ -645,6 +645,8 @@ const Students = () => {
                 { value: 'click', label: t('paymentMethodClick') },
                 { value: 'payme', label: t('paymentMethodPayme') },
               ]} />
+            <textarea placeholder={t('commentCol')} value={paymentForm.comment} onChange={e => setPaymentForm({ ...paymentForm, comment: e.target.value })}
+              rows={2} className='px-4 py-3 rounded-xl bg-bg border border-hairline text-sm' />
             <p className='text-xs text-muted'>{t('paymentCreditNote')}</p>
             <button type='submit' disabled={submittingPayment} className='py-3 rounded-xl bg-accent text-white font-medium disabled:opacity-50 dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10'>
               {submittingPayment ? t('recordingPayment') : t('confirmPaymentBtn')}

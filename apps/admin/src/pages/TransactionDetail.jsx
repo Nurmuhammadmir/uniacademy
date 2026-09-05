@@ -26,7 +26,7 @@ const TransactionDetail = ({ type }) => {
   const { t } = useLanguage()
   const [record, setRecord] = useState(false)
   const [showEditPayment, setShowEditPayment] = useState(false)
-  const [editForm, setEditForm] = useState({ amount: '', method: '' })
+  const [editForm, setEditForm] = useState({ amount: '', method: '', comment: '' })
   const [saving, setSaving] = useState(false)
   const [printing, setPrinting] = useState(false)
 
@@ -42,7 +42,7 @@ const TransactionDetail = ({ type }) => {
   const isPayment = type === 'payment'
 
   const openEditPayment = () => {
-    setEditForm({ amount: record.amount, method: record.method })
+    setEditForm({ amount: record.amount, method: record.method, comment: record.comment || '' })
     setShowEditPayment(true)
   }
 
@@ -50,7 +50,7 @@ const TransactionDetail = ({ type }) => {
     e.preventDefault()
     if (saving) return
     setSaving(true)
-    const ok = await updatePayment(record._id, { amount: Number(editForm.amount), method: editForm.method })
+    const ok = await updatePayment(record._id, { amount: Number(editForm.amount), method: editForm.method, comment: editForm.comment })
     setSaving(false)
     if (ok) { setShowEditPayment(false); reload() }
   }
@@ -113,6 +113,13 @@ const TransactionDetail = ({ type }) => {
             <Row label={t('recordedAtLabel')} value={fullDate(record.createdAt)} />
           </div>
 
+          {record.comment && (
+            <div className='bg-bg-elevated border border-hairline rounded-2xl p-5'>
+              <p className='text-ink font-medium mb-1'>{t('commentCol')}</p>
+              <p className='text-ink text-sm whitespace-pre-wrap break-words'>{record.comment}</p>
+            </div>
+          )}
+
           {record.refunded && (
             <div className='bg-bg-elevated border border-hairline rounded-2xl p-5'>
               <p className='text-ink font-medium mb-2'>{t('refundBtn')}</p>
@@ -168,6 +175,11 @@ const TransactionDetail = ({ type }) => {
                 <p className='text-xs text-muted mb-1'>{t('dateCol')}</p>
                 <p className='px-3 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-800/40 text-sm text-muted'>{fullDate(record.date)}</p>
                 <p className='text-[11px] text-muted mt-1'>{t('paymentDateNotEditableHint')}</p>
+              </div>
+              <div>
+                <p className='text-xs text-muted mb-1'>{t('commentCol')}</p>
+                <textarea value={editForm.comment} onChange={e => setEditForm({ ...editForm, comment: e.target.value })}
+                  rows={3} className='w-full px-3 py-2.5 rounded-lg bg-bg border border-hairline text-sm' />
               </div>
               <button type='submit' disabled={saving}
                 className='w-full bg-[#4F46E5] hover:bg-[#5D55FA] text-white font-semibold py-2.5 rounded-xl text-sm transition-all mt-2 disabled:opacity-50'>

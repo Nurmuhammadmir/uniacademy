@@ -801,7 +801,7 @@ const PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'click', 'payme']
 
 export const createPayment = async (req, res) => {
     try {
-        const { studentId, amount, method, date } = req.body
+        const { studentId, amount, method, date, comment } = req.body
         if (!PAYMENT_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_payment_method' })
         if (!(amount > 0)) return res.status(400).json({ error: 'invalid_amount' })
 
@@ -813,6 +813,7 @@ export const createPayment = async (req, res) => {
         const paymentDate = date ? new Date(date) : new Date()
         const payment = await Payment.create({
             studentId, amount, method, date: paymentDate, adminId: req.auth.userId, branchId: req.auth.branchId,
+            comment: typeof comment === 'string' ? comment.trim().slice(0, 2000) : '',
         })
 
         const studentAccount = await getOrCreateAccount('student', studentId)
@@ -1074,7 +1075,7 @@ export const deletePayment = async (req, res) => {
 // existing ledger entries (a pure metadata correction - doesn't touch any balance).
 export const updatePayment = async (req, res) => {
     try {
-        const { amount, method } = req.body
+        const { amount, method, comment } = req.body
         const payment = await Payment.findById(req.params.id)
         if (!payment) return res.status(404).json({ error: 'not_found' })
         // confirmed real gap (same one just fixed on refundPayment): without this, an admin could
@@ -1121,6 +1122,7 @@ export const updatePayment = async (req, res) => {
             if (payment.ledgerTransactionId) await LedgerEntry.updateMany({ transactionId: payment.ledgerTransactionId }, { method })
             payment.method = method
         }
+        if (comment !== undefined) payment.comment = String(comment).trim().slice(0, 2000)
         await payment.save({ validateModifiedOnly: true })
 
         res.json({ payment })

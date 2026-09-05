@@ -41,6 +41,10 @@ const paymentSchema = new mongoose.Schema({
     // increase) - lets updatePayment/refundPayment/deletePayment find and adjust/reverse the exact
     // ledger posting this document caused, instead of re-deriving it from scratch on every edit.
     ledgerTransactionId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    // free-text note an admin can attach to a payment (e.g. why it was recorded this way) - staff
+    // only, never shown to the student/parent apps. Editable under the same isEditableToday window
+    // as the payment's own amount/method.
+    comment: { type: String, default: '' },
 }, { timestamps: true })
 
 paymentSchema.index({ studentId: 1, languageId: 1 })
