@@ -60,7 +60,17 @@ const computeRevenueForGroup = async (teacherId, group, dateFrom, dateTo) => {
     const entries = []
     const students = await User.find({ _id: { $in: group.studentIds } }).select('name').lean()
     const nameByStudent = new Map(students.map(s => [String(s._id), s.name]))
-    const coveredByStudent = await computeCoveredDebtPeriodsBatch(group.studentIds, group.languageId)
+    // group.languageId may be a populated {_id,name} object (getTeacherSalaryDetail's own groups
+    // query populates it, for display) or a raw ObjectId (calculateSalaries' doesn't) - same
+    // populated-vs-raw unwrap resolveRateForGroup already needs above. Without this, the Details
+    // view's percent_of_revenue teachers always showed 0/empty: computeCoveredDebtPeriodsBatch's own
+    // filter does `String(a.entry.languageId) === String(languageId)`, and String() on a populated
+    // plain object (post-.lean()) stringifies to "[object Object]", never matching a real id - so
+    // EVERY period got silently filtered out, while the main Salary table (raw, unpopulated
+    // languageId) computed the correct total for the exact same teacher/period.
+    const groupLanguageId = group.languageId?._id || group.languageId
+    const coveredByStudent = await computeCoveredDebtPeriodsBatch(group.studentIds, groupLanguageId)
+    const studentsWithRevenue = new Set()
     for (const studentId of group.studentIds) {
         const covered = coveredByStudent.get(String(studentId)) || []
         for (const p of covered) {
@@ -69,8 +79,17 @@ const computeRevenueForGroup = async (teacherId, group, dateFrom, dateTo) => {
             const amount = prorateByDateOverlap(p.amount, p.periodStart, p.periodEnd, dateFrom, dateTo)
             if (amount <= 0) continue
             revenue += amount
+            studentsWithRevenue.add(String(studentId))
             entries.push({ studentId, studentName: nameByStudent.get(String(studentId)), groupId: group._id, periodStart: p.periodStart, periodEnd: p.periodEnd, amount, pending: false })
         }
+    }
+    // confirmed ask: the Details view must show EVERY student in the group, not just the ones who
+    // actually paid something toward this teacher's revenue this period - a student who owes money
+    // but hasn't paid needs to be visibly flagged at 0, not silently absent from the list (which used
+    // to read as "this teacher only has 2 students" instead of "8 students, 6 haven't paid yet").
+    for (const studentId of group.studentIds) {
+        if (studentsWithRevenue.has(String(studentId))) continue
+        entries.push({ studentId, studentName: nameByStudent.get(String(studentId)), groupId: group._id, periodStart: null, periodEnd: null, amount: 0, pending: false, unpaid: true })
     }
     return { revenue, entries }
 }

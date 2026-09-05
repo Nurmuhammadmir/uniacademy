@@ -460,8 +460,14 @@ const Salary = ({ branchId }) => {
                           <tr key={i} className='border-b border-hairline last:border-0'>
                             <td className='py-2 text-ink'>{e.studentName}</td>
                             <td className='py-2 text-muted'>{detail.groups.find(g => String(g.groupId) === String(e.groupId))?.language || '—'}</td>
-                            <td className='py-2 text-muted'>{formatUTCDate(e.periodStart)} – {formatUTCDate(e.periodEnd)}{e.pending ? ` (${t('pendingBadge')})` : ''}</td>
-                            <td className='py-2 font-mono text-ink'>{formatMoney(e.amount)}</td>
+                            <td className='py-2 text-muted'>
+                              {e.unpaid ? (
+                                <span className='text-rose-500 dark:text-rose-400 font-medium'>{t('studentNotPaidLabel')}</span>
+                              ) : (
+                                <>{formatUTCDate(e.periodStart)} – {formatUTCDate(e.periodEnd)}{e.pending ? ` (${t('pendingBadge')})` : ''}</>
+                              )}
+                            </td>
+                            <td className={`py-2 font-mono ${e.unpaid ? 'text-rose-500 dark:text-rose-400' : 'text-ink'}`}>{formatMoney(e.amount)}</td>
                           </tr>
                         ))}
                       </tbody>
