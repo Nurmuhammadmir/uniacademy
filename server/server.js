@@ -15,6 +15,8 @@ import teacherRouter from './routes/teacherRoute.js'
 import studentRouter from './routes/studentRoute.js'
 import parentRouter from './routes/parentRoute.js'
 import publicRouter from './routes/publicRoute.js'
+import shantiAuthRouter from './routes/shantiAuthRoute.js'
+import shantiRouter from './routes/shantiRoute.js'
 import { sendDailyParentDigest } from './services/parentNotifications.service.js'
 import { runDailyBillingCycle } from './services/billingCycle.service.js'
 
@@ -72,6 +74,11 @@ app.use('/api/teacher', teacherRouter)
 app.use('/api/student', studentRouter)
 app.use('/api/parent', parentRouter)
 app.use('/api/public', publicRouter)
+// LasummaShanti - a separate purchases/sales CRM for an unrelated production company, sharing only
+// this VPS/Mongo connection with the school platform. Own ShantiUser collection, own login, own
+// role ('shanti') - see routes/shantiRoute.js's header comment for why requireRole needs no changes.
+app.use('/api/shanti-auth', shantiAuthRouter)
+app.use('/api/shanti', shantiRouter)
 
 app.get('/', (req, res) => res.send('uniacademy api working'))
 
