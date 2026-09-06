@@ -8,7 +8,7 @@ import Spinner from '../components/Spinner.jsx'
 import { formatMoney } from '../lib/format.js'
 import { todayISO } from '../lib/date.js'
 
-const METHODS = [['cash', 'Наличные'], ['card', 'Карта'], ['click', 'Click']]
+const METHODS = [['cash', 'Наличные'], ['card', 'Карта'], ['bank_transfer', 'Перечисление']]
 const emptyLine = () => ({ productId: '', quantity: '', price: '' })
 
 const NewSaleModal = ({ onClose, onCreated }) => {

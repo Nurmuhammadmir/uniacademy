@@ -6,7 +6,7 @@ import DatePicker from '../components/DatePicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { todayISO } from '../lib/date.js'
 
-const METHODS = [['cash', 'Наличные'], ['card', 'Карта'], ['click', 'Click']]
+const METHODS = [['cash', 'Наличные'], ['card', 'Карта'], ['bank_transfer', 'Перечисление']]
 
 const emptyForm = () => ({ materialId: '', quantity: '', date: todayISO(), amount: '', paidAmount: '', method: 'cash', comment: '' })
 
