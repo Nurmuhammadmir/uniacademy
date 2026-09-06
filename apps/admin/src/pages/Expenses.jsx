@@ -9,7 +9,7 @@ import Modal from '../components/Modal.jsx'
 import Select from '../components/Select.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import { formatMoney } from '../lib/format.js'
-import { todayISO, formatDateTime } from '../lib/date.js'
+import { todayISO, firstOfMonthISO, formatDateTime } from '../lib/date.js'
 
 const FALLBACK_COLORS = ['#6366F1', '#3E7CB1', '#2E8B57', '#8E44AD', '#D6497A', '#B7950B', '#16A085', '#C0392B']
 const colorForCategory = (name, categories) => {
@@ -22,8 +22,10 @@ const colorForCategory = (name, categories) => {
 
 const METHODS = ['cash', 'card', 'click', 'bank_transfer', 'payme', 'apelsin']
 // search lives outside this object now - it's a live top-level search bar, not part of the
-// "advanced filters" panel that only applies once its own submit button is pressed
-const DEFAULT_PENDING_FILTERS = { dateFrom: '', dateTo: '', method: '', amountMin: '', amountMax: '' }
+// "advanced filters" panel that only applies once its own submit button is pressed.
+// dateFrom/dateTo default to the current month (same default the Payments tab uses) - the
+// overview (total, chart, category breakdown, list) is always scoped to a period, never "all time"
+const DEFAULT_PENDING_FILTERS = { dateFrom: firstOfMonthISO(), dateTo: todayISO(), method: '', amountMin: '', amountMax: '' }
 const FIELD = 'w-full px-3 py-2 rounded-lg bg-[#f5f5f7] dark:bg-[#1E293B] dark:text-slate-200 border-none text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 dark:focus:ring-[#4F46E5]/30'
 
 const emptyExpenseForm = () => ({ name: '', date: todayISO(), category: '', recipient: '', amount: '', method: 'cash' })
@@ -158,6 +160,7 @@ const Expenses = () => {
             <div>
               <p className='text-muted text-[11px] leading-tight'>{t('totalExpensesAmount')}</p>
               <p className='font-bold tracking-tight text-lg text-[#1D1D1F] dark:text-[#F8FAFC] leading-tight'>-{formatMoney(totalAmount)}</p>
+              <p className='text-[10px] text-slate-400 dark:text-slate-600 mt-0.5'>{appliedFilters.dateFrom} — {appliedFilters.dateTo}</p>
             </div>
           </div>
           {showExpenseBreakdown && (

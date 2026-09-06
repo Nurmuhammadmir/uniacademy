@@ -4,7 +4,7 @@ import mongoose from "mongoose"
 import Expense, { EXPENSE_METHODS } from "../models/Expense.js"
 import ExpenseCategory from "../models/ExpenseCategory.js"
 import LedgerEntry from "../models/LedgerEntry.js"
-import { startOfLocalDay, endOfLocalDay, isEditableToday } from "../services/businessTime.service.js"
+import { startOfLocalDay, endOfLocalDay, isEditableToday, todayLocalISO } from "../services/businessTime.service.js"
 import { ensureDefaultCategories, OTHER_CATEGORY } from "../services/expenseCategories.service.js"
 import { getOrCreateAccount, postEntry, deleteEntries } from "../services/ledger.service.js"
 
@@ -84,27 +84,31 @@ export const getExpensesOverview = async (req, res) => {
     try {
         const { dateFrom, dateTo, category, categories, method, search, amountMin, amountMax, groupBy } = req.query
         // cast explicitly - .find() below auto-casts a raw string fine, but the .aggregate() $match
-        // further down does NOT, and would silently match zero documents against a real ObjectId field
-        const match = { branchId: new mongoose.Types.ObjectId(req.auth.branchId) }
-        if (dateFrom || dateTo) {
-            match.date = {}
-            if (dateFrom) match.date.$gte = startOfLocalDay(dateFrom)
-            if (dateTo) match.date.$lte = endOfLocalDay(dateTo)
-        }
+        // further down does NOT, and would silently match zero documents against a real ObjectId field.
+        // baseMatch holds every non-date filter, shared by both the period-scoped total/list below AND
+        // the chart's own fixed rolling window (see seriesMatch) - only the date bound differs between them.
+        const baseMatch = { branchId: new mongoose.Types.ObjectId(req.auth.branchId) }
         // `categories` (comma-separated, from the filter panel's multi-select) and the older
         // single `category` (from a legend/pie-slice quick-filter click) both narrow by category -
         // whichever one the caller sent wins, they're never both present at once
         const categoryList = categories ? categories.split(',').filter(Boolean) : (category ? [category] : [])
-        if (categoryList.length > 0) match.category = { $in: categoryList }
-        if (method) match.method = method
+        if (categoryList.length > 0) baseMatch.category = { $in: categoryList }
+        if (method) baseMatch.method = method
         if (amountMin || amountMax) {
-            match.amount = {}
-            if (amountMin) match.amount.$gte = Number(amountMin)
-            if (amountMax) match.amount.$lte = Number(amountMax)
+            baseMatch.amount = {}
+            if (amountMin) baseMatch.amount.$gte = Number(amountMin)
+            if (amountMax) baseMatch.amount.$lte = Number(amountMax)
         }
         if (search) {
             const q = search.trim()
-            match.$or = [{ name: new RegExp(q, 'i') }, { recipient: new RegExp(q, 'i') }]
+            baseMatch.$or = [{ name: new RegExp(q, 'i') }, { recipient: new RegExp(q, 'i') }]
+        }
+
+        const match = { ...baseMatch }
+        if (dateFrom || dateTo) {
+            match.date = {}
+            if (dateFrom) match.date.$gte = startOfLocalDay(dateFrom)
+            if (dateTo) match.date.$lte = endOfLocalDay(dateTo)
         }
 
         const expenses = await Expense.find(match).sort({ date: -1 }).populate('teacherId', 'name').populate('createdBy', 'name').lean()
@@ -115,16 +119,38 @@ export const getExpensesOverview = async (req, res) => {
         expenses.forEach(e => { byCategoryMap[e.category] = (byCategoryMap[e.category] || 0) + e.amount })
         const byCategory = Object.entries(byCategoryMap).map(([cat, total]) => ({ category: cat, total }))
 
+        // the chart is a fixed rolling trend, independent of the dateFrom/dateTo period filter above -
+        // confirmed spec: strictly the last 3 calendar months when grouped by month, or the last 2
+        // calendar years when grouped by year, no matter what period the admin has the list filtered to
+        const todayStr = todayLocalISO()
+        const [curYear, curMonth] = todayStr.split('-').map(Number)
+        let seriesFromStr
+        if (groupBy === 'year') {
+            seriesFromStr = `${curYear - 1}-01-01`
+        } else {
+            let m = curMonth - 2
+            let y = curYear
+            if (m <= 0) { m += 12; y -= 1 }
+            seriesFromStr = `${y}-${String(m).padStart(2, '0')}-01`
+        }
+        const seriesMatch = { ...baseMatch, date: { $gte: startOfLocalDay(seriesFromStr), $lte: endOfLocalDay(todayStr) } }
+
         const dateFormat = groupBy === 'year' ? '%Y' : '%Y-%m'
         const series = await Expense.aggregate([
-            { $match: match },
+            { $match: seriesMatch },
             { $group: { _id: { $dateToString: { format: dateFormat, date: '$date' } }, total: { $sum: '$amount' } } },
             { $sort: { _id: 1 } },
         ])
+        const seriesByPeriod = Object.fromEntries(series.map(s => [s._id, s.total]))
+        // zero-fill every period in the fixed window (not just the ones with actual expenses) so the
+        // chart always renders exactly 3 bars/2 bars, never fewer just because a period was empty
+        const expectedPeriods = groupBy === 'year'
+            ? [String(curYear - 1), String(curYear)]
+            : [0, 1, 2].map(i => { let m = curMonth - 2 + i, y = curYear; if (m <= 0) { m += 12; y -= 1 }; return `${y}-${String(m).padStart(2, '0')}` })
 
         res.json({
             expenses, totalAmount, byCategory,
-            series: series.map(s => ({ period: s._id, total: s.total })),
+            series: expectedPeriods.map(period => ({ period, total: seriesByPeriod[period] || 0 })),
         })
     } catch (error) {
         console.log(error)
