@@ -1616,6 +1616,16 @@ export const getSalaryDetail = async (req, res) => {
     }
 }
 
+// ONE-TIME migration-era exception (confirmed with the user, 2026-09) - every branch ran on a
+// different, non-platform system through August 2026, and staff were already paid for that whole
+// span through it. The 2026-09-01 go-live is also exactly when this platform's own billing/groups
+// start (see recognizeNextPeriod's real enrollment dates), so any salary period starting on or
+// before this cutoff would double-pay a teacher already paid for it once outside this system. Not a
+// general feature - just guards against this specific pre-launch window; nothing here should ever
+// need to move this cutoff forward again once it's past.
+const LEGACY_PAYROLL_CUTOFF = new Date('2026-08-31T23:59:59.999Z')
+const isLegacyPayrollPeriod = (dateFrom) => dateFrom && new Date(dateFrom) <= LEGACY_PAYROLL_CUTOFF
+
 // records a salary payout as a branch Expense - this is what makes it show up as a cost against
 // the Finance page's net-profit figure, and what makes this teacher show as "paid" for this exact
 // date range next time the calculator runs
@@ -1627,6 +1637,7 @@ export const paySalary = async (req, res) => {
         // are falsy) - same class of bug already fixed on createPayment/updatePayment/expenses
         if (!(amount > 0)) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
+        if (isLegacyPayrollPeriod(dateFrom)) return res.status(400).json({ error: 'salary_locked_legacy_period' })
 
         // confirmed real gap: nothing here checked the teacher actually belongs to (or is
         // additionally assigned to) this admin's own branch - teacherId is a plain request body
@@ -1697,6 +1708,7 @@ export const prepaySalary = async (req, res) => {
         if (!teacherId) return res.status(400).json({ error: 'missing_fields' })
         if (!(amount > 0)) return res.status(400).json({ error: 'missing_fields' })
         if (!EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
+        if (isLegacyPayrollPeriod(dateFrom)) return res.status(400).json({ error: 'salary_locked_legacy_period' })
 
         // same real gap just fixed on paySalary - teacherId is a plain request body value, so
         // without this an admin could send branch money to any teacher at all, not just one

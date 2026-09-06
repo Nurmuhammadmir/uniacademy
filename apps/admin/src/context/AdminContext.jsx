@@ -367,7 +367,9 @@ const AdminContextProvider = (props) => {
             return true
         } catch (error) {
             const code = error.response?.data?.error
-            toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError') : (code || t('couldNotPaySalary')))
+            toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError')
+                : code === 'salary_locked_legacy_period' ? t('salaryLockedLegacyPeriodError')
+                : (code || t('couldNotPaySalary')))
             return false
         }
     }
@@ -381,7 +383,9 @@ const AdminContextProvider = (props) => {
             return true
         } catch (error) {
             const code = error.response?.data?.error
-            toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError') : (code || t('couldNotPrepaySalary')))
+            toast.error(code === 'invalid_method' ? t('invalidPaymentMethodError')
+                : code === 'salary_locked_legacy_period' ? t('salaryLockedLegacyPeriodError')
+                : (code || t('couldNotPrepaySalary')))
             return false
         }
     }
