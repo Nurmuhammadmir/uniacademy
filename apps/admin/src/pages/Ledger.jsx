@@ -60,7 +60,8 @@ const BusinessLedger = ({ t }) => {
             </div>
           </div>
 
-          <p className='text-ink font-medium mb-2'>{t('paymentMethodAccountsTitle')}</p>
+          <p className='text-ink font-medium'>{t('paymentMethodAccountsTitle')}</p>
+          <p className='text-muted text-xs mb-2'>{t('paymentMethodLifetimeNote')}</p>
           <div className='grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-4'>
             {data.byMethod.map(m => (
               <button key={m.method} onClick={() => toggleMethodFilter(m.method)}
