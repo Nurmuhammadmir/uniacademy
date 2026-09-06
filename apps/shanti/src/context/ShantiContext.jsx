@@ -108,6 +108,24 @@ const ShantiContextProvider = (props) => {
         catch (error) { toast.error(error.response?.data?.error || 'Не удалось удалить'); return false }
     }
 
+    // ==== Sellers ====
+    const getSellers = async () => {
+        try { const { data } = await axios.get(backendUrl + '/api/shanti/sellers', authHeader); setSellers(data.sellers) }
+        catch (error) { toast.error(error.response?.data?.error || 'Не удалось загрузить продавцов') }
+    }
+    const createSeller = async (payload) => {
+        try { await axios.post(backendUrl + '/api/shanti/sellers', payload, authHeader); toast.success('Продавец добавлен'); getSellers(); return true }
+        catch (error) { toast.error(error.response?.data?.error || 'Не удалось добавить'); return false }
+    }
+    const updateSeller = async (id, payload) => {
+        try { await axios.put(backendUrl + '/api/shanti/sellers/' + id, payload, authHeader); getSellers(); return true }
+        catch (error) { toast.error(error.response?.data?.error || 'Не удалось изменить'); return false }
+    }
+    const deleteSeller = async (id) => {
+        try { await axios.delete(backendUrl + '/api/shanti/sellers/' + id, authHeader); getSellers(); return true }
+        catch (error) { toast.error(error.response?.data?.error || 'Не удалось удалить'); return false }
+    }
+
     // ==== Purchases ====
     const getPurchasesOverview = async (filters) => {
         try { const { data } = await axios.get(backendUrl + '/api/shanti/purchases', { ...authHeader, params: filters }); return data }
@@ -117,16 +135,12 @@ const ShantiContextProvider = (props) => {
         try { const { data } = await axios.get(backendUrl + '/api/shanti/purchases/debts', { ...authHeader, params: filters }); return data }
         catch (error) { toast.error(error.response?.data?.error || 'Не удалось загрузить долги'); return false }
     }
-    const getSellers = async () => {
-        try { const { data } = await axios.get(backendUrl + '/api/shanti/purchases/sellers', authHeader); setSellers(data.sellers) }
-        catch (error) { toast.error(error.response?.data?.error || 'Не удалось загрузить продавцов') }
-    }
     const createPurchase = async (payload) => {
-        try { await axios.post(backendUrl + '/api/shanti/purchases', payload, authHeader); toast.success('Покупка добавлена'); getMaterials(); getSellers(); return true }
+        try { await axios.post(backendUrl + '/api/shanti/purchases', payload, authHeader); toast.success('Покупка добавлена'); getMaterials(); return true }
         catch (error) { toast.error(error.response?.data?.error || 'Не удалось добавить покупку'); return false }
     }
     const updatePurchase = async (id, payload) => {
-        try { await axios.put(backendUrl + '/api/shanti/purchases/' + id, payload, authHeader); getMaterials(); getSellers(); return true }
+        try { await axios.put(backendUrl + '/api/shanti/purchases/' + id, payload, authHeader); getMaterials(); return true }
         catch (error) { toast.error(error.response?.data?.error || 'Не удалось изменить'); return false }
     }
     const deletePurchase = async (id) => {
@@ -224,7 +238,7 @@ const ShantiContextProvider = (props) => {
         units, getUnits, createUnit, updateUnit, deleteUnit,
         materialCategories, getMaterialCategories, createMaterialCategory, updateMaterialCategory, deleteMaterialCategory,
         materials, getMaterials, createMaterial, updateMaterial, deleteMaterial,
-        sellers, getSellers,
+        sellers, getSellers, createSeller, updateSeller, deleteSeller,
         getPurchasesOverview, getPurchaseDebts, createPurchase, updatePurchase, deletePurchase,
         clientCategories, getClientCategories, createClientCategory, updateClientCategory, deleteClientCategory,
         clients, getClients, createClient, updateClient, deleteClient,

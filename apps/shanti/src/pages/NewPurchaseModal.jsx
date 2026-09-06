@@ -9,7 +9,7 @@ import { todayISO } from '../lib/date.js'
 
 const METHODS = [['cash', 'Наличные'], ['card', 'Карта'], ['bank_transfer', 'Перечисление']]
 
-const emptyForm = () => ({ materialId: '', quantity: '', date: todayISO(), amount: '', paidAmount: '', method: 'cash', seller: '', comment: '' })
+const emptyForm = () => ({ materialId: '', quantity: '', date: todayISO(), amount: '', paidAmount: '', method: 'cash', sellerId: '', comment: '' })
 
 const NewPurchaseModal = ({ onClose, onCreated }) => {
   const { materials, sellers, createPurchase } = useContext(ShantiContext)
@@ -23,7 +23,7 @@ const NewPurchaseModal = ({ onClose, onCreated }) => {
     const ok = await createPurchase({
       materialId: form.materialId, quantity: Number(form.quantity), date: form.date, amount: Number(form.amount),
       paidAmount: form.paidAmount === '' ? Number(form.amount) : Number(form.paidAmount),
-      method: form.method, seller: form.seller, comment: form.comment,
+      method: form.method, sellerId: form.sellerId || undefined, comment: form.comment,
     })
     setSubmitting(false)
     if (ok) { onCreated(); onClose() }
@@ -59,11 +59,8 @@ const NewPurchaseModal = ({ onClose, onCreated }) => {
         </div>
         <div>
           <p className='text-xs text-muted mb-1'>Продавец</p>
-          <input list='shanti-sellers' value={form.seller} onChange={e => setForm({ ...form, seller: e.target.value })}
-            placeholder='Например: ООО Строймир' className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
-          <datalist id='shanti-sellers'>
-            {sellers.map(s => <option key={s} value={s} />)}
-          </datalist>
+          <Select forceSearch value={form.sellerId} onChange={(v) => setForm({ ...form, sellerId: v })} placeholder='Не указан'
+            options={[{ value: '', label: 'Не указан' }, ...sellers.map(s => ({ value: s._id, label: s.phone ? `${s.name} · ${s.phone}` : s.name }))]} />
         </div>
         <div>
           <p className='text-xs text-muted mb-2'>Способ оплаты</p>

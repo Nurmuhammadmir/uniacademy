@@ -2,11 +2,13 @@ import React from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import PurchasesList from './PurchasesList.jsx'
 import PurchaseMaterials from './PurchaseMaterials.jsx'
+import PurchaseSellers from './PurchaseSellers.jsx'
 import PurchaseDebts from './PurchaseDebts.jsx'
 
 const TABS = [
   ['list', 'Покупки'],
   ['materials', 'Материалы'],
+  ['sellers', 'Продавцы'],
   ['debts', 'Долги'],
 ]
 const TAB_VALUES = TABS.map(([value]) => value)
@@ -33,6 +35,7 @@ const Purchases = () => {
 
       {tab === 'list' && <PurchasesList />}
       {tab === 'materials' && <PurchaseMaterials />}
+      {tab === 'sellers' && <PurchaseSellers />}
       {tab === 'debts' && <PurchaseDebts />}
     </div>
   )

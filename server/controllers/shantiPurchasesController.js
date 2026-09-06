@@ -7,6 +7,7 @@ import ShantiUnit from "../models/ShantiUnit.js"
 import ShantiMaterialCategory from "../models/ShantiMaterialCategory.js"
 import ShantiMaterial from "../models/ShantiMaterial.js"
 import ShantiPurchase from "../models/ShantiPurchase.js"
+import ShantiSeller from "../models/ShantiSeller.js"
 import { SHANTI_METHODS } from "../models/shantiConstants.js"
 import { ensureDefaultShantiUnits, ensureOtherMaterialCategoryExists, OTHER_MATERIAL_CATEGORY } from "../services/shantiCatalog.service.js"
 
@@ -191,9 +192,65 @@ export const deleteMaterial = async (req, res) => {
     }
 }
 
+// ==== Sellers ====
+
+export const listSellers = async (req, res) => {
+    try {
+        const sellers = await ShantiSeller.find({}).sort({ name: 1 }).lean()
+        res.json({ sellers })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const createSeller = async (req, res) => {
+    try {
+        const { name, phone, comment } = req.body
+        if (!name?.trim()) return res.status(400).json({ error: 'name_required' })
+        const seller = await ShantiSeller.create({ name: name.trim(), phone: phone || '', comment: comment || '' })
+        res.status(201).json({ seller })
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ error: 'seller_already_exists' })
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const updateSeller = async (req, res) => {
+    try {
+        const { name, phone, comment } = req.body
+        const seller = await ShantiSeller.findById(req.params.id)
+        if (!seller) return res.status(404).json({ error: 'not_found' })
+        if (name !== undefined && name.trim()) seller.name = name.trim()
+        if (phone !== undefined) seller.phone = phone
+        if (comment !== undefined) seller.comment = comment
+        await seller.save()
+        res.json({ seller })
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ error: 'seller_already_exists' })
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const deleteSeller = async (req, res) => {
+    try {
+        const seller = await ShantiSeller.findById(req.params.id)
+        if (!seller) return res.status(404).json({ error: 'not_found' })
+        const inUse = await ShantiPurchase.countDocuments({ sellerId: seller._id })
+        if (inUse > 0) return res.status(409).json({ error: 'seller_in_use' })
+        await seller.deleteOne()
+        res.json({ deleted: true })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 // ==== Purchases ====
 
-const buildPurchaseMatch = async ({ dateFrom, dateTo, category, materialId, seller, amountMin, amountMax, search }) => {
+const buildPurchaseMatch = async ({ dateFrom, dateTo, category, materialId, sellerId, amountMin, amountMax, search }) => {
     const match = {}
     if (dateFrom || dateTo) {
         match.date = {}
@@ -205,7 +262,7 @@ const buildPurchaseMatch = async ({ dateFrom, dateTo, category, materialId, sell
         const materialIds = await ShantiMaterial.find({ category }).select('_id').lean()
         match.materialId = { $in: materialIds.map(m => m._id) }
     }
-    if (seller) match.seller = seller
+    if (sellerId) match.sellerId = new mongoose.Types.ObjectId(sellerId)
     if (amountMin || amountMax) {
         match.amount = {}
         if (amountMin) match.amount.$gte = Number(amountMin)
@@ -215,22 +272,10 @@ const buildPurchaseMatch = async ({ dateFrom, dateTo, category, materialId, sell
     return match
 }
 
-// distinct sellers actually used on a real purchase - backs the filter dropdown. No manageable
-// "sellers" collection exists (seller is free text on the purchase itself), so this IS the list.
-export const getPurchaseSellers = async (req, res) => {
-    try {
-        const sellers = await ShantiPurchase.distinct('seller', { seller: { $ne: '' } })
-        res.json({ sellers: sellers.sort() })
-    } catch (error) {
-        console.log(error)
-        res.status(500).json({ error: 'server_error' })
-    }
-}
-
 export const getPurchasesOverview = async (req, res) => {
     try {
         const match = await buildPurchaseMatch(req.query)
-        const purchases = await ShantiPurchase.find(match).sort({ date: -1 }).populate('materialId', 'name category unit').populate('createdBy', 'name').lean()
+        const purchases = await ShantiPurchase.find(match).sort({ date: -1 }).populate('materialId', 'name category unit').populate('sellerId', 'name phone').populate('createdBy', 'name').lean()
         const totalAmount = purchases.reduce((sum, p) => sum + p.amount, 0)
         res.json({ purchases, totalAmount })
     } catch (error) {
@@ -243,7 +288,7 @@ export const getPurchaseDebts = async (req, res) => {
     try {
         const match = await buildPurchaseMatch(req.query)
         match.$expr = { $gt: [{ $subtract: ['$amount', '$paidAmount'] }, 0] }
-        const purchases = await ShantiPurchase.find(match).sort({ date: -1 }).populate('materialId', 'name category unit').populate('createdBy', 'name').lean()
+        const purchases = await ShantiPurchase.find(match).sort({ date: -1 }).populate('materialId', 'name category unit').populate('sellerId', 'name phone').populate('createdBy', 'name').lean()
         const totalDebt = purchases.reduce((sum, p) => sum + (p.amount - p.paidAmount), 0)
         res.json({ purchases, totalDebt })
     } catch (error) {
@@ -254,7 +299,7 @@ export const getPurchaseDebts = async (req, res) => {
 
 export const getPurchaseDetail = async (req, res) => {
     try {
-        const purchase = await ShantiPurchase.findById(req.params.id).populate('materialId', 'name category unit').populate('createdBy', 'name').lean()
+        const purchase = await ShantiPurchase.findById(req.params.id).populate('materialId', 'name category unit').populate('sellerId', 'name phone').populate('createdBy', 'name').lean()
         if (!purchase) return res.status(404).json({ error: 'not_found' })
         res.json({ purchase })
     } catch (error) {
@@ -265,20 +310,24 @@ export const getPurchaseDetail = async (req, res) => {
 
 export const createPurchase = async (req, res) => {
     try {
-        const { materialId, quantity, date, amount, paidAmount, method, seller, comment } = req.body
+        const { materialId, quantity, date, amount, paidAmount, method, sellerId, comment } = req.body
         if (!materialId) return res.status(400).json({ error: 'material_required' })
         if (!(quantity > 0)) return res.status(400).json({ error: 'invalid_quantity' })
         if (!(amount > 0)) return res.status(400).json({ error: 'invalid_amount' })
         if (method && !SHANTI_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
         const material = await ShantiMaterial.findById(materialId)
         if (!material) return res.status(404).json({ error: 'material_not_found' })
+        if (sellerId) {
+            const seller = await ShantiSeller.findById(sellerId)
+            if (!seller) return res.status(404).json({ error: 'seller_not_found' })
+        }
 
         const resolvedPaid = paidAmount !== undefined ? Number(paidAmount) : amount
         if (resolvedPaid < 0 || resolvedPaid > amount) return res.status(400).json({ error: 'invalid_paid_amount' })
 
         const purchase = await ShantiPurchase.create({
             materialId, quantity, date: date ? new Date(date) : new Date(), amount, paidAmount: resolvedPaid,
-            method: method || 'cash', seller: seller?.trim() || '', comment: comment || '', createdBy: req.auth.userId,
+            method: method || 'cash', sellerId: sellerId || null, comment: comment || '', createdBy: req.auth.userId,
         })
         await ShantiMaterial.updateOne({ _id: materialId }, { $inc: { stock: quantity } })
         res.status(201).json({ purchase })
@@ -292,8 +341,12 @@ export const updatePurchase = async (req, res) => {
     try {
         const purchase = await ShantiPurchase.findById(req.params.id)
         if (!purchase) return res.status(404).json({ error: 'not_found' })
-        const { materialId, quantity, date, amount, paidAmount, method, seller, comment } = req.body
+        const { materialId, quantity, date, amount, paidAmount, method, sellerId, comment } = req.body
         if (method && !SHANTI_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
+        if (sellerId) {
+            const seller = await ShantiSeller.findById(sellerId)
+            if (!seller) return res.status(404).json({ error: 'seller_not_found' })
+        }
 
         const oldMaterialId = String(purchase.materialId)
         const oldQuantity = purchase.quantity
@@ -321,7 +374,7 @@ export const updatePurchase = async (req, res) => {
         purchase.paidAmount = newPaid
         if (date !== undefined) purchase.date = new Date(date)
         if (method !== undefined) purchase.method = method
-        if (seller !== undefined) purchase.seller = seller.trim()
+        if (sellerId !== undefined) purchase.sellerId = sellerId || null
         if (comment !== undefined) purchase.comment = comment
         await purchase.save()
         res.json({ purchase })

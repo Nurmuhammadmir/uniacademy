@@ -9,7 +9,7 @@ import { firstOfMonthISO, todayISO, formatDateTime } from '../lib/date.js'
 import NewPurchaseModal from './NewPurchaseModal.jsx'
 
 const METHOD_LABEL = { cash: 'Наличные', card: 'Карта', click: 'Click', bank_transfer: 'Перечисление', payme: 'Payme', apelsin: 'Apelsin' }
-const DEFAULT_FILTERS = { dateFrom: firstOfMonthISO(), dateTo: todayISO(), category: '', materialId: '', seller: '', amountMin: '', amountMax: '' }
+const DEFAULT_FILTERS = { dateFrom: firstOfMonthISO(), dateTo: todayISO(), category: '', materialId: '', sellerId: '', amountMin: '', amountMax: '' }
 
 const PurchasesList = () => {
   const { materialCategories, materials, sellers, getPurchasesOverview, updatePurchase, deletePurchase } = useContext(ShantiContext)
@@ -75,8 +75,8 @@ const PurchasesList = () => {
           </div>
           <div>
             <p className='text-xs text-muted mb-1'>Продавец</p>
-            <Select forceSearch className='w-48' value={filters.seller} onChange={(v) => setFilters({ ...filters, seller: v })} placeholder='Любой'
-              options={[{ value: '', label: 'Любой' }, ...sellers.map(s => ({ value: s, label: s }))]} />
+            <Select forceSearch className='w-48' value={filters.sellerId} onChange={(v) => setFilters({ ...filters, sellerId: v })} placeholder='Любой'
+              options={[{ value: '', label: 'Любой' }, ...sellers.map(s => ({ value: s._id, label: s.name }))]} />
           </div>
           <div>
             <p className='text-xs text-muted mb-1'>Сумма</p>
@@ -114,7 +114,7 @@ const PurchasesList = () => {
                   <td className='px-4 py-3 text-muted whitespace-nowrap'>{formatDateTime(p.date)}</td>
                   <td className='px-4 py-3 text-ink'>{p.materialId?.name || '—'}</td>
                   <td className='px-4 py-3 text-muted'>{p.quantity} {p.materialId?.unit}</td>
-                  <td className='px-4 py-3 text-muted'>{p.seller || '—'}</td>
+                  <td className='px-4 py-3 text-muted'>{p.sellerId?.name || '—'}</td>
                   <td className='px-4 py-3 font-mono text-ink'>{formatMoney(p.amount)}</td>
                   <td className='px-4 py-3 font-mono text-emerald-600'>{formatMoney(p.paidAmount)}</td>
                   <td className={`px-4 py-3 font-mono ${debt > 0 ? 'text-amber-600 font-semibold' : 'text-muted'}`}>{debt > 0 ? formatMoney(debt) : '—'}</td>
@@ -157,7 +157,7 @@ const PurchasesList = () => {
               <div className='flex justify-between items-start'>
                 <div className='min-w-0'>
                   <p className='font-semibold text-[#1D1D1F] text-sm truncate'>{p.materialId?.name || '—'}</p>
-                  <p className='text-xs text-slate-400 mt-1'>{formatDateTime(p.date)} · {p.quantity} {p.materialId?.unit}{p.seller ? ` · ${p.seller}` : ''}</p>
+                  <p className='text-xs text-slate-400 mt-1'>{formatDateTime(p.date)} · {p.quantity} {p.materialId?.unit}{p.sellerId?.name ? ` · ${p.sellerId.name}` : ''}</p>
                 </div>
                 <p className='text-base font-bold text-slate-900 flex-shrink-0 ml-3'>{formatMoney(p.amount)}</p>
               </div>
