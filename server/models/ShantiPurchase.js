@@ -13,12 +13,17 @@ const shantiPurchaseSchema = new mongoose.Schema({
     amount: { type: Number, required: true },
     paidAmount: { type: Number, required: true },
     method: { type: String, enum: SHANTI_METHODS, default: 'cash' },
+    // who the material was actually bought from - free text (no manageable "sellers" list requested,
+    // unlike categories), so any new name typed on a purchase is immediately usable and immediately
+    // shows up as a filter option (see getSellers/distinct('seller') in the controller)
+    seller: { type: String, default: '' },
     comment: { type: String, default: '' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'ShantiUser', required: true },
 }, { timestamps: true })
 
 shantiPurchaseSchema.index({ date: 1 })
 shantiPurchaseSchema.index({ materialId: 1 })
+shantiPurchaseSchema.index({ seller: 1 })
 
 const ShantiPurchase = mongoose.models.ShantiPurchase || mongoose.model('ShantiPurchase', shantiPurchaseSchema)
 export default ShantiPurchase

@@ -4,7 +4,7 @@ import {
     listUnits, createUnit, updateUnit, deleteUnit,
     listMaterialCategories, createMaterialCategory, updateMaterialCategory, deleteMaterialCategory,
     listMaterials, createMaterial, updateMaterial, deleteMaterial,
-    getPurchasesOverview, getPurchaseDebts, getPurchaseDetail, createPurchase, updatePurchase, deletePurchase,
+    getPurchasesOverview, getPurchaseDebts, getPurchaseDetail, createPurchase, updatePurchase, deletePurchase, getPurchaseSellers,
 } from "../controllers/shantiPurchasesController.js"
 import {
     listClientCategories, createClientCategory, updateClientCategory, deleteClientCategory,
@@ -32,8 +32,9 @@ shantiRouter.put('/materials/:id', updateMaterial)
 shantiRouter.delete('/materials/:id', deleteMaterial)
 
 // must be registered before the generic '/purchases/:id' below - Express matches routes in
-// registration order, and :id would otherwise greedily match the literal "debts" segment
+// registration order, and :id would otherwise greedily match the literal "debts"/"sellers" segment
 shantiRouter.get('/purchases/debts', getPurchaseDebts)
+shantiRouter.get('/purchases/sellers', getPurchaseSellers)
 shantiRouter.get('/purchases', getPurchasesOverview)
 shantiRouter.get('/purchases/:id', getPurchaseDetail)
 shantiRouter.post('/purchases', createPurchase)

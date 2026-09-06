@@ -15,6 +15,7 @@ const ShantiContextProvider = (props) => {
     const [clientCategories, setClientCategories] = useState([])
     const [clients, setClients] = useState([])
     const [products, setProducts] = useState([])
+    const [sellers, setSellers] = useState([])
 
     const authHeader = { headers: { Authorization: `Bearer ${token}` } }
 
@@ -116,12 +117,16 @@ const ShantiContextProvider = (props) => {
         try { const { data } = await axios.get(backendUrl + '/api/shanti/purchases/debts', { ...authHeader, params: filters }); return data }
         catch (error) { toast.error(error.response?.data?.error || 'Не удалось загрузить долги'); return false }
     }
+    const getSellers = async () => {
+        try { const { data } = await axios.get(backendUrl + '/api/shanti/purchases/sellers', authHeader); setSellers(data.sellers) }
+        catch (error) { toast.error(error.response?.data?.error || 'Не удалось загрузить продавцов') }
+    }
     const createPurchase = async (payload) => {
-        try { await axios.post(backendUrl + '/api/shanti/purchases', payload, authHeader); toast.success('Покупка добавлена'); getMaterials(); return true }
+        try { await axios.post(backendUrl + '/api/shanti/purchases', payload, authHeader); toast.success('Покупка добавлена'); getMaterials(); getSellers(); return true }
         catch (error) { toast.error(error.response?.data?.error || 'Не удалось добавить покупку'); return false }
     }
     const updatePurchase = async (id, payload) => {
-        try { await axios.put(backendUrl + '/api/shanti/purchases/' + id, payload, authHeader); getMaterials(); return true }
+        try { await axios.put(backendUrl + '/api/shanti/purchases/' + id, payload, authHeader); getMaterials(); getSellers(); return true }
         catch (error) { toast.error(error.response?.data?.error || 'Не удалось изменить'); return false }
     }
     const deletePurchase = async (id) => {
@@ -207,7 +212,7 @@ const ShantiContextProvider = (props) => {
 
     useEffect(() => {
         if (token) {
-            Promise.all([getUnits(), getMaterialCategories(), getMaterials(), getClientCategories(), getClients(), getProducts()])
+            Promise.all([getUnits(), getMaterialCategories(), getMaterials(), getSellers(), getClientCategories(), getClients(), getProducts()])
                 .finally(() => setInitialLoading(false))
         } else {
             setInitialLoading(false)
@@ -219,6 +224,7 @@ const ShantiContextProvider = (props) => {
         units, getUnits, createUnit, updateUnit, deleteUnit,
         materialCategories, getMaterialCategories, createMaterialCategory, updateMaterialCategory, deleteMaterialCategory,
         materials, getMaterials, createMaterial, updateMaterial, deleteMaterial,
+        sellers, getSellers,
         getPurchasesOverview, getPurchaseDebts, createPurchase, updatePurchase, deletePurchase,
         clientCategories, getClientCategories, createClientCategory, updateClientCategory, deleteClientCategory,
         clients, getClients, createClient, updateClient, deleteClient,

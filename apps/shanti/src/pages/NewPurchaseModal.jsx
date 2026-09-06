@@ -9,10 +9,10 @@ import { todayISO } from '../lib/date.js'
 
 const METHODS = [['cash', 'Наличные'], ['card', 'Карта'], ['bank_transfer', 'Перечисление']]
 
-const emptyForm = () => ({ materialId: '', quantity: '', date: todayISO(), amount: '', paidAmount: '', method: 'cash', comment: '' })
+const emptyForm = () => ({ materialId: '', quantity: '', date: todayISO(), amount: '', paidAmount: '', method: 'cash', seller: '', comment: '' })
 
 const NewPurchaseModal = ({ onClose, onCreated }) => {
-  const { materials, createPurchase } = useContext(ShantiContext)
+  const { materials, sellers, createPurchase } = useContext(ShantiContext)
   const [form, setForm] = useState(emptyForm())
   const [submitting, setSubmitting] = useState(false)
 
@@ -23,7 +23,7 @@ const NewPurchaseModal = ({ onClose, onCreated }) => {
     const ok = await createPurchase({
       materialId: form.materialId, quantity: Number(form.quantity), date: form.date, amount: Number(form.amount),
       paidAmount: form.paidAmount === '' ? Number(form.amount) : Number(form.paidAmount),
-      method: form.method, comment: form.comment,
+      method: form.method, seller: form.seller, comment: form.comment,
     })
     setSubmitting(false)
     if (ok) { onCreated(); onClose() }
@@ -56,6 +56,14 @@ const NewPurchaseModal = ({ onClose, onCreated }) => {
         <div>
           <p className='text-xs text-muted mb-1'>Оплачено (по умолчанию — вся сумма)</p>
           <NumberInput placeholder={form.amount || '0'} value={form.paidAmount} onChange={v => setForm({ ...form, paidAmount: v })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+        </div>
+        <div>
+          <p className='text-xs text-muted mb-1'>Продавец</p>
+          <input list='shanti-sellers' value={form.seller} onChange={e => setForm({ ...form, seller: e.target.value })}
+            placeholder='Например: ООО Строймир' className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+          <datalist id='shanti-sellers'>
+            {sellers.map(s => <option key={s} value={s} />)}
+          </datalist>
         </div>
         <div>
           <p className='text-xs text-muted mb-2'>Способ оплаты</p>
