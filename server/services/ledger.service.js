@@ -71,6 +71,25 @@ const applyEntry = async (account, direction, amount, session) => {
     return account.balance
 }
 
+// balanceAfter is a per-row SNAPSHOT (see LedgerEntry.js), only ever correct if every entry on an
+// account was stamped in true date order. Inserting a BACKDATED entry (a 2024-01-01 reconciliation
+// posted today, say) breaks that - it's appended after entries that already carry a stamp computed
+// without it, leaving every one of THEIR stamps wrong even though the account's own running
+// `balance` is still correct. Re-derived from scratch (not "is this entry backdated relative to the
+// latest one") because a chain of several out-of-order inserts can each individually look fine while
+// still leaving earlier-created rows stale - only a full date-order replay is reliably correct.
+const restampAccount = async (accountId, session) => {
+    const remaining = await LedgerEntry.find({ accountId }).sort({ date: 1, _id: 1 }).session(session)
+    let running = 0
+    for (const entry of remaining) {
+        running += entry.direction === 'increase' ? entry.amount : -entry.amount
+        if (entry.balanceAfter !== running) {
+            entry.balanceAfter = running
+            await entry.save({ session })
+        }
+    }
+}
+
 // the common two-leg case - money (or debt) moving from one account to another in the same event.
 // e.g. a payment: decrease the student's balance, increase the branch's, both legs sharing one
 // transactionId so the UI can always show "this payment is the other half of that revenue entry".
@@ -97,6 +116,12 @@ export const postTransfer = async ({
                 { transactionId, accountId: fromAccountId, direction: fromDirection, amount, balanceAfter: fromBalanceAfter, kind, method, description, createdBy, date, ...meta },
                 { transactionId, accountId: toAccountId, direction: toDirection, amount, balanceAfter: toBalanceAfter, kind, method, description, createdBy, date, ...meta },
             ], { session, ordered: true })
+            // a backdated post (a historical correction dated earlier than entries that already
+            // exist) needs every affected account's stamps redone in true date order - see
+            // restampAccount. Cheap no-op for the overwhelmingly common case (a same-day entry
+            // appended after everything else already on the account).
+            await restampAccount(fromAccountId, session)
+            if (String(toAccountId) !== String(fromAccountId)) await restampAccount(toAccountId, session)
         })
     } finally {
         await session.endSession()
@@ -122,6 +147,7 @@ export const postEntry = async ({
             ;[entry] = await LedgerEntry.create([
                 { transactionId, accountId, direction, amount, balanceAfter, kind, method, description, createdBy, date, ...meta },
             ], { session, ordered: true })
+            await restampAccount(accountId, session)
         })
     } finally {
         await session.endSession()
@@ -152,23 +178,10 @@ export const deleteEntries = async (filter) => {
             }
             await LedgerEntry.deleteMany({ transactionId: { $in: transactionIds } }).session(session)
 
-            // balanceAfter is a per-row SNAPSHOT (see LedgerEntry.js) - deleting an entry from the
-            // middle of an account's history leaves every LATER entry's snapshot stale (it no longer
-            // equals "sum of everything up to and including this row"), even though the account's
-            // final balance itself is already correct from the reversal above. Every remaining entry
-            // on each affected account is replayed in date order and re-stamped so balanceAfter stays
-            // trustworthy everywhere, not just at the current moment.
-            for (const accountId of affectedAccountIds) {
-                const remaining = await LedgerEntry.find({ accountId }).sort({ date: 1, _id: 1 }).session(session)
-                let running = 0
-                for (const entry of remaining) {
-                    running += entry.direction === 'increase' ? entry.amount : -entry.amount
-                    if (entry.balanceAfter !== running) {
-                        entry.balanceAfter = running
-                        await entry.save({ session })
-                    }
-                }
-            }
+            // deleting an entry from the middle of an account's history leaves every LATER entry's
+            // snapshot stale, even though the account's final `balance` itself is already correct
+            // from the reversal above - see restampAccount.
+            for (const accountId of affectedAccountIds) await restampAccount(accountId, session)
         })
     } finally {
         await session.endSession()
