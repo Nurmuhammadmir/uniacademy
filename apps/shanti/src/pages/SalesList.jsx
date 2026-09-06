@@ -4,6 +4,7 @@ import { ShantiContext } from '../context/ShantiContext.jsx'
 import Select from '../components/Select.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import NumberInput from '../components/NumberInput.jsx'
+import { confirm } from '../lib/confirm.js'
 import { formatMoney } from '../lib/format.js'
 import { firstOfMonthISO, todayISO, formatDateTime } from '../lib/date.js'
 import NewSaleModal from './NewSaleModal.jsx'
@@ -18,6 +19,7 @@ const SalesList = () => {
   const [data, setData] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showNew, setShowNew] = useState(false)
+  const [editingSale, setEditingSale] = useState(null)
   const [editingComment, setEditingComment] = useState(null)
   const [commentDraft, setCommentDraft] = useState('')
 
@@ -31,7 +33,10 @@ const SalesList = () => {
     if (ok) { setEditingComment(null); load() }
   }
 
-  const handleDelete = async (id) => { if (await deleteSale(id)) load() }
+  const handleDelete = async (id) => {
+    if (!(await confirm('Удалить эту продажу?'))) return
+    if (await deleteSale(id)) load()
+  }
 
   return (
     <div>
@@ -132,6 +137,7 @@ const SalesList = () => {
                     )}
                   </td>
                   <td className='px-4 py-3 text-right whitespace-nowrap'>
+                    <button onClick={() => setEditingSale(s)} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-xs font-medium mr-2'>Изменить</button>
                     <button onClick={() => handleDelete(s._id)} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>Удалить</button>
                   </td>
                 </tr>
@@ -162,13 +168,17 @@ const SalesList = () => {
                 <p className='text-base font-bold text-slate-900 flex-shrink-0 ml-3'>{formatMoney(s.amount)}</p>
               </div>
               {debt > 0 && <p className='text-xs text-amber-600 font-semibold mt-2'>Долг: {formatMoney(debt)}</p>}
-              <button onClick={() => handleDelete(s._id)} className='mt-2 text-xs text-muted'>Удалить</button>
+              <div className='flex gap-3 mt-2'>
+                <button onClick={() => setEditingSale(s)} className='text-xs text-accent font-medium'>Изменить</button>
+                <button onClick={() => handleDelete(s._id)} className='text-xs text-muted'>Удалить</button>
+              </div>
             </div>
           )
         })}
       </div>
 
       {showNew && <NewSaleModal onClose={() => setShowNew(false)} onCreated={load} />}
+      {editingSale && <NewSaleModal sale={editingSale} onClose={() => setEditingSale(null)} onCreated={load} />}
     </div>
   )
 }

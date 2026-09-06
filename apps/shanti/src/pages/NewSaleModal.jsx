@@ -6,22 +6,29 @@ import Select from '../components/Select.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import NumberInput from '../components/NumberInput.jsx'
+import { confirm } from '../lib/confirm.js'
 import { formatMoney } from '../lib/format.js'
 import { todayISO } from '../lib/date.js'
 
 const METHODS = [['cash', 'Наличные'], ['card', 'Карта'], ['bank_transfer', 'Перечисление']]
 const emptyLine = () => ({ productId: '', quantity: '', price: '' })
+const lineFromItem = (item) => ({ productId: item.productId?._id || item.productId, quantity: String(item.quantity), price: String(item.price) })
 
-const NewSaleModal = ({ onClose, onCreated }) => {
-  const { products, clients, createSale } = useContext(ShantiContext)
-  const [clientId, setClientId] = useState('')
-  const [date, setDate] = useState(todayISO())
-  const [items, setItems] = useState([emptyLine()])
-  const [amount, setAmount] = useState('')
-  const [amountTouched, setAmountTouched] = useState(false)
-  const [paidAmount, setPaidAmount] = useState('')
-  const [method, setMethod] = useState('cash')
-  const [comment, setComment] = useState('')
+// `sale` present means edit mode (pre-filled, PUT + confirmation) instead of create
+const NewSaleModal = ({ sale, onClose, onCreated }) => {
+  const { products, clients, createSale, updateSale } = useContext(ShantiContext)
+  const isEditing = !!sale
+  const [clientId, setClientId] = useState(sale?.clientId?._id || sale?.clientId || '')
+  const [date, setDate] = useState(sale ? sale.date.slice(0, 10) : todayISO())
+  const [items, setItems] = useState(sale ? sale.items.map(lineFromItem) : [emptyLine()])
+  const [amount, setAmount] = useState(sale ? String(sale.amount) : '')
+  // editing starts "touched" - the loaded amount is the sale's own recorded total, which may
+  // already differ from a fresh sum of its items (it was overridable at creation too), so it must
+  // not get silently recomputed out from under an admin who hasn't changed anything yet
+  const [amountTouched, setAmountTouched] = useState(isEditing)
+  const [paidAmount, setPaidAmount] = useState(sale ? String(sale.paidAmount) : '')
+  const [method, setMethod] = useState(sale?.method || 'cash')
+  const [comment, setComment] = useState(sale?.comment || '')
   const [submitting, setSubmitting] = useState(false)
 
   const computedTotal = items.reduce((sum, i) => sum + (Number(i.quantity) || 0) * (Number(i.price) || 0), 0)
@@ -46,18 +53,20 @@ const NewSaleModal = ({ onClose, onCreated }) => {
     if (!clientId) return
     const validItems = items.filter(i => i.productId && Number(i.quantity) > 0)
     if (validItems.length === 0) return
+    if (isEditing && !(await confirm('Изменить эту продажу?'))) return
     setSubmitting(true)
     const finalAmount = amount === '' ? computedTotal : Number(amount)
-    const ok = await createSale({
+    const payload = {
       clientId, date, items: validItems.map(i => ({ productId: i.productId, quantity: Number(i.quantity), price: Number(i.price) || 0 })),
       amount: finalAmount, paidAmount: paidAmount === '' ? finalAmount : Number(paidAmount), method, comment,
-    })
+    }
+    const ok = isEditing ? await updateSale(sale._id, payload) : await createSale(payload)
     setSubmitting(false)
     if (ok) { onCreated(); onClose() }
   }
 
   return (
-    <Modal title='Новая продажа' wide onClose={onClose}>
+    <Modal title={isEditing ? 'Изменить продажу' : 'Новая продажа'} wide onClose={onClose}>
       <form onSubmit={submit} className='flex flex-col gap-3'>
         <div className='grid grid-cols-2 gap-3'>
           <div>
@@ -120,7 +129,7 @@ const NewSaleModal = ({ onClose, onCreated }) => {
         </div>
 
         <button type='submit' disabled={submitting} className='py-2.5 rounded-xl bg-accent text-white text-sm font-medium mt-2 transition-colors disabled:opacity-50 flex items-center justify-center gap-2'>
-          {submitting && <Spinner size={14} />} Добавить продажу
+          {submitting && <Spinner size={14} />} {isEditing ? 'Сохранить' : 'Добавить продажу'}
         </button>
       </form>
     </Modal>

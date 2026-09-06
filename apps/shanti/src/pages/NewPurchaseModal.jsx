@@ -5,26 +5,39 @@ import Select from '../components/Select.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import NumberInput from '../components/NumberInput.jsx'
+import { confirm } from '../lib/confirm.js'
 import { todayISO } from '../lib/date.js'
 
 const METHODS = [['cash', 'Наличные'], ['card', 'Карта'], ['bank_transfer', 'Перечисление']]
 
 const emptyForm = () => ({ materialId: '', quantity: '', date: todayISO(), amount: '', paidAmount: '', method: 'cash', sellerId: '', comment: '' })
 
-const NewPurchaseModal = ({ onClose, onCreated }) => {
-  const { materials, sellers, createPurchase } = useContext(ShantiContext)
-  const [form, setForm] = useState(emptyForm())
+// purchase from a table row, formatted back into the same shape the form fields expect
+const formFromPurchase = (purchase) => ({
+  materialId: purchase.materialId?._id || purchase.materialId || '',
+  quantity: String(purchase.quantity), date: purchase.date.slice(0, 10), amount: String(purchase.amount),
+  paidAmount: String(purchase.paidAmount), method: purchase.method,
+  sellerId: purchase.sellerId?._id || purchase.sellerId || '', comment: purchase.comment || '',
+})
+
+// `purchase` present means edit mode (pre-filled, PUT + confirmation) instead of create
+const NewPurchaseModal = ({ purchase, onClose, onCreated }) => {
+  const { materials, sellers, createPurchase, updatePurchase } = useContext(ShantiContext)
+  const [form, setForm] = useState(() => purchase ? formFromPurchase(purchase) : emptyForm())
   const [submitting, setSubmitting] = useState(false)
+  const isEditing = !!purchase
 
   const submit = async (e) => {
     e.preventDefault()
     if (!form.materialId || !(Number(form.quantity) > 0) || !(Number(form.amount) > 0)) return
+    if (isEditing && !(await confirm('Изменить эту покупку?'))) return
     setSubmitting(true)
-    const ok = await createPurchase({
+    const payload = {
       materialId: form.materialId, quantity: Number(form.quantity), date: form.date, amount: Number(form.amount),
       paidAmount: form.paidAmount === '' ? Number(form.amount) : Number(form.paidAmount),
       method: form.method, sellerId: form.sellerId || undefined, comment: form.comment,
-    })
+    }
+    const ok = isEditing ? await updatePurchase(purchase._id, payload) : await createPurchase(payload)
     setSubmitting(false)
     if (ok) { onCreated(); onClose() }
   }
@@ -32,7 +45,7 @@ const NewPurchaseModal = ({ onClose, onCreated }) => {
   const material = materials.find(m => m._id === form.materialId)
 
   return (
-    <Modal title='Новая покупка' onClose={onClose}>
+    <Modal title={isEditing ? 'Изменить покупку' : 'Новая покупка'} onClose={onClose}>
       <form onSubmit={submit} className='flex flex-col gap-3'>
         <div>
           <p className='text-xs text-muted mb-1'>Материал</p>
@@ -78,7 +91,7 @@ const NewPurchaseModal = ({ onClose, onCreated }) => {
           <textarea value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' rows={2} />
         </div>
         <button type='submit' disabled={submitting} className='py-2.5 rounded-xl bg-accent text-white text-sm font-medium mt-2 transition-colors disabled:opacity-50 flex items-center justify-center gap-2'>
-          {submitting && <Spinner size={14} />} Добавить
+          {submitting && <Spinner size={14} />} {isEditing ? 'Сохранить' : 'Добавить'}
         </button>
       </form>
     </Modal>
