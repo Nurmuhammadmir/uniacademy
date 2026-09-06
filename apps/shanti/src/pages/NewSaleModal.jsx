@@ -5,6 +5,7 @@ import Modal from '../components/Modal.jsx'
 import Select from '../components/Select.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import Spinner from '../components/Spinner.jsx'
+import NumberInput from '../components/NumberInput.jsx'
 import { formatMoney } from '../lib/format.js'
 import { todayISO } from '../lib/date.js'
 
@@ -76,8 +77,8 @@ const NewSaleModal = ({ onClose, onCreated }) => {
             <div key={idx} className='flex gap-2 items-center'>
               <Select forceSearch className='flex-1' value={line.productId} onChange={(v) => setLine(idx, { productId: v })} placeholder='Товар'
                 options={products.map(p => ({ value: p._id, label: `${p.name} · ${p.unit} · остаток ${p.stock}` }))} />
-              <input type='number' step='any' placeholder='Кол-во' value={line.quantity} onChange={e => setLine(idx, { quantity: e.target.value })} className='w-24 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
-              <input type='number' placeholder='Цена' value={line.price} onChange={e => setLine(idx, { price: e.target.value })} className='w-28 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+              <NumberInput placeholder='Кол-во' value={line.quantity} onChange={v => setLine(idx, { quantity: v })} className='w-24 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+              <NumberInput placeholder='Цена' value={line.price} onChange={v => setLine(idx, { price: v })} className='w-28 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
               {items.length > 1 && (
                 <button type='button' onClick={() => removeLine(idx)} className='plain w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-50 flex-shrink-0'>
                   <X size={15} strokeWidth={1.5} />
@@ -93,11 +94,11 @@ const NewSaleModal = ({ onClose, onCreated }) => {
         <div className='grid grid-cols-2 gap-3 mt-1'>
           <div>
             <p className='text-xs text-muted mb-1'>Итоговая сумма (по умолчанию — {formatMoney(computedTotal)}, можно изменить)</p>
-            <input type='number' value={amount} onChange={e => { setAmount(e.target.value); setAmountTouched(true) }} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+            <NumberInput value={amount} onChange={v => { setAmount(v); setAmountTouched(true) }} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
           </div>
           <div>
             <p className='text-xs text-muted mb-1'>Оплачено (по умолчанию — вся сумма)</p>
-            <input type='number' placeholder={amount || '0'} value={paidAmount} onChange={e => setPaidAmount(e.target.value)} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+            <NumberInput placeholder={amount || '0'} value={paidAmount} onChange={v => setPaidAmount(v)} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
           </div>
         </div>
 

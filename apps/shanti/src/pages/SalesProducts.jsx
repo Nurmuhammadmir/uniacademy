@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
 import Modal from '../components/Modal.jsx'
 import Select from '../components/Select.jsx'
+import NumberInput from '../components/NumberInput.jsx'
 import { formatMoney } from '../lib/format.js'
 
 const SalesProducts = () => {
@@ -51,8 +52,8 @@ const SalesProducts = () => {
                       <input value={editingProduct.name} onChange={e => setEditingProduct({ ...editingProduct, name: e.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm flex-1' required />
                       <Select className='w-32' value={editingProduct.unit} onChange={(v) => setEditingProduct({ ...editingProduct, unit: v })}
                         options={units.map(u => ({ value: u.name, label: u.name }))} />
-                      <input type='number' value={editingProduct.price} onChange={e => setEditingProduct({ ...editingProduct, price: e.target.value })} className='w-28 px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm' placeholder='Цена' />
-                      <input type='number' value={editingProduct.stock} onChange={e => setEditingProduct({ ...editingProduct, stock: e.target.value })} className='w-28 px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm' placeholder='Остаток' />
+                      <NumberInput value={editingProduct.price} onChange={v => setEditingProduct({ ...editingProduct, price: v })} className='w-28 px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm' placeholder='Цена' />
+                      <NumberInput value={editingProduct.stock} onChange={v => setEditingProduct({ ...editingProduct, stock: v })} className='w-28 px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm' placeholder='Остаток' />
                       <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>Сохранить</button>
                       <button type='button' onClick={() => setEditingProduct(null)} className='px-4 py-2 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>Отмена</button>
                     </form>
@@ -92,11 +93,11 @@ const SalesProducts = () => {
             </div>
             <div>
               <p className='text-xs text-muted mb-1'>Цена продажи (по умолчанию для новой продажи)</p>
-              <input type='number' value={newProduct.price} onChange={e => setNewProduct({ ...newProduct, price: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+              <NumberInput value={newProduct.price} onChange={v => setNewProduct({ ...newProduct, price: v })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
             </div>
             <div>
               <p className='text-xs text-muted mb-1'>Начальный остаток на складе</p>
-              <input type='number' value={newProduct.stock} onChange={e => setNewProduct({ ...newProduct, stock: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+              <NumberInput value={newProduct.stock} onChange={v => setNewProduct({ ...newProduct, stock: v })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
             </div>
             <button type='submit' className='py-2.5 rounded-xl bg-accent text-white text-sm font-medium mt-2'>Добавить</button>
           </form>

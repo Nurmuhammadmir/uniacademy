@@ -4,6 +4,7 @@ import Modal from '../components/Modal.jsx'
 import Select from '../components/Select.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import Spinner from '../components/Spinner.jsx'
+import NumberInput from '../components/NumberInput.jsx'
 import { todayISO } from '../lib/date.js'
 
 const METHODS = [['cash', 'Наличные'], ['card', 'Карта'], ['bank_transfer', 'Перечисление']]
@@ -41,7 +42,7 @@ const NewPurchaseModal = ({ onClose, onCreated }) => {
         <div className='grid grid-cols-2 gap-3'>
           <div>
             <p className='text-xs text-muted mb-1'>Количество {material ? `(${material.unit})` : ''}</p>
-            <input type='number' step='any' value={form.quantity} onChange={e => setForm({ ...form, quantity: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+            <NumberInput value={form.quantity} onChange={v => setForm({ ...form, quantity: v })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
           </div>
           <div>
             <p className='text-xs text-muted mb-1'>Дата</p>
@@ -50,11 +51,11 @@ const NewPurchaseModal = ({ onClose, onCreated }) => {
         </div>
         <div>
           <p className='text-xs text-muted mb-1'>Цена (сколько заплатили за покупку)</p>
-          <input type='number' value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+          <NumberInput value={form.amount} onChange={v => setForm({ ...form, amount: v })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
         </div>
         <div>
           <p className='text-xs text-muted mb-1'>Оплачено (по умолчанию — вся сумма)</p>
-          <input type='number' placeholder={form.amount || '0'} value={form.paidAmount} onChange={e => setForm({ ...form, paidAmount: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+          <NumberInput placeholder={form.amount || '0'} value={form.paidAmount} onChange={v => setForm({ ...form, paidAmount: v })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
         </div>
         <div>
           <p className='text-xs text-muted mb-2'>Способ оплаты</p>

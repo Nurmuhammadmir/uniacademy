@@ -3,11 +3,12 @@ import { Plus, SlidersHorizontal } from 'lucide-react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
 import Select from '../components/Select.jsx'
 import DatePicker from '../components/DatePicker.jsx'
+import NumberInput from '../components/NumberInput.jsx'
 import { formatMoney } from '../lib/format.js'
 import { firstOfMonthISO, todayISO, formatDateTime } from '../lib/date.js'
 import NewPurchaseModal from './NewPurchaseModal.jsx'
 
-const METHOD_LABEL = { cash: 'Наличные', card: 'Карта', click: 'Click', bank_transfer: 'Перевод', payme: 'Payme', apelsin: 'Apelsin' }
+const METHOD_LABEL = { cash: 'Наличные', card: 'Карта', click: 'Click', bank_transfer: 'Перечисление', payme: 'Payme', apelsin: 'Apelsin' }
 const DEFAULT_FILTERS = { dateFrom: firstOfMonthISO(), dateTo: todayISO(), category: '', materialId: '', amountMin: '', amountMax: '' }
 
 const PurchasesList = () => {
@@ -75,9 +76,9 @@ const PurchasesList = () => {
           <div>
             <p className='text-xs text-muted mb-1'>Сумма</p>
             <div className='flex items-center gap-1.5'>
-              <input type='number' placeholder='От' value={filters.amountMin} onChange={e => setFilters({ ...filters, amountMin: e.target.value })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
+              <NumberInput placeholder='От' value={filters.amountMin} onChange={v => setFilters({ ...filters, amountMin: v })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
               <span className='text-muted text-xs'>—</span>
-              <input type='number' placeholder='До' value={filters.amountMax} onChange={e => setFilters({ ...filters, amountMax: e.target.value })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
+              <NumberInput placeholder='До' value={filters.amountMax} onChange={v => setFilters({ ...filters, amountMax: v })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
             </div>
           </div>
           <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium transition-colors'>Применить</button>
