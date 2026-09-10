@@ -118,9 +118,13 @@ const TeachersList = () => {
                   <td className='px-5 py-4 text-muted font-mono'>{t2.phone}</td>
                   <td className='px-5 py-4'>
                     {t2.checkedInToday ? (
-                      <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${t2.late ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200 animate-pulse dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'}`}>
-                        {t('checkedIn')} · {new Date(t2.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{t2.late ? ` · ${t('lateBadge')}` : ''}
-                      </span>
+                      <div className='flex flex-wrap gap-1.5'>
+                        {t2.checkIns.map((scannedAt, i) => (
+                          <span key={i} className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${i === 0 && t2.late ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'} ${i === t2.checkIns.length - 1 ? 'animate-pulse' : ''}`}>
+                            {new Date(scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{i === 0 && t2.late ? ` · ${t('lateBadge')}` : ''}
+                          </span>
+                        ))}
+                      </div>
                     ) : (
                       <span className='text-xs font-medium px-3 py-1 rounded-full bg-slate-50 text-slate-400 border border-slate-200/60 dark:bg-slate-800/40 dark:text-slate-500 dark:border-slate-800/80'>{t('notCheckedIn')}</span>
                     )}
@@ -151,11 +155,15 @@ const TeachersList = () => {
                   <p className='text-xs text-slate-400 dark:text-slate-600 mt-0.5 font-mono'>{t2.phone}</p>
                 </div>
               </button>
-              <div className='flex items-center justify-between mt-2.5'>
+              <div className='flex items-center justify-between mt-2.5 gap-2'>
                 {t2.checkedInToday ? (
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${t2.late ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'}`}>
-                    {t('checkedIn')} · {new Date(t2.checkedInAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{t2.late ? ` · ${t('lateBadge')}` : ''}
-                  </span>
+                  <div className='flex flex-wrap gap-1.5 min-w-0'>
+                    {t2.checkIns.map((scannedAt, i) => (
+                      <span key={i} className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${i === 0 && t2.late ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20'}`}>
+                        {new Date(scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{i === 0 && t2.late ? ` · ${t('lateBadge')}` : ''}
+                      </span>
+                    ))}
+                  </div>
                 ) : (
                   <span className='text-xs font-medium px-3 py-1 rounded-full bg-slate-50 text-slate-400 border border-slate-200/60 dark:bg-slate-800/40 dark:text-slate-500 dark:border-slate-800/80'>{t('notCheckedIn')}</span>
                 )}

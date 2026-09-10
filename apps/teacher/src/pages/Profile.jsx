@@ -51,7 +51,12 @@ const Profile = () => {
                 {me.todayAttendance.late ? '⚠️ Checked in late today' : '✓ Checked in on time today'}
               </p>
               <p className='text-muted text-xs mt-1'>
-                {new Date(me.todayAttendance.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {me.todayAttendance.checkIns.map((c, i) => (
+                  <span key={i}>
+                    {i > 0 && ', '}
+                    {new Date(c.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{c.branchName ? ` (${c.branchName})` : ''}
+                  </span>
+                ))}
                 {me.todayAttendance.firstLessonTime && ` · first lesson at ${me.todayAttendance.firstLessonTime}`}
               </p>
             </div>

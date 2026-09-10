@@ -556,9 +556,18 @@ export const getAttendanceOverview = async (req, res) => {
         const startOfDay = new Date(requestedDate); startOfDay.setUTCHours(0, 0, 0, 0)
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
-        const teachers = await User.find({ role: 'teacher', ...teacherBranchMembershipFilter(req) }).select('name branchId').populate('branchId', 'name').lean()
-        const teacherCheckIns = await TeacherAttendance.find({ date: { $gte: startOfDay, $lt: endOfDay } }).lean()
-        const checkInByTeacher = Object.fromEntries(teacherCheckIns.map(t => [String(t.teacherId), t.scannedAt]))
+        const teachers = await User.find({ role: 'teacher', ...teacherBranchMembershipFilter(req) })
+            .select('name branchId additionalBranchIds').populate('branchId', 'name').populate('additionalBranchIds', 'name').lean()
+        // a check-in only ever counts for the branch whose QR was actually scanned (its own
+        // branchId), never the teacher's home branch - a multi-branch teacher can show up correctly
+        // under more than one branch card below, each reflecting only that branch's real check-ins
+        const teacherCheckIns = await TeacherAttendance.find({ date: { $gte: startOfDay, $lt: endOfDay } }).sort({ scannedAt: 1 }).lean()
+        const checkInsByTeacherBranch = {}
+        for (const c of teacherCheckIns) {
+            const key = `${c.teacherId}_${c.branchId}`
+            if (!checkInsByTeacherBranch[key]) checkInsByTeacherBranch[key] = []
+            checkInsByTeacherBranch[key].push(c.scannedAt)
+        }
         const allGroups = await Group.find({ teacherId: { $in: teachers.map(t => t._id) } }).lean()
 
         // a sub_director's teacher list is already branch-scoped above, but a teacher can also
@@ -566,19 +575,31 @@ export const getAttendanceOverview = async (req, res) => {
         // aggregates below to this branch's own groups specifically, not just "this branch's teachers'" groups
         const branchGroupIds = isSubDirector(req) ? (await Group.find({ branchId: req.auth.branchId }).select('_id').lean()).map(g => g._id) : null
 
-        const teacherRows = teachers.map(t => {
-            const scannedAt = checkInByTeacher[String(t._id)] || null
-            const firstLessonTime = earliestLessonTimeOnDate(allGroups.filter(g => String(g.teacherId) === String(t._id)), startOfDay)
-            return {
-                teacherId: t._id,
-                name: t.name,
-                branchId: t.branchId?._id,
-                branchName: t.branchId?.name,
-                checkedIn: !!scannedAt,
-                scannedAt,
-                firstLessonTime, late: isLateCheckIn(scannedAt, firstLessonTime),
+        // one row per (teacher, branch they actually belong to) - a sub_director only ever sees
+        // their own single branch per teacher, a full director sees every branch a teacher belongs
+        // to (home + additional), each with its own independent check-in status
+        const teacherRows = []
+        for (const t of teachers) {
+            const relevantBranches = isSubDirector(req)
+                ? [{ _id: req.auth.branchId, name: t.branchId?.name }]
+                : [t.branchId, ...(t.additionalBranchIds || [])].filter(Boolean)
+            for (const branch of relevantBranches) {
+                const todaysCheckIns = checkInsByTeacherBranch[`${t._id}_${branch._id}`] || []
+                const firstLessonTime = earliestLessonTimeOnDate(
+                    allGroups.filter(g => String(g.teacherId) === String(t._id) && String(g.branchId) === String(branch._id)), startOfDay,
+                )
+                teacherRows.push({
+                    teacherId: t._id,
+                    name: t.name,
+                    branchId: branch._id,
+                    branchName: branch.name,
+                    checkedIn: todaysCheckIns.length > 0,
+                    scannedAt: todaysCheckIns[0] || null,
+                    checkIns: todaysCheckIns,
+                    firstLessonTime, late: isLateCheckIn(todaysCheckIns[0] || null, firstLessonTime),
+                })
             }
-        })
+        }
 
         const studentAttendanceByBranch = await Attendance.aggregate([
             { $match: { scannedAt: { $gte: startOfDay, $lt: endOfDay }, ...(branchGroupIds ? { groupId: { $in: branchGroupIds } } : {}) } },

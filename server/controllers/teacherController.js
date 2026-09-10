@@ -347,7 +347,10 @@ export const getMe = async (req, res) => {
         // today - same judgment admin/director see, just from the teacher's own side
         const startOfDay = new Date(); startOfDay.setUTCHours(0, 0, 0, 0)
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
-        const todayCheckIn = await TeacherAttendance.findOne({ teacherId: teacher._id, date: { $gte: startOfDay, $lt: endOfDay } }).lean()
+        // a multi-branch teacher's own view shows every check-in they made today, at any branch -
+        // sorted so the first one is what "on time" is judged against, same as everyone else sees
+        const todayCheckIns = await TeacherAttendance.find({ teacherId: teacher._id, date: { $gte: startOfDay, $lt: endOfDay } })
+            .sort({ scannedAt: 1 }).populate('branchId', 'name').lean()
         const firstLessonTime = earliestLessonTimeOnDate(activeGroups, startOfDay)
 
         res.json({
@@ -356,10 +359,11 @@ export const getMe = async (req, res) => {
             activeGroupsCount: activeGroups.length,
             totalStudents: uniqueStudentIds.size,
             todayAttendance: {
-                checkedIn: !!todayCheckIn,
-                scannedAt: todayCheckIn?.scannedAt || null,
+                checkedIn: todayCheckIns.length > 0,
+                scannedAt: todayCheckIns[0]?.scannedAt || null,
+                checkIns: todayCheckIns.map(c => ({ scannedAt: c.scannedAt, branchName: c.branchId?.name })),
                 firstLessonTime,
-                late: isLateCheckIn(todayCheckIn?.scannedAt || null, firstLessonTime),
+                late: isLateCheckIn(todayCheckIns[0]?.scannedAt || null, firstLessonTime),
             },
         })
     } catch (error) {
@@ -368,8 +372,14 @@ export const getMe = async (req, res) => {
     }
 }
 
-// api for a teacher to check THEMSELVES in for today by scanning the QR their admin generated -
-// the token must belong to THIS teacher (not just any valid session) and not be expired
+// api for a teacher to check THEMSELVES in for today by scanning the QR their admin generated.
+// The QR's own branchId (never the client) decides which branch this check-in counts for, so a
+// teacher working several branches gets independent statuses at each. A teacher may scan several
+// times in one day (leaves after a morning lesson, comes back hours later for an evening one) -
+// each real scan gets its own row; only a scan within CHECKIN_DEDUPE_MS of their last one at this
+// same branch is treated as an accidental double-tap/retry rather than a genuine second arrival.
+const CHECKIN_DEDUPE_MS = 60 * 1000
+
 export const scanOwnAttendance = async (req, res) => {
     try {
         const { token } = req.body
@@ -378,20 +388,17 @@ export const scanOwnAttendance = async (req, res) => {
             return res.status(400).json({ error: qr ? 'qr_expired' : 'invalid_qr' })
         }
 
+        const now = new Date()
+        const lastCheckIn = await TeacherAttendance.findOne({ teacherId: req.auth.userId, branchId: qr.branchId })
+            .sort({ scannedAt: -1 }).lean()
+        if (lastCheckIn && now - lastCheckIn.scannedAt < CHECKIN_DEDUPE_MS) return res.json({ alreadyMarked: true })
+
         // UTC, not local server time - directorController.getAttendanceOverview parses "today" from
         // a plain YYYY-MM-DD string, which JS always treats as UTC midnight; zeroing locally here
         // would silently disagree with that read-side calculation on any non-UTC server timezone,
         // making a real check-in invisible to the director's attendance overview
         const today = new Date(); today.setUTCHours(0, 0, 0, 0)
-        const existing = await TeacherAttendance.findOne({ teacherId: req.auth.userId, date: today }).lean()
-        if (existing) return res.json({ alreadyMarked: true })
-
-        try {
-            await TeacherAttendance.create({ teacherId: req.auth.userId, date: today })
-        } catch (createError) {
-            if (createError.code === 11000) return res.json({ alreadyMarked: true })
-            throw createError
-        }
+        await TeacherAttendance.create({ teacherId: req.auth.userId, branchId: qr.branchId, date: today, scannedAt: now })
 
         res.status(201).json({ alreadyMarked: false })
     } catch (error) {

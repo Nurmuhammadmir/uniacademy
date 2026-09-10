@@ -1,25 +1,25 @@
 import Group from "../models/Group.js"
 import User from "../models/User.js"
 import Expense from "../models/Expense.js"
-import TeacherAttendance from "../models/TeacherAttendance.js"
 import { getScheduleDays } from "./scheduleDays.service.js"
 import { prorateByDateOverlap } from "./attribution.service.js"
 import { computeCoveredDebtPeriodsBatch } from "./billingCycle.service.js"
 import { SALARY_CATEGORY, PREPAYMENT_CATEGORY } from "./expenseCategories.service.js"
 
-// per_lesson/per_hour pay only counts a day if the teacher's group was actually scheduled to meet
-// AND the teacher actually checked themselves in that day (TeacherAttendance) - ties pay to real
-// presence, not just a theoretical weekly pattern that assumes every scheduled class happened.
-// Returns the actual list of taught calendar dates (not just a count) so the Salary "Details" view
-// can show exactly which lessons were counted, not just a number to take on faith.
-const taughtLessonDates = (group, attendedDates, from, to) => {
+// per_lesson/per_hour pay counts every calendar day in range that the teacher's group was
+// scheduled to meet, on the weekly pattern alone - deliberately NOT gated on TeacherAttendance
+// (the teacher's own QR self-check-in): that's purely an informational "who's at the branch today"
+// view and must never change what anyone gets paid. Returns the actual list of taught calendar
+// dates (not just a count) so the Salary "Details" view can show exactly which lessons were
+// counted, not just a number to take on faith.
+const taughtLessonDates = (group, from, to) => {
     const days = getScheduleDays(group)
     if (days.length === 0) return []
     const dates = []
     const cursor = new Date(Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), from.getUTCDate()))
     const end = new Date(Date.UTC(to.getUTCFullYear(), to.getUTCMonth(), to.getUTCDate()))
     while (cursor <= end) {
-        if (days.includes(cursor.getUTCDay()) && attendedDates.has(cursor.toISOString().slice(0, 10))) dates.push(new Date(cursor))
+        if (days.includes(cursor.getUTCDay())) dates.push(new Date(cursor))
         cursor.setUTCDate(cursor.getUTCDate() + 1)
     }
     return dates
@@ -113,9 +113,7 @@ const computeGroupContribution = async (teacher, group, rate, dateFrom, dateTo) 
         revenueEntries = entries
         total = Math.round(revenue * (rate.rateValue / 100))
     } else if (rate.rateType === 'per_lesson' || rate.rateType === 'per_hour') {
-        const attendanceRows = await TeacherAttendance.find({ teacherId: teacher._id, date: { $gte: dateFrom, $lte: dateTo } }).select('date').lean()
-        const attendedDates = new Set(attendanceRows.map(a => a.date.toISOString().slice(0, 10)))
-        const dates = taughtLessonDates(group, attendedDates, dateFrom, dateTo)
+        const dates = taughtLessonDates(group, dateFrom, dateTo)
         dates.forEach(date => lessonEntries.push({ date, groupId: group._id, language: group.languageId?.name, level: group.levelId?.name }))
         const units = rate.rateType === 'per_hour' ? dates.length * ((group.durationMinutes || 90) / 60) : dates.length
         total = Math.round(rate.rateValue * units)

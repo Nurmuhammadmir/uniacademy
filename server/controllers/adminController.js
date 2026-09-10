@@ -260,24 +260,34 @@ export const listBranchTeachers = async (req, res) => {
 
         const startOfDay = new Date(); startOfDay.setUTCHours(0, 0, 0, 0)
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
+        // branchId: req.auth.branchId - a teacher's check-in at a DIFFERENT branch must never show
+        // up here, even for a teacher who works at both (that's the whole point of stamping the
+        // scanned QR's own branch onto each row instead of just the teacher's id)
         const checkIns = await TeacherAttendance.find({
             teacherId: { $in: teachers.map(t => t._id) },
+            branchId: req.auth.branchId,
             date: { $gte: startOfDay, $lt: endOfDay },
-        }).lean()
-        const checkInByTeacher = Object.fromEntries(checkIns.map(c => [String(c.teacherId), c.scannedAt]))
+        }).sort({ scannedAt: 1 }).lean()
+        const checkInsByTeacher = {}
+        for (const c of checkIns) {
+            const key = String(c.teacherId)
+            if (!checkInsByTeacher[key]) checkInsByTeacher[key] = []
+            checkInsByTeacher[key].push(c.scannedAt)
+        }
 
         // "on time" is judged against each teacher's own EARLIEST group lesson today, so a teacher
         // with no lesson scheduled today is never flagged late
         const allGroups = await Group.find({ teacherId: { $in: teachers.map(t => t._id) } }).lean()
         const teachersWithAttendance = teachers.map(t => {
-            const scannedAt = checkInByTeacher[String(t._id)] || null
+            const todaysCheckIns = checkInsByTeacher[String(t._id)] || []
             const firstLessonTime = earliestLessonTimeOnDate(allGroups.filter(g => String(g.teacherId) === String(t._id)), startOfDay)
             return {
                 ...t.toObject(),
-                checkedInToday: !!scannedAt,
-                checkedInAt: scannedAt,
+                checkedInToday: todaysCheckIns.length > 0,
+                checkedInAt: todaysCheckIns[0] || null,
+                checkIns: todaysCheckIns,
                 firstLessonTime,
-                late: isLateCheckIn(scannedAt, firstLessonTime),
+                late: isLateCheckIn(todaysCheckIns[0] || null, firstLessonTime),
             }
         })
 
@@ -349,11 +359,18 @@ export const getAttendanceOverview = async (req, res) => {
             role: 'teacher',
             $or: [{ branchId: req.auth.branchId }, { additionalBranchIds: req.auth.branchId }],
         }).select('name phone').lean()
+        // branchId: req.auth.branchId - see listBranchTeachers' identical note just above
         const teacherCheckIns = await TeacherAttendance.find({
             teacherId: { $in: teachers.map(t => t._id) },
+            branchId: req.auth.branchId,
             date: { $gte: startOfDay, $lt: endOfDay },
-        }).lean()
-        const checkInByTeacher = Object.fromEntries(teacherCheckIns.map(t => [String(t.teacherId), t.scannedAt]))
+        }).sort({ scannedAt: 1 }).lean()
+        const checkInsByTeacher = {}
+        for (const c of teacherCheckIns) {
+            const key = String(c.teacherId)
+            if (!checkInsByTeacher[key]) checkInsByTeacher[key] = []
+            checkInsByTeacher[key].push(c.scannedAt)
+        }
 
         // pre-fetch this branch's own groups and match by real ObjectId rather than trying to
         // $match a populated field inside the aggregate below
@@ -361,12 +378,12 @@ export const getAttendanceOverview = async (req, res) => {
             .populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name').lean()
 
         const teacherRows = teachers.map(t => {
-            const scannedAt = checkInByTeacher[String(t._id)] || null
+            const todaysCheckIns = checkInsByTeacher[String(t._id)] || []
             const firstLessonTime = earliestLessonTimeOnDate(branchGroups.filter(g => String(g.teacherId?._id || g.teacherId) === String(t._id)), startOfDay)
             return {
                 teacherId: t._id, name: t.name, phone: t.phone,
-                checkedIn: !!scannedAt, scannedAt,
-                firstLessonTime, late: isLateCheckIn(scannedAt, firstLessonTime),
+                checkedIn: todaysCheckIns.length > 0, scannedAt: todaysCheckIns[0] || null, checkIns: todaysCheckIns,
+                firstLessonTime, late: isLateCheckIn(todaysCheckIns[0] || null, firstLessonTime),
             }
         })
         const groupAttendanceRaw = await Attendance.aggregate([

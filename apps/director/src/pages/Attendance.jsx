@@ -45,11 +45,19 @@ const Attendance = () => {
             </div>
             <div className='flex flex-col gap-3'>
               {list.map(tc => (
-                <div key={tc.teacherId} className='flex justify-between text-sm'>
+                <div key={tc.teacherId} className='flex justify-between items-start text-sm gap-3'>
                   <span className={tc.checkedIn ? 'text-ink' : 'text-muted'}>{tc.name}</span>
-                  <span className={`font-mono text-xs ${tc.checkedIn ? (tc.late ? 'text-red-500' : 'text-accent') : 'text-muted'}`}>
-                    {tc.checkedIn ? `${new Date(tc.scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${tc.late ? ` · ${t('lateBadge')}` : ''}` : t('notCheckedIn')}
-                  </span>
+                  {tc.checkedIn ? (
+                    <span className='flex flex-wrap justify-end gap-x-2 gap-y-0.5'>
+                      {tc.checkIns.map((scannedAt, i) => (
+                        <span key={i} className={`font-mono text-xs ${i === 0 && tc.late ? 'text-red-500' : 'text-accent'}`}>
+                          {new Date(scannedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}{i === 0 && tc.late ? ` · ${t('lateBadge')}` : ''}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className='font-mono text-xs text-muted'>{t('notCheckedIn')}</span>
+                  )}
                 </div>
               ))}
             </div>
