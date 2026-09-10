@@ -1,11 +1,13 @@
 import React, { useState } from 'react'
 import { Listbox } from '@headlessui/react'
 import { ChevronDown, Search } from 'lucide-react'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 
 // `options` is [{ value, label }]; `value`/`onChange` behave like a native select's.
 const SEARCH_THRESHOLD = 8
 
 const Select = ({ value, onChange, options, placeholder, className = '', disabled = false, forceSearch = false }) => {
+  const { t } = useLanguage()
   const [query, setQuery] = useState('')
   const selected = options.find(o => o.value === value)
   const showSearch = forceSearch || options.length > SEARCH_THRESHOLD
@@ -32,7 +34,7 @@ const Select = ({ value, onChange, options, placeholder, className = '', disable
                   onChange={e => setQuery(e.target.value)}
                   onClick={e => e.stopPropagation()}
                   onKeyDown={e => e.stopPropagation()}
-                  placeholder='Поиск...'
+                  placeholder={t('searchPlaceholder')}
                   className='w-full h-8 pl-7 pr-2 rounded-lg bg-slate-50 border-none text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-accent/40'
                 />
               </div>
@@ -46,7 +48,7 @@ const Select = ({ value, onChange, options, placeholder, className = '', disable
             </Listbox.Option>
           ))}
           {showSearch && filteredOptions.length === 0 && (
-            <p className='px-3.5 py-3 text-xs text-slate-400 text-center'>Ничего не найдено</p>
+            <p className='px-3.5 py-3 text-xs text-slate-400 text-center'>{t('notFoundOption')}</p>
           )}
         </Listbox.Options>
       </div>

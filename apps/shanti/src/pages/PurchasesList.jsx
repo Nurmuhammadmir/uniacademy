@@ -1,19 +1,22 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { Plus, SlidersHorizontal } from 'lucide-react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Select from '../components/Select.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import NumberInput from '../components/NumberInput.jsx'
+import { methodDisplay } from '../components/MethodPicker.jsx'
 import { confirm } from '../lib/confirm.js'
 import { formatMoney } from '../lib/format.js'
 import { firstOfMonthISO, todayISO, formatDateTime } from '../lib/date.js'
 import NewPurchaseModal from './NewPurchaseModal.jsx'
 
-const METHOD_LABEL = { cash: 'Наличные', card: 'Карта', click: 'Click', bank_transfer: 'Перечисление', payme: 'Payme', apelsin: 'Apelsin' }
 const DEFAULT_FILTERS = { dateFrom: firstOfMonthISO(), dateTo: todayISO(), category: '', materialId: '', sellerId: '', amountMin: '', amountMax: '' }
 
 const PurchasesList = () => {
   const { materialCategories, materials, sellers, getPurchasesOverview, updatePurchase, deletePurchase } = useContext(ShantiContext)
+  const { t } = useLanguage()
+  const METHOD_LABEL = { cash: t('methodCash'), card: t('methodCard'), click: t('methodClick'), bank_transfer: t('methodBankTransfer'), payme: t('methodPayme'), apelsin: t('methodApelsin') }
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS)
   const [data, setData] = useState(null)
@@ -34,7 +37,7 @@ const PurchasesList = () => {
   }
 
   const handleDelete = async (id) => {
-    if (!(await confirm('Удалить эту покупку?'))) return
+    if (!(await confirm(t('confirmDeletePurchase')))) return
     if (await deletePurchase(id)) load()
   }
 
@@ -42,18 +45,18 @@ const PurchasesList = () => {
     <div>
       <div className='flex justify-between items-center mb-4 gap-3 flex-wrap'>
         <div className='bg-white border border-slate-100 rounded-2xl px-5 py-3 shadow-sm'>
-          <p className='text-muted text-[11px] leading-tight'>Сумма покупок</p>
+          <p className='text-muted text-[11px] leading-tight'>{t('purchasesTotalLabel')}</p>
           <p className='font-bold tracking-tight text-lg text-[#1D1D1F] leading-tight'>{data ? formatMoney(data.totalAmount) : '—'}</p>
           <p className='text-[10px] text-slate-400 mt-0.5'>{appliedFilters.dateFrom} — {appliedFilters.dateTo}</p>
         </div>
         <div className='flex gap-2'>
           <button onClick={() => setShowFilters(v => !v)}
             className={`h-10 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors ${showFilters ? 'bg-accent-soft text-accent' : 'bg-slate-100 text-slate-700'}`}>
-            <SlidersHorizontal size={15} strokeWidth={1.75} /> Фильтр
+            <SlidersHorizontal size={15} strokeWidth={1.75} /> {t('filterBtn')}
           </button>
           <button onClick={() => setShowNew(true)}
             className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium transition-colors shadow-sm flex items-center gap-1.5'>
-            <Plus size={15} strokeWidth={1.5} /> Новая покупка
+            <Plus size={15} strokeWidth={1.5} /> {t('newPurchaseBtn')}
           </button>
         </div>
       </div>
@@ -61,37 +64,37 @@ const PurchasesList = () => {
       {showFilters && (
         <form onSubmit={applyFilters} className='flex flex-wrap gap-3 items-end mb-4 bg-white border border-slate-200/60 rounded-2xl p-4'>
           <div>
-            <p className='text-xs text-muted mb-1'>С даты</p>
+            <p className='text-xs text-muted mb-1'>{t('dateFromLabel')}</p>
             <DatePicker className='w-36' value={filters.dateFrom} onChange={(v) => setFilters({ ...filters, dateFrom: v })} />
           </div>
           <div>
-            <p className='text-xs text-muted mb-1'>По дату</p>
+            <p className='text-xs text-muted mb-1'>{t('dateToLabel')}</p>
             <DatePicker className='w-36' value={filters.dateTo} onChange={(v) => setFilters({ ...filters, dateTo: v })} />
           </div>
           <div>
-            <p className='text-xs text-muted mb-1'>Категория</p>
-            <Select className='w-44' value={filters.category} onChange={(v) => setFilters({ ...filters, category: v })} placeholder='Любая'
-              options={[{ value: '', label: 'Любая' }, ...materialCategories.map(c => ({ value: c.name, label: c.name }))]} />
+            <p className='text-xs text-muted mb-1'>{t('categoryLabel')}</p>
+            <Select className='w-44' value={filters.category} onChange={(v) => setFilters({ ...filters, category: v })} placeholder={t('anyCategoryOption')}
+              options={[{ value: '', label: t('anyCategoryOption') }, ...materialCategories.map(c => ({ value: c.name, label: c.name }))]} />
           </div>
           <div>
-            <p className='text-xs text-muted mb-1'>Материал</p>
-            <Select forceSearch className='w-52' value={filters.materialId} onChange={(v) => setFilters({ ...filters, materialId: v })} placeholder='Любой'
-              options={[{ value: '', label: 'Любой' }, ...materials.map(m => ({ value: m._id, label: m.name }))]} />
+            <p className='text-xs text-muted mb-1'>{t('materialLabel')}</p>
+            <Select forceSearch className='w-52' value={filters.materialId} onChange={(v) => setFilters({ ...filters, materialId: v })} placeholder={t('anyOption')}
+              options={[{ value: '', label: t('anyOption') }, ...materials.map(m => ({ value: m._id, label: m.name }))]} />
           </div>
           <div>
-            <p className='text-xs text-muted mb-1'>Продавец</p>
-            <Select forceSearch className='w-48' value={filters.sellerId} onChange={(v) => setFilters({ ...filters, sellerId: v })} placeholder='Любой'
-              options={[{ value: '', label: 'Любой' }, ...sellers.map(s => ({ value: s._id, label: s.name }))]} />
+            <p className='text-xs text-muted mb-1'>{t('sellerLabel')}</p>
+            <Select forceSearch className='w-48' value={filters.sellerId} onChange={(v) => setFilters({ ...filters, sellerId: v })} placeholder={t('anyOption')}
+              options={[{ value: '', label: t('anyOption') }, ...sellers.map(s => ({ value: s._id, label: s.name }))]} />
           </div>
           <div>
-            <p className='text-xs text-muted mb-1'>Сумма</p>
+            <p className='text-xs text-muted mb-1'>{t('amountLabel')}</p>
             <div className='flex items-center gap-1.5'>
-              <NumberInput placeholder='От' value={filters.amountMin} onChange={v => setFilters({ ...filters, amountMin: v })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
+              <NumberInput value={filters.amountMin} onChange={v => setFilters({ ...filters, amountMin: v })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
               <span className='text-muted text-xs'>—</span>
-              <NumberInput placeholder='До' value={filters.amountMax} onChange={v => setFilters({ ...filters, amountMax: v })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
+              <NumberInput value={filters.amountMax} onChange={v => setFilters({ ...filters, amountMax: v })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
             </div>
           </div>
-          <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium transition-colors'>Применить</button>
+          <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium transition-colors'>{t('apply')}</button>
         </form>
       )}
 
@@ -99,15 +102,15 @@ const PurchasesList = () => {
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
-              <th className='px-4 py-3 font-medium'>Дата</th>
-              <th className='px-4 py-3 font-medium'>Материал</th>
-              <th className='px-4 py-3 font-medium'>Кол-во</th>
-              <th className='px-4 py-3 font-medium'>Продавец</th>
-              <th className='px-4 py-3 font-medium'>Сумма</th>
-              <th className='px-4 py-3 font-medium'>Оплачено</th>
-              <th className='px-4 py-3 font-medium'>Долг</th>
-              <th className='px-4 py-3 font-medium'>Способ</th>
-              <th className='px-4 py-3 font-medium'>Комментарий</th>
+              <th className='px-4 py-3 font-medium'>{t('dateCol')}</th>
+              <th className='px-4 py-3 font-medium'>{t('materialLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('quantityShort')}</th>
+              <th className='px-4 py-3 font-medium'>{t('sellerLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('amountLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('paidLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('debtLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('methodLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('commentLabel')}</th>
               <th className='px-4 py-3 font-medium'></th>
             </tr>
           </thead>
@@ -123,7 +126,7 @@ const PurchasesList = () => {
                   <td className='px-4 py-3 font-mono text-ink'>{formatMoney(p.amount)}</td>
                   <td className='px-4 py-3 font-mono text-emerald-600'>{formatMoney(p.paidAmount)}</td>
                   <td className={`px-4 py-3 font-mono ${debt > 0 ? 'text-amber-600 font-semibold' : 'text-muted'}`}>{debt > 0 ? formatMoney(debt) : '—'}</td>
-                  <td className='px-4 py-3 text-muted'>{METHOD_LABEL[p.method] || p.method}</td>
+                  <td className='px-4 py-3 text-muted' title={methodDisplay(p, METHOD_LABEL).title}>{methodDisplay(p, METHOD_LABEL).label}</td>
                   <td className='px-4 py-3 text-muted max-w-[220px]'>
                     {editingComment === p._id ? (
                       <div className='flex gap-1.5'>
@@ -132,30 +135,30 @@ const PurchasesList = () => {
                       </div>
                     ) : (
                       <button onClick={() => { setEditingComment(p._id); setCommentDraft(p.comment || '') }} className='plain text-left truncate block w-full' title={p.comment}>
-                        {p.comment || <span className='text-slate-300'>+ добавить</span>}
+                        {p.comment || <span className='text-slate-300'>{t('addCommentPlaceholder')}</span>}
                       </button>
                     )}
                   </td>
                   <td className='px-4 py-3 text-right whitespace-nowrap'>
-                    <button onClick={() => setEditingPurchase(p)} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-xs font-medium mr-2'>Изменить</button>
-                    <button onClick={() => handleDelete(p._id)} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>Удалить</button>
+                    <button onClick={() => setEditingPurchase(p)} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-xs font-medium mr-2'>{t('edit')}</button>
+                    <button onClick={() => handleDelete(p._id)} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>{t('delete')}</button>
                   </td>
                 </tr>
               )
             })}
             {data && data.purchases.length === 0 && (
-              <tr><td colSpan={10} className='px-4 py-8 text-center text-muted'>Покупок пока нет</td></tr>
+              <tr><td colSpan={10} className='px-4 py-8 text-center text-muted'>{t('noPurchasesYet')}</td></tr>
             )}
             {!data && (
-              <tr><td colSpan={10} className='px-4 py-8 text-center text-muted'>Загрузка...</td></tr>
+              <tr><td colSpan={10} className='px-4 py-8 text-center text-muted'>{t('loading')}</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       <div className='block md:hidden flex flex-col gap-2.5'>
-        {!data && <p className='text-muted text-sm text-center py-8'>Загрузка...</p>}
-        {data && data.purchases.length === 0 && <p className='text-muted text-sm text-center py-8'>Покупок пока нет</p>}
+        {!data && <p className='text-muted text-sm text-center py-8'>{t('loading')}</p>}
+        {data && data.purchases.length === 0 && <p className='text-muted text-sm text-center py-8'>{t('noPurchasesYet')}</p>}
         {(data?.purchases || []).map(p => {
           const debt = p.amount - p.paidAmount
           return (
@@ -167,10 +170,10 @@ const PurchasesList = () => {
                 </div>
                 <p className='text-base font-bold text-slate-900 flex-shrink-0 ml-3'>{formatMoney(p.amount)}</p>
               </div>
-              {debt > 0 && <p className='text-xs text-amber-600 font-semibold mt-2'>Долг: {formatMoney(debt)}</p>}
+              {debt > 0 && <p className='text-xs text-amber-600 font-semibold mt-2'>{t('debtLabel')}: {formatMoney(debt)}</p>}
               <div className='flex gap-3 mt-2'>
-                <button onClick={() => setEditingPurchase(p)} className='text-xs text-accent font-medium'>Изменить</button>
-                <button onClick={() => handleDelete(p._id)} className='text-xs text-muted'>Удалить</button>
+                <button onClick={() => setEditingPurchase(p)} className='text-xs text-accent font-medium'>{t('edit')}</button>
+                <button onClick={() => handleDelete(p._id)} className='text-xs text-muted'>{t('delete')}</button>
               </div>
             </div>
           )

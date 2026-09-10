@@ -10,9 +10,11 @@
 import ShantiUnit from "../models/ShantiUnit.js"
 import ShantiMaterialCategory from "../models/ShantiMaterialCategory.js"
 import ShantiClientCategory from "../models/ShantiClientCategory.js"
+import ShantiExpenseCategory from "../models/ShantiExpenseCategory.js"
 
 export const OTHER_MATERIAL_CATEGORY = 'Другое'
 export const OTHER_CLIENT_CATEGORY = 'Другое'
+export const OTHER_EXPENSE_CATEGORY = 'Другое'
 const DEFAULT_UNITS = ['шт', 'кг', 'л', 'услуга']
 
 let unitsSeeded = false
@@ -49,4 +51,15 @@ export const ensureOtherClientCategoryExists = async () => {
         { upsert: true }
     )
     clientCategorySeeded = true
+}
+
+let expenseCategorySeeded = false
+export const ensureOtherExpenseCategoryExists = async () => {
+    if (expenseCategorySeeded) return
+    await ShantiExpenseCategory.findOneAndUpdate(
+        { name: OTHER_EXPENSE_CATEGORY },
+        { $setOnInsert: { name: OTHER_EXPENSE_CATEGORY, color: '#7A7266' } },
+        { upsert: true }
+    )
+    expenseCategorySeeded = true
 }

@@ -8,6 +8,8 @@ import ShantiProduct from "../models/ShantiProduct.js"
 import ShantiSale from "../models/ShantiSale.js"
 import { SHANTI_METHODS } from "../models/shantiConstants.js"
 import { ensureOtherClientCategoryExists, OTHER_CLIENT_CATEGORY } from "../services/shantiCatalog.service.js"
+import { getClientDebtMap } from "../services/shantiDebt.service.js"
+import { validateMethodBreakdown, normalizeMethodBreakdown } from "../services/shantiMethodBreakdown.service.js"
 
 // ==== Client categories ====
 
@@ -176,6 +178,22 @@ export const updateProduct = async (req, res) => {
     }
 }
 
+export const restockProduct = async (req, res) => {
+    try {
+        const { quantity } = req.body
+        const resolvedQuantity = Number(quantity)
+        if (!(resolvedQuantity > 0)) return res.status(400).json({ error: 'invalid_quantity' })
+        const product = await ShantiProduct.findByIdAndUpdate(
+            req.params.id, { $inc: { stock: resolvedQuantity } }, { new: true }
+        )
+        if (!product) return res.status(404).json({ error: 'not_found' })
+        res.json({ product })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 export const deleteProduct = async (req, res) => {
     try {
         const product = await ShantiProduct.findById(req.params.id)
@@ -228,15 +246,13 @@ export const getSalesOverview = async (req, res) => {
 
 export const getSalesDebtors = async (req, res) => {
     try {
-        const debtors = await ShantiSale.aggregate([
-            { $addFields: { debt: { $subtract: ['$amount', '$paidAmount'] } } },
-            { $match: { debt: { $gt: 0 } } },
-            { $group: { _id: '$clientId', totalDebt: { $sum: '$debt' }, saleCount: { $sum: 1 } } },
-            { $sort: { totalDebt: -1 } },
-            { $lookup: { from: 'shanticlients', localField: '_id', foreignField: '_id', as: 'client' } },
-            { $unwind: '$client' },
-            { $project: { clientId: '$_id', _id: 0, totalDebt: 1, saleCount: 1, name: '$client.name', phone: '$client.phone', category: '$client.category' } },
-        ])
+        const debtMap = await getClientDebtMap()
+        const ids = [...debtMap.entries()].filter(([, v]) => v.debt > 0.0001).map(([id]) => id)
+        const clients = await ShantiClient.find({ _id: { $in: ids } }).select('name phone category').lean()
+        const debtors = clients
+            .map(c => ({ clientId: c._id, name: c.name, phone: c.phone, category: c.category, ...debtMap.get(String(c._id)) }))
+            .map(d => ({ ...d, totalDebt: d.debt }))
+            .sort((a, b) => b.totalDebt - a.totalDebt)
         res.json({ debtors })
     } catch (error) {
         console.log(error)
@@ -273,7 +289,7 @@ const applyStockDelta = async (items, sign) => {
 
 export const createSale = async (req, res) => {
     try {
-        const { clientId, date, items, amount, paidAmount, method, comment } = req.body
+        const { clientId, date, items, amount, paidAmount, method, methodBreakdown, comment } = req.body
         if (!clientId) return res.status(400).json({ error: 'client_required' })
         const client = await ShantiClient.findById(clientId)
         if (!client) return res.status(404).json({ error: 'client_not_found' })
@@ -286,11 +302,16 @@ export const createSale = async (req, res) => {
         if (!(resolvedAmount >= 0)) return res.status(400).json({ error: 'invalid_amount' })
         const resolvedPaid = paidAmount !== undefined ? Number(paidAmount) : resolvedAmount
         if (resolvedPaid < 0 || resolvedPaid > resolvedAmount) return res.status(400).json({ error: 'invalid_paid_amount' })
+        const breakdownError = validateMethodBreakdown(methodBreakdown, resolvedPaid)
+        if (breakdownError) return res.status(400).json({ error: breakdownError })
+        const normalizedBreakdown = normalizeMethodBreakdown(methodBreakdown)
 
         const sale = await ShantiSale.create({
             clientId, date: date ? new Date(date) : new Date(),
             items: items.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
-            amount: resolvedAmount, paidAmount: resolvedPaid, method: method || 'cash', comment: comment || '',
+            amount: resolvedAmount, paidAmount: resolvedPaid,
+            method: normalizedBreakdown.length ? normalizedBreakdown[0].method : (method || 'cash'),
+            methodBreakdown: normalizedBreakdown, comment: comment || '',
             createdBy: req.auth.userId,
         })
         await applyStockDelta(sale.items, -1)
@@ -305,7 +326,7 @@ export const updateSale = async (req, res) => {
     try {
         const sale = await ShantiSale.findById(req.params.id)
         if (!sale) return res.status(404).json({ error: 'not_found' })
-        const { clientId, date, items, amount, paidAmount, method, comment } = req.body
+        const { clientId, date, items, amount, paidAmount, method, methodBreakdown, comment } = req.body
         if (method && !SHANTI_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
         let newItems = sale.items
@@ -320,6 +341,10 @@ export const updateSale = async (req, res) => {
         if (!(newAmount >= 0)) return res.status(400).json({ error: 'invalid_amount' })
         const newPaid = paidAmount !== undefined ? Number(paidAmount) : Math.min(sale.paidAmount, newAmount)
         if (newPaid < 0 || newPaid > newAmount) return res.status(400).json({ error: 'invalid_paid_amount' })
+        if (methodBreakdown !== undefined) {
+            const breakdownError = validateMethodBreakdown(methodBreakdown, newPaid)
+            if (breakdownError) return res.status(400).json({ error: breakdownError })
+        }
 
         // reverse the OLD items' stock effect, then apply the NEW ones - correct whether items
         // actually changed or not (a no-op reverse+reapply for unchanged items nets to zero)
@@ -335,7 +360,13 @@ export const updateSale = async (req, res) => {
         sale.amount = newAmount
         sale.paidAmount = newPaid
         if (date !== undefined) sale.date = new Date(date)
-        if (method !== undefined) sale.method = method
+        if (methodBreakdown !== undefined) {
+            const normalizedBreakdown = normalizeMethodBreakdown(methodBreakdown)
+            sale.methodBreakdown = normalizedBreakdown
+            sale.method = normalizedBreakdown.length ? normalizedBreakdown[0].method : (method || sale.method)
+        } else if (method !== undefined) {
+            sale.method = method
+        }
         if (comment !== undefined) sale.comment = comment
         await sale.save()
         res.json({ sale })

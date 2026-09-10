@@ -6,6 +6,11 @@
 import mongoose from "mongoose"
 import { SHANTI_METHODS } from "./shantiConstants.js"
 
+const methodBreakdownSchema = new mongoose.Schema({
+    method: { type: String, enum: SHANTI_METHODS, required: true },
+    amount: { type: Number, required: true },
+}, { _id: false })
+
 const shantiPurchaseSchema = new mongoose.Schema({
     materialId: { type: mongoose.Schema.Types.ObjectId, ref: 'ShantiMaterial', required: true },
     quantity: { type: Number, required: true },
@@ -13,6 +18,11 @@ const shantiPurchaseSchema = new mongoose.Schema({
     amount: { type: Number, required: true },
     paidAmount: { type: Number, required: true },
     method: { type: String, enum: SHANTI_METHODS, default: 'cash' },
+    // set only when paidAmount was actually split across more than one method at once (e.g. part
+    // cash, part bank transfer) - `method` above is then just the first row, kept for any code that
+    // still reads it directly. Empty/absent means "the whole paidAmount went via `method`", which is
+    // the common case and needs no migration for existing documents.
+    methodBreakdown: { type: [methodBreakdownSchema], default: [] },
     // who the material was actually bought from - a real ShantiSeller (so contact info like phone
     // is attached once and reused), not free text - optional since the seller isn't always known.
     sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'ShantiSeller', default: null },

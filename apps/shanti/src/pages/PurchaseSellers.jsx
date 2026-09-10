@@ -1,10 +1,12 @@
 import React, { useContext, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
 
 const PurchaseSellers = () => {
   const { sellers, createSeller, updateSeller, deleteSeller } = useContext(ShantiContext)
+  const { t } = useLanguage()
   const [showNew, setShowNew] = useState(false)
   const [newSeller, setNewSeller] = useState({ name: '', phone: '', comment: '' })
   const [editingSeller, setEditingSeller] = useState(null)
@@ -25,7 +27,7 @@ const PurchaseSellers = () => {
     <div>
       <div className='flex justify-end mb-4'>
         <button onClick={() => setShowNew(true)} className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium flex items-center gap-1.5'>
-          <Plus size={15} strokeWidth={1.5} /> Продавец
+          <Plus size={15} strokeWidth={1.5} /> {t('sellerLabel')}
         </button>
       </div>
 
@@ -33,9 +35,9 @@ const PurchaseSellers = () => {
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
-              <th className='px-4 py-3 font-medium'>Имя</th>
-              <th className='px-4 py-3 font-medium'>Телефон</th>
-              <th className='px-4 py-3 font-medium'>Комментарий</th>
+              <th className='px-4 py-3 font-medium'>{t('personNameLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('phoneLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('commentLabel')}</th>
               <th className='px-4 py-3 font-medium'></th>
             </tr>
           </thead>
@@ -46,10 +48,10 @@ const PurchaseSellers = () => {
                   <td colSpan={4} className='px-4 py-3'>
                     <form onSubmit={submitEditSeller} className='flex flex-wrap gap-2 items-end'>
                       <input value={editingSeller.name} onChange={e => setEditingSeller({ ...editingSeller, name: e.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm flex-1' required />
-                      <input value={editingSeller.phone} onChange={e => setEditingSeller({ ...editingSeller, phone: e.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm w-40' placeholder='Телефон' />
-                      <input value={editingSeller.comment} onChange={e => setEditingSeller({ ...editingSeller, comment: e.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm flex-1' placeholder='Комментарий' />
-                      <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>Сохранить</button>
-                      <button type='button' onClick={() => setEditingSeller(null)} className='px-4 py-2 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>Отмена</button>
+                      <input value={editingSeller.phone} onChange={e => setEditingSeller({ ...editingSeller, phone: e.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm w-40' placeholder={t('phoneLabel')} />
+                      <input value={editingSeller.comment} onChange={e => setEditingSeller({ ...editingSeller, comment: e.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm flex-1' placeholder={t('commentLabel')} />
+                      <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>{t('save')}</button>
+                      <button type='button' onClick={() => setEditingSeller(null)} className='px-4 py-2 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('cancel')}</button>
                     </form>
                   </td>
                 </tr>
@@ -59,35 +61,35 @@ const PurchaseSellers = () => {
                   <td className='px-4 py-3 text-muted'>{s.phone || '—'}</td>
                   <td className='px-4 py-3 text-muted'>{s.comment || '—'}</td>
                   <td className='px-4 py-3 text-right whitespace-nowrap'>
-                    <button onClick={() => setEditingSeller(s)} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-sm font-medium mr-2'>Изменить</button>
-                    <button onClick={() => deleteSeller(s._id)} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>Удалить</button>
+                    <button onClick={() => setEditingSeller(s)} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-sm font-medium mr-2'>{t('edit')}</button>
+                    <button onClick={() => deleteSeller(s._id)} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('delete')}</button>
                   </td>
                 </tr>
               )
             ))}
             {sellers.length === 0 && (
-              <tr><td colSpan={4} className='px-4 py-8 text-center text-muted'>Продавцов пока нет</td></tr>
+              <tr><td colSpan={4} className='px-4 py-8 text-center text-muted'>{t('noSellersYet')}</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       {showNew && (
-        <Modal title='Новый продавец' onClose={() => setShowNew(false)}>
+        <Modal title={t('newSellerTitle')} onClose={() => setShowNew(false)}>
           <form onSubmit={submitNewSeller} className='flex flex-col gap-3'>
             <div>
-              <p className='text-xs text-muted mb-1'>Имя</p>
+              <p className='text-xs text-muted mb-1'>{t('personNameLabel')}</p>
               <input value={newSeller.name} onChange={e => setNewSeller({ ...newSeller, name: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
             </div>
             <div>
-              <p className='text-xs text-muted mb-1'>Телефон</p>
+              <p className='text-xs text-muted mb-1'>{t('phoneLabel')}</p>
               <input value={newSeller.phone} onChange={e => setNewSeller({ ...newSeller, phone: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
             </div>
             <div>
-              <p className='text-xs text-muted mb-1'>Комментарий</p>
+              <p className='text-xs text-muted mb-1'>{t('commentLabel')}</p>
               <textarea value={newSeller.comment} onChange={e => setNewSeller({ ...newSeller, comment: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' rows={2} />
             </div>
-            <button type='submit' className='py-2.5 rounded-xl bg-accent text-white text-sm font-medium mt-2'>Добавить</button>
+            <button type='submit' className='py-2.5 rounded-xl bg-accent text-white text-sm font-medium mt-2'>{t('add')}</button>
           </form>
         </Modal>
       )}

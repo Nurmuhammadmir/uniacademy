@@ -11,6 +11,11 @@ const shantiSaleItemSchema = new mongoose.Schema({
     price: { type: Number, required: true },
 }, { _id: false })
 
+const methodBreakdownSchema = new mongoose.Schema({
+    method: { type: String, enum: SHANTI_METHODS, required: true },
+    amount: { type: Number, required: true },
+}, { _id: false })
+
 const shantiSaleSchema = new mongoose.Schema({
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'ShantiClient', required: true },
     date: { type: Date, default: Date.now },
@@ -18,6 +23,9 @@ const shantiSaleSchema = new mongoose.Schema({
     amount: { type: Number, required: true },
     paidAmount: { type: Number, required: true },
     method: { type: String, enum: SHANTI_METHODS, default: 'cash' },
+    // set only when paidAmount was actually split across more than one method (part cash, part
+    // transfer, etc.) - empty/absent means the whole paidAmount went via `method` (the common case).
+    methodBreakdown: { type: [methodBreakdownSchema], default: [] },
     comment: { type: String, default: '' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'ShantiUser', required: true },
 }, { timestamps: true })

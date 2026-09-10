@@ -8,8 +8,10 @@ import ShantiMaterialCategory from "../models/ShantiMaterialCategory.js"
 import ShantiMaterial from "../models/ShantiMaterial.js"
 import ShantiPurchase from "../models/ShantiPurchase.js"
 import ShantiSeller from "../models/ShantiSeller.js"
+import ShantiExpense from "../models/ShantiExpense.js"
 import { SHANTI_METHODS } from "../models/shantiConstants.js"
 import { ensureDefaultShantiUnits, ensureOtherMaterialCategoryExists, OTHER_MATERIAL_CATEGORY } from "../services/shantiCatalog.service.js"
+import { validateMethodBreakdown, normalizeMethodBreakdown } from "../services/shantiMethodBreakdown.service.js"
 
 // ==== Units ====
 
@@ -239,6 +241,7 @@ export const deleteSeller = async (req, res) => {
         const seller = await ShantiSeller.findById(req.params.id)
         if (!seller) return res.status(404).json({ error: 'not_found' })
         const inUse = await ShantiPurchase.countDocuments({ sellerId: seller._id })
+            || await ShantiExpense.countDocuments({ sellerId: seller._id })
         if (inUse > 0) return res.status(409).json({ error: 'seller_in_use' })
         await seller.deleteOne()
         res.json({ deleted: true })
@@ -310,7 +313,7 @@ export const getPurchaseDetail = async (req, res) => {
 
 export const createPurchase = async (req, res) => {
     try {
-        const { materialId, quantity, date, amount, paidAmount, method, sellerId, comment } = req.body
+        const { materialId, quantity, date, amount, paidAmount, method, methodBreakdown, sellerId, comment } = req.body
         if (!materialId) return res.status(400).json({ error: 'material_required' })
         if (!(quantity > 0)) return res.status(400).json({ error: 'invalid_quantity' })
         if (!(amount > 0)) return res.status(400).json({ error: 'invalid_amount' })
@@ -324,10 +327,14 @@ export const createPurchase = async (req, res) => {
 
         const resolvedPaid = paidAmount !== undefined ? Number(paidAmount) : amount
         if (resolvedPaid < 0 || resolvedPaid > amount) return res.status(400).json({ error: 'invalid_paid_amount' })
+        const breakdownError = validateMethodBreakdown(methodBreakdown, resolvedPaid)
+        if (breakdownError) return res.status(400).json({ error: breakdownError })
+        const normalizedBreakdown = normalizeMethodBreakdown(methodBreakdown)
 
         const purchase = await ShantiPurchase.create({
             materialId, quantity, date: date ? new Date(date) : new Date(), amount, paidAmount: resolvedPaid,
-            method: method || 'cash', sellerId: sellerId || null, comment: comment || '', createdBy: req.auth.userId,
+            method: normalizedBreakdown.length ? normalizedBreakdown[0].method : (method || 'cash'),
+            methodBreakdown: normalizedBreakdown, sellerId: sellerId || null, comment: comment || '', createdBy: req.auth.userId,
         })
         await ShantiMaterial.updateOne({ _id: materialId }, { $inc: { stock: quantity } })
         res.status(201).json({ purchase })
@@ -341,7 +348,7 @@ export const updatePurchase = async (req, res) => {
     try {
         const purchase = await ShantiPurchase.findById(req.params.id)
         if (!purchase) return res.status(404).json({ error: 'not_found' })
-        const { materialId, quantity, date, amount, paidAmount, method, sellerId, comment } = req.body
+        const { materialId, quantity, date, amount, paidAmount, method, methodBreakdown, sellerId, comment } = req.body
         if (method && !SHANTI_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
         if (sellerId) {
             const seller = await ShantiSeller.findById(sellerId)
@@ -358,6 +365,10 @@ export const updatePurchase = async (req, res) => {
         if (!(newAmount > 0)) return res.status(400).json({ error: 'invalid_amount' })
         const newPaid = paidAmount !== undefined ? Number(paidAmount) : Math.min(purchase.paidAmount, newAmount)
         if (newPaid < 0 || newPaid > newAmount) return res.status(400).json({ error: 'invalid_paid_amount' })
+        if (methodBreakdown !== undefined) {
+            const breakdownError = validateMethodBreakdown(methodBreakdown, newPaid)
+            if (breakdownError) return res.status(400).json({ error: breakdownError })
+        }
 
         if (newMaterialId !== oldMaterialId) {
             await ShantiMaterial.updateOne({ _id: oldMaterialId }, { $inc: { stock: -oldQuantity } })
@@ -373,7 +384,13 @@ export const updatePurchase = async (req, res) => {
         purchase.amount = newAmount
         purchase.paidAmount = newPaid
         if (date !== undefined) purchase.date = new Date(date)
-        if (method !== undefined) purchase.method = method
+        if (methodBreakdown !== undefined) {
+            const normalizedBreakdown = normalizeMethodBreakdown(methodBreakdown)
+            purchase.methodBreakdown = normalizedBreakdown
+            purchase.method = normalizedBreakdown.length ? normalizedBreakdown[0].method : (method || purchase.method)
+        } else if (method !== undefined) {
+            purchase.method = method
+        }
         if (sellerId !== undefined) purchase.sellerId = sellerId || null
         if (comment !== undefined) purchase.comment = comment
         await purchase.save()

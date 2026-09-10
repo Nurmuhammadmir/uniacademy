@@ -1,10 +1,12 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
+import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
 import { formatDateTime } from '../lib/date.js'
 
 const PurchaseDebts = () => {
   const { getPurchaseDebts } = useContext(ShantiContext)
+  const { t } = useLanguage()
   const [data, setData] = useState(null)
 
   useEffect(() => { getPurchaseDebts({}).then(d => { if (d) setData(d) }) }, [])
@@ -12,7 +14,7 @@ const PurchaseDebts = () => {
   return (
     <div>
       <div className='bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 mb-4 inline-block'>
-        <p className='text-amber-700 text-[11px]'>Общий долг перед поставщиками</p>
+        <p className='text-amber-700 text-[11px]'>{t('totalSupplierDebtLabel')}</p>
         <p className='font-bold tracking-tight text-lg text-amber-700'>{data ? formatMoney(data.totalDebt) : '—'}</p>
       </div>
 
@@ -20,12 +22,12 @@ const PurchaseDebts = () => {
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
-              <th className='px-4 py-3 font-medium'>Дата</th>
-              <th className='px-4 py-3 font-medium'>Материал</th>
-              <th className='px-4 py-3 font-medium'>Сумма</th>
-              <th className='px-4 py-3 font-medium'>Оплачено</th>
-              <th className='px-4 py-3 font-medium'>Долг</th>
-              <th className='px-4 py-3 font-medium'>Комментарий</th>
+              <th className='px-4 py-3 font-medium'>{t('dateCol')}</th>
+              <th className='px-4 py-3 font-medium'>{t('materialLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('amountLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('paidLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('debtLabel')}</th>
+              <th className='px-4 py-3 font-medium'>{t('commentLabel')}</th>
             </tr>
           </thead>
           <tbody>
@@ -40,10 +42,10 @@ const PurchaseDebts = () => {
               </tr>
             ))}
             {data && data.purchases.length === 0 && (
-              <tr><td colSpan={6} className='px-4 py-8 text-center text-muted'>Долгов нет</td></tr>
+              <tr><td colSpan={6} className='px-4 py-8 text-center text-muted'>{t('noDebtsYet')}</td></tr>
             )}
             {!data && (
-              <tr><td colSpan={6} className='px-4 py-8 text-center text-muted'>Загрузка...</td></tr>
+              <tr><td colSpan={6} className='px-4 py-8 text-center text-muted'>{t('loading')}</td></tr>
             )}
           </tbody>
         </table>
