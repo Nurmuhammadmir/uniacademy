@@ -3,6 +3,7 @@ import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney, groupLabel } from '../lib/format.js'
 import Spinner from '../components/Spinner.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 import { currentMonthISO, lastDayOfMonthISO, formatUTCDate } from '../lib/date.js'
 
 // kept for every rate TYPE the backend still supports (so an existing rate set before this change
@@ -141,8 +142,13 @@ const Salary = ({ branchId }) => {
               <form onSubmit={submitDefault} className='flex gap-2 items-end flex-wrap'>
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('rateValueLabel')}</p>
-                  <input type='number' value={defaultForm.rateValue} onChange={e => setDefaultForm({ ...defaultForm, rateValue: e.target.value })}
-                    className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm w-36' required />
+                  {defaultForm.rateType === 'percent_of_revenue' ? (
+                    <input type='number' value={defaultForm.rateValue} onChange={e => setDefaultForm({ ...defaultForm, rateValue: e.target.value })}
+                      className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm w-36' required />
+                  ) : (
+                    <MoneyInput value={defaultForm.rateValue} onChange={e => setDefaultForm({ ...defaultForm, rateValue: e.target.value })}
+                      className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm w-36' required />
+                  )}
                 </div>
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('rateUnitLabel')}</p>
@@ -204,8 +210,13 @@ const Salary = ({ branchId }) => {
                 )}
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('rateValueLabel')}</p>
-                  <input type='number' value={customForm.rateValue} onChange={e => setCustomForm({ ...customForm, rateValue: e.target.value })}
-                    className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm w-36' required />
+                  {customForm.rateType === 'percent_of_revenue' ? (
+                    <input type='number' value={customForm.rateValue} onChange={e => setCustomForm({ ...customForm, rateValue: e.target.value })}
+                      className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm w-36' required />
+                  ) : (
+                    <MoneyInput value={customForm.rateValue} onChange={e => setCustomForm({ ...customForm, rateValue: e.target.value })}
+                      className='px-3 py-2 rounded-lg bg-bg-elevated border border-hairline text-sm w-36' required />
+                  )}
                 </div>
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('rateUnitLabel')}</p>
@@ -388,7 +399,7 @@ const Salary = ({ branchId }) => {
                       </p>
                     </>
                   ) : (
-                    <input type='number' value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                    <MoneyInput value={payAmount} onChange={e => setPayAmount(e.target.value)}
                       className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
                   )}
                 </div>
@@ -396,7 +407,7 @@ const Salary = ({ branchId }) => {
               {payMode === 'pay' && (
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('amountLabel')}</p>
-                  <input type='number' value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                  <MoneyInput value={payAmount} onChange={e => setPayAmount(e.target.value)}
                     className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
                 </div>
               )}

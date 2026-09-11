@@ -4,6 +4,7 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney, scheduleDaysLabel } from '../lib/format.js'
 import Spinner from '../components/Spinner.jsx'
 import Select from '../components/Select.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 import { currentMonthISO, lastDayOfMonthISO, formatUTCDate } from '../lib/date.js'
 
 const PAYOUT_METHODS = ['cash', 'card', 'click', 'bank_transfer', 'payme', 'apelsin']
@@ -211,7 +212,7 @@ const Salary = () => {
                       </p>
                     </>
                   ) : (
-                    <input type='number' value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                    <MoneyInput value={payAmount} onChange={e => setPayAmount(e.target.value)}
                       className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
                   )}
                 </div>
@@ -219,7 +220,7 @@ const Salary = () => {
               {payMode === 'pay' && (
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('amountLabel')}</p>
-                  <input type='number' value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                  <MoneyInput value={payAmount} onChange={e => setPayAmount(e.target.value)}
                     className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
                 </div>
               )}

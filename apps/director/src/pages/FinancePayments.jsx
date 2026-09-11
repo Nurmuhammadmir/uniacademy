@@ -5,6 +5,7 @@ import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney, paymentMethodLabelKey, groupLabel } from '../lib/format.js'
 import { todayISO, firstOfMonthISO } from '../lib/date.js'
+import MoneyInput from '../components/MoneyInput.jsx'
 
 const DEFAULT_FILTERS = { dateFrom: firstOfMonthISO(), dateTo: todayISO(), search: '', groupId: '', teacherId: '', method: '', amount: '' }
 
@@ -129,7 +130,7 @@ const FinancePayments = ({ branchId }) => {
         </div>
         <div>
           <p className='text-xs text-muted mb-1'>{t('amountFilterLabel')}</p>
-          <input type='number' value={filters.amount} onChange={e => setFilters({ ...filters, amount: e.target.value })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-28' />
+          <MoneyInput value={filters.amount} onChange={e => setFilters({ ...filters, amount: e.target.value })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-28' />
         </div>
         <button type='submit' className='px-5 py-2 rounded-lg bg-[#F2542D] text-white text-sm font-medium'>{t('filterBtn')}</button>
       </form>

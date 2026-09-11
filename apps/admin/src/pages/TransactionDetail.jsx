@@ -7,6 +7,7 @@ import { formatMoney, paymentMethodLabelKey } from '../lib/format.js'
 import { formatDateTime as fullDate, todayISO } from '../lib/date.js'
 import Select from '../components/Select.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 
 const PAY_METHODS = ['cash', 'bank_transfer', 'card', 'click', 'payme']
 
@@ -163,7 +164,7 @@ const TransactionDetail = ({ type }) => {
             <form onSubmit={submitEditPayment} className='flex flex-col gap-3'>
               <div>
                 <p className='text-xs text-muted mb-1'>{t('amountLabel')}</p>
-                <input type='number' min='1' value={editForm.amount} onChange={e => setEditForm({ ...editForm, amount: e.target.value })}
+                <MoneyInput value={editForm.amount} onChange={e => setEditForm({ ...editForm, amount: e.target.value })}
                   className='w-full px-3 py-2.5 rounded-lg bg-bg border border-hairline text-sm' required autoFocus />
               </div>
               <div>

@@ -63,9 +63,22 @@ export const getMe = async (req, res) => {
     res.json({ id: req.auth.userId, role: req.auth.role, branchId: req.auth.branchId })
 }
 
+// same real-world boundary as salaryCalculation.service.js's LEGACY_BILLING_CUTOFF and
+// adminController.js's LEGACY_PAYROLL_CUTOFF - every branch ran on a different, non-platform system
+// through August 2026, and some of that pre-launch history was manually backdated into real Payment
+// records (the technique used by hand before adjustStudentBalance existed to reconcile a student's
+// balance) rather than a real payment. One-time exception, confirmed with the user: the Overview
+// page's "Revenue by branch" chart is the one place that still summed EVERY Payment ever, all-time,
+// with no date floor at all - those backdated 2024/2025 corrections were silently inflating it and
+// making the branch comparison misleading. Every other revenue figure in the app (Finance, Salary,
+// Business Ledger) already takes an explicit date range from the caller, so this is the only spot
+// that needed its own floor.
+const OVERVIEW_REVENUE_CUTOFF = new Date(Date.UTC(2026, 8, 1))
+
 export const getStats = async (req, res) => {
     try {
         const revenueByBranch = await Payment.aggregate([
+            { $match: { date: { $gte: OVERVIEW_REVENUE_CUTOFF } } },
             { $lookup: { from: 'users', localField: 'studentId', foreignField: '_id', as: 'student' } },
             { $unwind: '$student' },
             { $group: { _id: '$student.branchId', revenue: { $sum: '$amount' }, payments: { $sum: 1 } } },

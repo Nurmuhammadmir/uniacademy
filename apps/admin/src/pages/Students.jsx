@@ -11,6 +11,7 @@ import Select from '../components/Select.jsx'
 import Spinner from '../components/Spinner.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 import { formatMoney, groupLabel } from '../lib/format.js'
 import { todayISO, formatDateTime } from '../lib/date.js'
 
@@ -500,9 +501,13 @@ const Students = () => {
               <button type='button' onClick={() => setDiscountForm({ ...discountForm, type: 'percent' })} className={`px-3 py-2 rounded-lg text-sm font-medium ${discountForm.type === 'percent' ? 'bg-accent text-white dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10' : 'bg-bg border border-hairline text-muted'}`}>%</button>
               <button type='button' onClick={() => setDiscountForm({ ...discountForm, type: 'amount' })} className={`px-3 py-2 rounded-lg text-sm font-medium ${discountForm.type === 'amount' ? 'bg-accent text-white dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10' : 'bg-bg border border-hairline text-muted'}`}>{t('amountLabel')}</button>
             </div>
-            <input type='number' value={discountForm.value} onChange={e => setDiscountForm({ ...discountForm, value: e.target.value })}
-              placeholder={discountForm.type === 'percent' ? t('discountPercentPlaceholder') : t('discountAmountPlaceholder')}
-              className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-32' required />
+            {discountForm.type === 'amount' ? (
+              <MoneyInput value={discountForm.value} onChange={e => setDiscountForm({ ...discountForm, value: e.target.value })}
+                placeholder={t('discountAmountPlaceholder')} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-32' required />
+            ) : (
+              <input type='number' value={discountForm.value} onChange={e => setDiscountForm({ ...discountForm, value: e.target.value })}
+                placeholder={t('discountPercentPlaceholder')} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-32' required />
+            )}
             <button type='submit'
               disabled={applyingDiscount || !discountForm.value
                 || (discountScope === 'students' && (selectedForDiscount.length === 0 || !discountForm.languageId))
@@ -715,7 +720,7 @@ const Students = () => {
                 <span className='font-mono'>{formatMoney(payingStudent.owed)}</span>
               </div>
             )}
-            <input placeholder={t('amountLabel')} type='number' value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+            <MoneyInput placeholder={t('amountLabel')} value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <Select value={paymentForm.method} onChange={(v) => setPaymentForm({ ...paymentForm, method: v })} placeholder={t('selectPaymentMethod')}
               options={[

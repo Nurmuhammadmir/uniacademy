@@ -5,6 +5,7 @@ import { formatMoney, paymentMethodLabelKey } from '../lib/format.js'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { confirm } from '../lib/confirm.js'
 import Modal from '../components/Modal.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 
 // director sees everything admin sees, PLUS address/geo - only the director is allowed to see
 // where a student lives. Read-only except for one deliberate override: adjustStudentBalance below,
@@ -63,7 +64,7 @@ const AdjustBalanceModal = ({ studentId, currentBalance, onClose, onAdjusted }) 
         </div>
         <div>
           <p className='text-xs text-muted mb-1'>{mode === 'debt' ? t('debtAmountLabel') : t('creditAmountLabel')}</p>
-          <input type='number' min='0' value={amount} onChange={e => setAmount(e.target.value)}
+          <MoneyInput value={amount} onChange={e => setAmount(e.target.value)}
             className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm font-mono' autoFocus />
         </div>
         {isValid && diff !== 0 && (

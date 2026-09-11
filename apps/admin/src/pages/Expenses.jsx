@@ -8,6 +8,7 @@ import { useTheme } from '../context/ThemeContext.jsx'
 import Modal from '../components/Modal.jsx'
 import Select from '../components/Select.jsx'
 import DatePicker from '../components/DatePicker.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 import { formatMoney } from '../lib/format.js'
 import { todayISO, firstOfMonthISO, formatDateTime } from '../lib/date.js'
 
@@ -206,9 +207,9 @@ const Expenses = () => {
           <div>
             <p className='text-xs text-muted mb-1'>{t('amountRangeLabel')}</p>
             <div className='flex items-center gap-1.5'>
-              <input type='number' placeholder={t('amountFromLabel')} value={pendingFilters.amountMin} onChange={e => setPendingFilters({ ...pendingFilters, amountMin: e.target.value })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
+              <MoneyInput placeholder={t('amountFromLabel')} value={pendingFilters.amountMin} onChange={e => setPendingFilters({ ...pendingFilters, amountMin: e.target.value })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
               <span className='text-muted text-xs'>—</span>
-              <input type='number' placeholder={t('amountToLabel')} value={pendingFilters.amountMax} onChange={e => setPendingFilters({ ...pendingFilters, amountMax: e.target.value })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
+              <MoneyInput placeholder={t('amountToLabel')} value={pendingFilters.amountMax} onChange={e => setPendingFilters({ ...pendingFilters, amountMax: e.target.value })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
             </div>
           </div>
           <div className='w-full'>
@@ -367,7 +368,7 @@ const Expenses = () => {
                       <Select className='w-40' value={editForm.category} onChange={(v) => setEditForm({ ...editForm, category: v })}
                         options={expenseCategories.map(c => ({ value: c.name, label: c.name }))} />
                       <input value={editForm.recipient} onChange={ev => setEditForm({ ...editForm, recipient: ev.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm' />
-                      <input type='number' value={editForm.amount} onChange={ev => setEditForm({ ...editForm, amount: ev.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm w-28' required />
+                      <MoneyInput value={editForm.amount} onChange={ev => setEditForm({ ...editForm, amount: ev.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm w-28' required />
                       <Select className='w-36' value={editForm.method} onChange={(v) => setEditForm({ ...editForm, method: v })}
                         options={METHODS.map(m => ({ value: m, label: t('expenseMethod_' + m) }))} />
                       <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-sm font-medium'>{t('save')}</button>
@@ -449,7 +450,7 @@ const Expenses = () => {
             </div>
             <div>
               <p className='text-xs text-muted mb-1'>{t('amountLabel')}</p>
-              <input type='number' value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className={FIELD} required />
+              <MoneyInput value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className={FIELD} required />
             </div>
             <div>
               <p className='text-xs text-muted mb-2'>{t('expenseMethodLabel')}</p>

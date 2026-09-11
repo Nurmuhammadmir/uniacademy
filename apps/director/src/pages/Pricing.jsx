@@ -2,6 +2,7 @@ import React, { useContext, useState } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 import { formatMoney } from '../lib/format.js'
 
 // one price per COURSE (language), not per level (see server/models/Pricing.js) - a course can have
@@ -75,7 +76,7 @@ const Pricing = () => {
               <option value=''>{t('languageCol')}</option>
               {languages.map(l => <option key={l._id} value={l._id}>{l.name}</option>)}
             </select>
-            <input placeholder={t('monthlyPrice')} type='number' value={form.monthlyPrice} onChange={e => setForm({ ...form, monthlyPrice: e.target.value })}
+            <MoneyInput placeholder={t('monthlyPrice')} value={form.monthlyPrice} onChange={e => setForm({ ...form, monthlyPrice: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <button type='submit' className='py-3 rounded-xl bg-accent text-white font-medium'>{t('savePrice')}</button>
           </form>

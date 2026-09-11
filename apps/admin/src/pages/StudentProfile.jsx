@@ -12,6 +12,7 @@ import DatePicker from '../components/DatePicker.jsx'
 import Modal from '../components/Modal.jsx'
 import Spinner from '../components/Spinner.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 
 const PAY_METHODS = ['cash', 'bank_transfer', 'card', 'click', 'payme']
 
@@ -438,7 +439,7 @@ const StudentProfile = () => {
             {editingPayment && (
               <form onSubmit={submitEditPayment} className='flex flex-col gap-2 bg-[#f5f5f7] rounded-xl p-3 mt-3 dark:bg-slate-800/40'>
                 <div className='flex gap-2 items-end'>
-                  <input placeholder={t('amountLabel')} type='number' value={editPaymentForm.amount} onChange={e => setEditPaymentForm({ ...editPaymentForm, amount: e.target.value })}
+                  <MoneyInput placeholder={t('amountLabel')} value={editPaymentForm.amount} onChange={e => setEditPaymentForm({ ...editPaymentForm, amount: e.target.value })}
                     className='flex-1 px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm dark:bg-[#1E293B] dark:border-none dark:text-slate-200' required />
                   <Select className='flex-1' value={editPaymentForm.method} onChange={(v) => setEditPaymentForm({ ...editPaymentForm, method: v })}
                     options={[
@@ -461,7 +462,7 @@ const StudentProfile = () => {
               <form onSubmit={submitRefund} className='flex gap-2 items-end bg-[#f5f5f7] rounded-xl p-3 mt-3 dark:bg-slate-800/40'>
                 <div className='flex-1'>
                   <p className='text-xs text-muted mb-1'>{t('refundAmountLabel', { max: formatMoney(remainingAmount(refundingPayment)) })}</p>
-                  <input type='number' min='1' max={remainingAmount(refundingPayment)} value={refundAmount}
+                  <MoneyInput value={refundAmount}
                     onChange={e => setRefundAmount(e.target.value)} className='w-full px-3 py-2 rounded-lg bg-white border border-slate-200 text-sm dark:bg-[#1E293B] dark:border-none dark:text-slate-200' required />
                 </div>
                 <button type='submit' className='px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium transition-colors'>{t('refundBtn')}</button>
@@ -547,7 +548,7 @@ const StudentProfile = () => {
             <form onSubmit={submitQuickPay} className='flex flex-col gap-3'>
               <div>
                 <p className='text-xs text-muted mb-1'>{t('amountLabel')}</p>
-                <input type='number' min='1' value={payForm.amount} onChange={e => setPayForm({ ...payForm, amount: e.target.value })}
+                <MoneyInput value={payForm.amount} onChange={e => setPayForm({ ...payForm, amount: e.target.value })}
                   className='w-full px-3 py-2.5 rounded-lg bg-bg border border-hairline text-sm' required autoFocus />
               </div>
               <div>

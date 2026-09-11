@@ -9,6 +9,7 @@ import Select from '../components/Select.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import Modal from '../components/Modal.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 import { formatMoney, paymentMethodLabelKey, remainingAmount, groupLabel } from '../lib/format.js'
 import { todayISO, firstOfMonthISO, formatDateTime } from '../lib/date.js'
 
@@ -54,7 +55,7 @@ const FilterFields = ({ filters, setFilters, groups, teachers, t }) => (
     </div>
     <div>
       <p className='text-xs text-muted mb-1'>{t('amountFilterLabel')}</p>
-      <input type='number' value={filters.amount} onChange={e => setFilters({ ...filters, amount: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+      <MoneyInput value={filters.amount} onChange={e => setFilters({ ...filters, amount: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
     </div>
   </>
 )
@@ -315,7 +316,7 @@ const FinancePayments = () => {
             <form onSubmit={submitRefund} className='flex flex-col gap-3'>
               <div>
                 <p className='text-xs text-muted mb-1'>{t('refundAmountLabel', { max: formatMoney(remainingAmount(refunding)) })}</p>
-                <input type='number' min='1' max={remainingAmount(refunding)} value={refundAmount}
+                <MoneyInput value={refundAmount}
                   onChange={e => setRefundAmount(e.target.value)} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
               </div>
               <button type='submit' className='py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-medium transition-colors'>{t('refundBtn')}</button>

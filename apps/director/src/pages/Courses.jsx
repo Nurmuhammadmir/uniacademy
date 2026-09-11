@@ -4,6 +4,7 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
 import Modal from '../components/Modal.jsx'
 import Select from '../components/Select.jsx'
+import MoneyInput from '../components/MoneyInput.jsx'
 import { X, Pencil, Check, Search, Plus } from 'lucide-react'
 
 const Courses = () => {
@@ -166,7 +167,7 @@ const Courses = () => {
 
             <div className='flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-hairline'>
               <p className='text-xs text-muted flex-shrink-0'>{t('monthlyPrice')}</p>
-              <input type='number' min='0'
+              <MoneyInput
                 value={priceDrafts[lang._id] ?? (priceFor(lang._id) ?? '')}
                 onChange={e => setPriceDrafts({ ...priceDrafts, [lang._id]: e.target.value })}
                 placeholder={t('notSetYet')}
