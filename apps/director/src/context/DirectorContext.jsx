@@ -105,6 +105,19 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // confirm() happens in the component, not here - it needs to show the actual current/target
+    // numbers and direction, which the component already has loaded (this function just posts)
+    const adjustStudentBalance = async (id, targetBalance) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/students/' + id + '/balance', { targetBalance }, authHeader)
+            toast.success(data.adjusted ? t('balanceAdjusted') : t('balanceAlreadyMatches'))
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotAdjustBalance'))
+            return false
+        }
+    }
+
     const permanentlyDeleteStudent = async (id) => {
         if (!(await confirm(t('confirmPermanentlyDeleteStudent')))) return false
         try {
@@ -1044,7 +1057,7 @@ const DirectorContextProvider = (props) => {
         token, login, logout,
         stats, getStats,
         mapData, getMapData,
-        allStudents, getAllStudents, getStudentProfile, permanentlyDeleteStudent,
+        allStudents, getAllStudents, getStudentProfile, adjustStudentBalance, permanentlyDeleteStudent,
         getBranchProfile,
         admins, getAdmins, createAdmin, updateAdmin, deleteAdminAccount, getAdminProfile,
         teachers, getTeachers, createTeacher, updateTeacher, deleteTeacherAccount, getTeacherProfile,

@@ -8,7 +8,7 @@ import Group from "../models/Group.js"
 import Pricing from "../models/Pricing.js"
 import { getOrCreateAccount, postEntry } from "../services/ledger.service.js"
 import Account from "../models/Account.js"
-import { computeCourseOwed } from "../services/billingCycle.service.js"
+import { computeCourseOwed, recomputeEnrollmentStatus } from "../services/billingCycle.service.js"
 import Language from "../models/Language.js"
 import CourseCategory from "../models/CourseCategory.js"
 import Level from "../models/Level.js"
@@ -220,6 +220,92 @@ export const getStudentProfile = async (req, res) => {
             groups,
             examAttempts,
         })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// director-only manual override: retype a student's balance to whatever real-world number is
+// actually correct (this platform is new - a lot of students arrived with history it never saw).
+// This is the exact same reconciliation technique used by hand all through the migration (see
+// project history), but made unconditionally safe rather than "safe as long as the student happens
+// to have older debt lying around to absorb it" (an early version of this used a payment+expense
+// pair for the reduce path - a real, empirically-confirmed bug: billingCycle.service.js's
+// foldReversalsAndAllocate pools ALL payment/expense/discount cash on an account into ONE total,
+// regardless of that cash's own date, then spends it against every 'debt' entry oldest-first BY THE
+// DEBT'S OWN period, not the payment's. A student with no older debt to soak up the fabricated cash
+// would have it spill onto their real, current, teacher-attributed debt instead - verified live: a
+// teacher's percent_of_revenue salary jumped from 0 to a nonzero figure purely from a director
+// "reducing" a student's balance, with zero real money involved).
+//   - target < current balance (need to erase some debt): a single-leg 'opening_balance' entry
+//     (student decrease only). 'opening_balance' is deliberately excluded from
+//     billingCycle.service.js's ALLOCATION_KINDS - the one kind that documents a balance change
+//     without ever entering the FIFO cash-vs-debt pool, so it can NEVER be attributed to covering any
+//     debt (real or legacy) and can NEVER reach a teacher's revenue calc, regardless of what other
+//     debts exist on the account. No branch-side leg at all: no real cash moved, so branch cash must
+//     never move either - the old payment+expense pairing was solving a problem (branch cash staying
+//     net-zero) that a single-leg entry never creates in the first place.
+//   - target > current balance (need to add debt they genuinely owe but was never entered): a
+//     single-leg debt entry on the student's account only - never touches branch cash at all, same
+//     as a normal recognized period. Attached to their one current course when they have exactly
+//     one (so it still shows correctly in that course's own balance breakdown); left unattributed
+//     to any specific course when they have zero or more than one, rather than guessing which. This
+//     side was always safe "regardless of allocation order" since periodStart/periodEnd (what
+//     computeRevenueForGroup actually filters on) are stamped 2024-01-01 on the debt entry ITSELF.
+// Either way, dating it 2024-01-01 keeps it permanently outside the legacy salary cutoff - no rate
+// type, on any teacher, is ever affected by this correction, by construction, not by convention.
+const ARTIFICIAL_CORRECTION_DATE = new Date(Date.UTC(2024, 0, 1))
+
+export const adjustStudentBalance = async (req, res) => {
+    try {
+        const { targetBalance } = req.body
+        if (typeof targetBalance !== 'number' || !Number.isFinite(targetBalance)) {
+            return res.status(400).json({ error: 'invalid_target_balance' })
+        }
+
+        const student = await User.findOne({ _id: req.params.id, role: 'student', ...branchOnlyFilter(req) })
+        if (!student) return res.status(404).json({ error: 'not_found' })
+
+        const account = await getOrCreateAccount('student', student._id)
+        const diff = Math.round(account.balance - targetBalance)
+        // sub-so'm rounding noise only - nothing to post, the balance already reads as the target
+        if (Math.abs(diff) < 1) return res.json({ adjusted: false, balance: account.balance })
+
+        const description = 'Ручная корректировка баланса (архивные данные до сентября 2026)'
+
+        if (diff > 0) {
+            // reducing debt by `diff` - single-leg, student account only, kind:'opening_balance' so
+            // it can never be pooled as "cash" against any debt (see the comment block above)
+            await postEntry({
+                accountId: account._id, direction: 'decrease', amount: diff, kind: 'opening_balance',
+                description, createdBy: req.auth.userId, date: ARTIFICIAL_CORRECTION_DATE,
+            })
+        } else {
+            const increaseAmount = -diff
+            const coursesWithGroup = student.courses.filter(c => c.groupId)
+            const soleCourse = coursesWithGroup.length === 1 ? coursesWithGroup[0] : null
+            const group = soleCourse ? await Group.findById(soleCourse.groupId).select('teacherId').lean() : null
+
+            await postEntry({
+                accountId: account._id, direction: 'increase', amount: increaseAmount, kind: 'debt',
+                meta: {
+                    studentId: student._id,
+                    ...(soleCourse ? {
+                        groupId: soleCourse.groupId, languageId: soleCourse.languageId, levelId: soleCourse.levelId,
+                        teacherId: group?.teacherId || null,
+                    } : {}),
+                    periodStart: ARTIFICIAL_CORRECTION_DATE, periodEnd: ARTIFICIAL_CORRECTION_DATE,
+                },
+                description, createdBy: req.auth.userId, date: ARTIFICIAL_CORRECTION_DATE,
+            })
+        }
+
+        await recomputeEnrollmentStatus(student)
+        await student.save()
+
+        const updatedAccount = await Account.findById(account._id).lean()
+        res.json({ adjusted: true, balance: updatedAccount.balance })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

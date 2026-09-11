@@ -3,18 +3,72 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { formatMoney, paymentMethodLabelKey } from '../lib/format.js'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import { confirm } from '../lib/confirm.js'
+import Modal from '../components/Modal.jsx'
 
 // director sees everything admin sees, PLUS address/geo - only the director is allowed to see
-// where a student lives. Read-only, same as before - director doesn't mutate students directly,
-// that stays the branch admin's job.
+// where a student lives. Read-only except for one deliberate override: adjustStudentBalance below,
+// a director-only manual reconciliation tool - everything else here stays the branch admin's job.
+const AdjustBalanceModal = ({ studentId, currentBalance, onClose, onAdjusted }) => {
+  const { adjustStudentBalance } = useContext(DirectorContext)
+  const { t } = useLanguage()
+  const [target, setTarget] = useState(String(currentBalance))
+  const [submitting, setSubmitting] = useState(false)
+
+  const targetNum = Number(target)
+  const diff = Math.round(currentBalance - targetNum)
+  const isValid = target !== '' && Number.isFinite(targetNum)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!isValid) return
+    if (diff === 0) { onClose(); return }
+    const confirmMessage = diff > 0
+      ? t('confirmReduceBalance', { amount: formatMoney(diff) })
+      : t('confirmIncreaseBalance', { amount: formatMoney(-diff) })
+    if (!(await confirm(confirmMessage))) return
+    setSubmitting(true)
+    const result = await adjustStudentBalance(studentId, targetNum)
+    setSubmitting(false)
+    if (result) onAdjusted()
+  }
+
+  return (
+    <Modal title={t('adjustBalanceTitle')} onClose={onClose}>
+      <form onSubmit={submit} className='flex flex-col gap-3'>
+        <div className='bg-bg border border-hairline rounded-xl p-3'>
+          <p className='text-muted text-xs mb-1'>{t('currentBalanceLabel')}</p>
+          <p className={`font-mono text-lg ${currentBalance > 0 ? 'text-rose-600' : 'text-ink'}`}>{formatMoney(currentBalance)}</p>
+        </div>
+        <div>
+          <p className='text-xs text-muted mb-1'>{t('targetBalanceLabel')}</p>
+          <input type='number' value={target} onChange={e => setTarget(e.target.value)}
+            className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm font-mono' autoFocus />
+        </div>
+        {isValid && diff !== 0 && (
+          <p className={`text-xs font-medium ${diff > 0 ? 'text-accent' : 'text-rose-600'}`}>
+            {diff > 0 ? t('willReduceBy', { amount: formatMoney(diff) }) : t('willIncreaseBy', { amount: formatMoney(-diff) })}
+          </p>
+        )}
+        <p className='text-muted text-xs bg-bg border border-hairline rounded-xl p-3'>{t('adjustBalanceHint')}</p>
+        <button type='submit' disabled={submitting || !isValid} className='py-2.5 rounded-xl bg-accent text-white text-sm font-medium transition-colors disabled:opacity-50'>
+          {t('saveChanges')}
+        </button>
+      </form>
+    </Modal>
+  )
+}
+
 const StudentProfile = () => {
   const { id: studentId } = useParams()
   const navigate = useNavigate()
   const { getStudentProfile, permanentlyDeleteStudent } = useContext(DirectorContext)
   const [data, setData] = useState(false)
+  const [showAdjustBalance, setShowAdjustBalance] = useState(false)
   const { t } = useLanguage()
 
-  useEffect(() => { getStudentProfile(studentId).then(setData) }, [studentId])
+  const load = () => getStudentProfile(studentId).then(setData)
+  useEffect(() => { load() }, [studentId])
 
   const handlePermanentDelete = async () => {
     if (await permanentlyDeleteStudent(studentId)) navigate('/students')
@@ -30,10 +84,17 @@ const StudentProfile = () => {
       </div>
 
       <div className='flex flex-col gap-5'>
-        <div>
-          <p className='font-display text-2xl text-ink'>{data.student.name}</p>
-          <p className='text-muted text-sm font-mono'>{data.student.phone}</p>
-          <p className='text-muted text-xs mt-1'>{t('registeredOn', { date: new Date(data.student.createdAt).toLocaleDateString('en-GB'), branch: data.student.branchId?.name })}</p>
+        <div className='flex justify-between items-start gap-3 flex-wrap'>
+          <div>
+            <p className='font-display text-2xl text-ink'>{data.student.name}</p>
+            <p className='text-muted text-sm font-mono'>{data.student.phone}</p>
+            <p className='text-muted text-xs mt-1'>{t('registeredOn', { date: new Date(data.student.createdAt).toLocaleDateString('en-GB'), branch: data.student.branchId?.name })}</p>
+          </div>
+          <div className='bg-bg-elevated border border-hairline rounded-xl p-3.5 text-right'>
+            <p className='text-muted text-xs mb-1'>{t('currentBalanceLabel')}</p>
+            <p className={`font-mono text-lg ${data.accountBalance > 0 ? 'text-rose-600' : 'text-ink'}`}>{formatMoney(data.accountBalance)}</p>
+            <button onClick={() => setShowAdjustBalance(true)} className='text-accent text-xs font-medium mt-1'>{t('adjustBalanceBtn')}</button>
+          </div>
         </div>
 
         {data.student.passportInfo && (
@@ -122,6 +183,15 @@ const StudentProfile = () => {
           </div>
         )}
       </div>
+
+      {showAdjustBalance && (
+        <AdjustBalanceModal
+          studentId={studentId}
+          currentBalance={data.accountBalance}
+          onClose={() => setShowAdjustBalance(false)}
+          onAdjusted={() => { setShowAdjustBalance(false); load() }}
+        />
+      )}
     </div>
   )
 }

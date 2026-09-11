@@ -1,7 +1,7 @@
 import express from "express"
 import requireRole from "../middleware/auth.js"
 import {
-    getMe, getStats, getMapData, getAllStudents, getStudentProfile, permanentlyDeleteStudent, getBranchProfile,
+    getMe, getStats, getMapData, getAllStudents, getStudentProfile, adjustStudentBalance, permanentlyDeleteStudent, getBranchProfile,
     createAdmin, listAdmins, updateAdmin, deleteAdmin, getAdminProfile,
     createTeacher, listTeachers, updateTeacher, deleteTeacher, getTeacherProfile,
     upsertPricing, listPricing, deletePricing, getAttendanceOverview,
@@ -107,6 +107,7 @@ directorRouter.get('/stats', directorOnly, getStats)
 directorRouter.get('/map-data', directorOnly, getMapData)
 directorRouter.get('/students', getAllStudents)
 directorRouter.get('/students/:id', getStudentProfile)
+directorRouter.put('/students/:id/balance', adjustStudentBalance)
 directorRouter.delete('/students/:id/permanent', permanentlyDeleteStudent)
 
 // Admins is sub_director-reachable (scoped to plain 'admin' accounts in their own branch only -

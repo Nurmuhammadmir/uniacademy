@@ -6,6 +6,17 @@ import { prorateByDateOverlap } from "./attribution.service.js"
 import { computeCoveredDebtPeriodsBatch } from "./billingCycle.service.js"
 import { SALARY_CATEGORY, PREPAYMENT_CATEGORY } from "./expenseCategories.service.js"
 
+// every branch ran payroll through a different, non-platform system through August 2026 and staff
+// were already paid for that whole span through it - this platform's own billing only starts
+// 2026-09-01 (same one-time migration boundary as the Pay/Prepay button guard added in bd946c0,
+// extended here to the calculation itself: any historical debt entered for a pre-cutoff period -
+// even if it's recorded/paid off today - must never be calculated or shown as that period's
+// teacher salary, on ANY rate type, or a teacher already compensated for it outside this system
+// would appear to earn it a second time). One-time migration-era guard, not a general feature -
+// nothing here should need touching again once the cutoff is safely in the past.
+const LEGACY_BILLING_CUTOFF = new Date(Date.UTC(2026, 8, 1))
+const clampToLegacyCutoff = (dateFrom) => dateFrom < LEGACY_BILLING_CUTOFF ? LEGACY_BILLING_CUTOFF : dateFrom
+
 // per_lesson/per_hour pay counts every calendar day in range that the teacher's group was
 // scheduled to meet, on the weekly pattern alone - deliberately NOT gated on TeacherAttendance
 // (the teacher's own QR self-check-in): that's purely an informational "who's at the branch today"
@@ -156,6 +167,9 @@ const computeTeacherAcrossGroups = async (teacher, teacherGroups, rates, dateFro
 // groups, or whose groups all resolve to no rate at all, is skipped entirely - there's nothing to
 // calculate until at least a branch default rate is set.
 export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
+    dateFrom = clampToLegacyCutoff(dateFrom)
+    if (dateFrom > dateTo) return [] // the whole requested range predates this platform's own billing start
+
     const teachers = await User.find({
         role: 'teacher',
         $or: [{ branchId }, { additionalBranchIds: branchId }],
@@ -216,6 +230,9 @@ export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
 // single number. Reuses computeTeacherAcrossGroups (the exact same function calculateSalaries
 // calls) so this view's total can never drift from the one shown in the results table.
 export const getTeacherSalaryDetail = async (branchId, teacherId, rates, dateFrom, dateTo) => {
+    dateFrom = clampToLegacyCutoff(dateFrom)
+    if (dateFrom > dateTo) return null // the whole requested range predates this platform's own billing start
+
     const teacher = await User.findById(teacherId).select('name').lean()
     if (!teacher) return null
 

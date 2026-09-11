@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Download } from 'lucide-react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import { formatMoney } from '../lib/format.js'
 import Select from '../components/Select.jsx'
 
 // no photo field exists on a student - every avatar is initials on a gradient, picked
@@ -106,6 +107,7 @@ const Students = () => {
               <th className='px-5 py-3 font-medium'>{t('phoneCol')}</th>
               <th className='px-5 py-3 font-medium'>{t('branch')}</th>
               <th className='px-5 py-3 font-medium'>{t('coursesCol')}</th>
+              <th className='px-5 py-3 font-medium'>{t('balanceCol')}</th>
               <th className='px-5 py-3 font-medium'>{t('status')}</th>
             </tr>
           </thead>
@@ -123,6 +125,15 @@ const Students = () => {
                 <td className='px-5 py-4 text-muted font-mono'>{s.phone}</td>
                 <td className='px-5 py-4 text-muted'>{s.branchId?.name}</td>
                 <td className='px-5 py-4 text-muted'>{courseSummary(s)}</td>
+                <td className='px-5 py-4 font-mono font-medium whitespace-nowrap'>
+                  {totalBalance(s) > 0 ? (
+                    <span className='text-rose-600'>-{formatMoney(totalBalance(s))}</span>
+                  ) : totalBalance(s) < 0 ? (
+                    <span className='text-emerald-600'>+{formatMoney(-totalBalance(s))}</span>
+                  ) : (
+                    <span className='text-muted'>{formatMoney(0)}</span>
+                  )}
+                </td>
                 <td className='px-5 py-4'>
                   <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${anyActive(s) ? 'bg-accent-soft text-accent' : 'bg-hairline text-muted'}`}>
                     {anyActive(s) ? t('active') : t('unpaid')}
@@ -131,7 +142,7 @@ const Students = () => {
               </tr>
             ))}
             {visibleStudents.length === 0 && (
-              <tr><td colSpan={5} className='px-5 py-8 text-center text-muted'>{allStudents.length === 0 ? t('noStudentsYetPlain') : t('noStudentsMatchFilters')}</td></tr>
+              <tr><td colSpan={6} className='px-5 py-8 text-center text-muted'>{allStudents.length === 0 ? t('noStudentsYetPlain') : t('noStudentsMatchFilters')}</td></tr>
             )}
           </tbody>
         </table>
@@ -155,10 +166,15 @@ const Students = () => {
                 </span>
               </div>
               <p className='text-muted text-xs mt-0.5 font-mono'>{s.phone} · {s.branchId?.name}</p>
-              <div className='flex flex-wrap gap-1 mt-1.5'>
-                {courseTags(s).length > 0 ? courseTags(s).map((name, i) => (
-                  <span key={i} className='text-[11px] font-medium px-2 py-0.5 rounded-full bg-bg text-muted'>{name}</span>
-                )) : <span className='text-[11px] text-muted'>—</span>}
+              <div className='flex flex-wrap items-center justify-between gap-1 mt-1.5'>
+                <div className='flex flex-wrap gap-1'>
+                  {courseTags(s).length > 0 ? courseTags(s).map((name, i) => (
+                    <span key={i} className='text-[11px] font-medium px-2 py-0.5 rounded-full bg-bg text-muted'>{name}</span>
+                  )) : <span className='text-[11px] text-muted'>—</span>}
+                </div>
+                <span className={`font-mono text-xs font-semibold flex-shrink-0 ${totalBalance(s) > 0 ? 'text-rose-600' : totalBalance(s) < 0 ? 'text-emerald-600' : 'text-muted'}`}>
+                  {totalBalance(s) > 0 ? `-${formatMoney(totalBalance(s))}` : totalBalance(s) < 0 ? `+${formatMoney(-totalBalance(s))}` : formatMoney(0)}
+                </span>
               </div>
             </div>
           </button>
