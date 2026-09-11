@@ -12,6 +12,8 @@ import {
     updateSettings,
     listAllGroups, updateGroupLimits, getTodayTimetable,
     getFinanceOverview, getPaymentDetail, listPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, prepaySalary, getBusinessLedger,
+    listExpenseCategoriesDirector, createExpenseCategoryDirector, updateExpenseCategoryDirector, deleteExpenseCategoryDirector,
+    getExpensesOverviewDirector, getExpenseDetailDirector, createExpenseDirector, updateExpenseDirector, deleteExpenseDirector,
 } from "../controllers/directorController.js"
 import { listLanguages, listLevels, listBranches, getSettings } from "../controllers/catalogController.js"
 import {
@@ -102,6 +104,16 @@ directorRouter.get('/salary/calculate', calculateSalary)
 directorRouter.get('/salary/detail/:teacherId', getSalaryDetail)
 directorRouter.post('/salary/pay', paySalary)
 directorRouter.post('/salary/prepay', prepaySalary)
+
+directorRouter.get('/expense-categories', listExpenseCategoriesDirector)
+directorRouter.post('/expense-categories', createExpenseCategoryDirector)
+directorRouter.put('/expense-categories/:id', updateExpenseCategoryDirector)
+directorRouter.delete('/expense-categories/:id', deleteExpenseCategoryDirector)
+directorRouter.get('/expenses', getExpensesOverviewDirector)
+directorRouter.get('/expenses/:id', getExpenseDetailDirector)
+directorRouter.post('/expenses', createExpenseDirector)
+directorRouter.put('/expenses/:id', updateExpenseDirector)
+directorRouter.delete('/expenses/:id', deleteExpenseDirector)
 
 directorRouter.get('/stats', directorOnly, getStats)
 directorRouter.get('/map-data', directorOnly, getMapData)

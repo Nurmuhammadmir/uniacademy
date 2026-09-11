@@ -38,7 +38,7 @@ import { computeEffectiveLessonStatuses, computeEffectiveLessonStatus } from "..
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
 import { applyDiscountToStudent, deleteDiscountEntry } from "../services/discountApplication.service.js"
 import { openMembership, closeMembership } from "../services/groupMembership.service.js"
-import { getOrCreateAccount, postTransfer, postEntry, deleteEntries } from "../services/ledger.service.js"
+import { getOrCreateAccount, postTransfer, postEntry, deleteEntries, formatAmount } from "../services/ledger.service.js"
 import { recognizeEnrollmentDebt, computeCourseOwed, recomputeEnrollmentStatus, reverseUnusedPeriod, recognizeNextPeriod } from "../services/billingCycle.service.js"
 
 // api for the teacher profile view, admin version - scoped to admin's own branch. A teacher may
@@ -871,7 +871,7 @@ export const createPayment = async (req, res) => {
             fromAccountId: studentAccount._id, toAccountId: branchAccount._id,
             amount, kind: 'payment', method,
             meta: { studentId, sourceType: 'payment', sourceId: payment._id },
-            description: `Payment received - ${amount.toLocaleString()} via ${method}`,
+            description: `Payment received - ${formatAmount(amount)} via ${method}`,
             createdBy: req.auth.userId, date: paymentDate,
         }) || []
         if (studentEntry) { payment.ledgerTransactionId = studentEntry.transactionId; await payment.save({ validateModifiedOnly: true }) }
@@ -1057,7 +1057,7 @@ export const refundPayment = async (req, res) => {
             fromDirection: 'decrease', toDirection: 'increase',
             amount: refundAmount, kind: 'refund', method: payment.method,
             meta: { studentId: payment.studentId, groupId: payment.groupId, languageId: payment.languageId, levelId: payment.levelId, teacherId: payment.teacherId, sourceType: 'payment', sourceId: payment._id },
-            description: `Refund of payment ${payment._id} - ${refundAmount.toLocaleString()}`,
+            description: `Refund of payment ${payment._id} - ${formatAmount(refundAmount)}`,
             createdBy: req.auth.userId, date: new Date(),
         })
 
@@ -1149,7 +1149,7 @@ export const updatePayment = async (req, res) => {
                     fromAccountId: studentAccount._id, toAccountId: branchAccount._id,
                     amount: delta, kind: 'payment', method: payment.method,
                     meta: { studentId: payment.studentId, groupId: payment.groupId, languageId: payment.languageId, levelId: payment.levelId, teacherId: payment.teacherId, sourceType: 'payment', sourceId: payment._id },
-                    description: `Correction to payment ${payment._id} - increased by ${delta.toLocaleString()}`,
+                    description: `Correction to payment ${payment._id} - increased by ${formatAmount(delta)}`,
                     createdBy: req.auth.userId, date: new Date(),
                 })
             } else {
@@ -1158,7 +1158,7 @@ export const updatePayment = async (req, res) => {
                     fromDirection: 'decrease', toDirection: 'increase',
                     amount: -delta, kind: 'payment', method: payment.method,
                     meta: { studentId: payment.studentId, groupId: payment.groupId, languageId: payment.languageId, levelId: payment.levelId, teacherId: payment.teacherId, sourceType: 'payment', sourceId: payment._id },
-                    description: `Correction to payment ${payment._id} - decreased by ${(-delta).toLocaleString()}`,
+                    description: `Correction to payment ${payment._id} - decreased by ${formatAmount(-delta)}`,
                     createdBy: req.auth.userId, date: new Date(),
                 })
             }
@@ -1168,7 +1168,13 @@ export const updatePayment = async (req, res) => {
         }
         if (method !== undefined && method !== payment.method) {
             if (!PAYMENT_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_payment_method' })
-            if (payment.ledgerTransactionId) await LedgerEntry.updateMany({ transactionId: payment.ledgerTransactionId }, { method })
+            // sourceType/sourceId (not ledgerTransactionId) - an earlier amount correction above posts
+            // its own delta transfer under a DIFFERENT transactionId, which ledgerTransactionId (only
+            // ever set once, at creation) never points at. Filtering by sourceId instead reaches that
+            // delta transfer too, same as deleteEntries below already does - confirmed real bug: editing
+            // amount then method (in that order) used to leave the delta's entries on the old method
+            // forever, silently splitting one payment's cash across two methods in the ledger.
+            await LedgerEntry.updateMany({ sourceType: 'payment', sourceId: payment._id }, { method })
             payment.method = method
         }
         if (comment !== undefined) payment.comment = String(comment).trim().slice(0, 2000)

@@ -410,6 +410,106 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // ==== Expenses (director) - mirrors adminController's own Expenses tab exactly, just scoped to
+    // whichever branchId the Finance switcher has selected instead of req.auth.branchId, same
+    // adaptation as getFinanceOverview/calculateSalary above ====
+    const [expenseCategories, setExpenseCategories] = useState([])
+
+    const getExpenseCategories = async (branchId) => {
+        if (!branchId) return
+        try {
+            const { data } = await axios.get(backendUrl + '/api/director/expense-categories', { params: { branchId }, ...authHeader })
+            setExpenseCategories(data.categories)
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadExpenseCategories'))
+        }
+    }
+
+    const createExpenseCategory = async (branchId, payload) => {
+        try {
+            await axios.post(backendUrl + '/api/director/expense-categories', { branchId, ...payload }, authHeader)
+            getExpenseCategories(branchId)
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'category_already_exists' ? t('categoryAlreadyExistsError') : (code || t('couldNotSaveCategory')))
+            return false
+        }
+    }
+
+    const updateExpenseCategory = async (branchId, id, payload) => {
+        try {
+            await axios.put(backendUrl + '/api/director/expense-categories/' + id, { branchId, ...payload }, authHeader)
+            getExpenseCategories(branchId)
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'category_already_exists' ? t('categoryAlreadyExistsError') : (code || t('couldNotSaveCategory')))
+            return false
+        }
+    }
+
+    const deleteExpenseCategory = async (branchId, id) => {
+        if (!(await confirm(t('confirmDeleteCategory')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/expense-categories/' + id, { params: { branchId }, ...authHeader })
+            getExpenseCategories(branchId)
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'cannot_delete_other' ? t('cannotDeleteOtherError') : (code || t('couldNotDeleteCategory')))
+            return false
+        }
+    }
+
+    const getExpensesOverview = async (branchId, filters = {}) => {
+        if (!branchId) return null
+        try {
+            const params = new URLSearchParams(Object.entries({ branchId, ...filters }).filter(([, v]) => v !== '' && v !== null && v !== undefined))
+            const { data } = await axios.get(backendUrl + '/api/director/expenses?' + params.toString(), authHeader)
+            return data
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadExpenses'))
+            return null
+        }
+    }
+
+    const createExpense = async (branchId, payload) => {
+        try {
+            await axios.post(backendUrl + '/api/director/expenses', { branchId, ...payload }, authHeader)
+            toast.success(t('expenseSaved'))
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotSaveExpense'))
+            return false
+        }
+    }
+
+    const updateExpense = async (branchId, id, payload) => {
+        try {
+            await axios.put(backendUrl + '/api/director/expenses/' + id, { branchId, ...payload }, authHeader)
+            toast.success(t('expenseSaved'))
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'expense_locked' ? t('expenseLockedError') : (code || t('couldNotSaveExpense')))
+            return false
+        }
+    }
+
+    const deleteExpense = async (branchId, id) => {
+        if (!(await confirm(t('confirmDeleteExpense')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/expenses/' + id, { params: { branchId }, ...authHeader })
+            toast.success(t('expenseDeleted'))
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'expense_locked' ? t('expenseLockedError') : (code || t('couldNotDeleteExpense')))
+            return false
+        }
+    }
+
     const getLanguages = async () => {
         try {
             const { data } = await axios.get(backendUrl + '/api/director/languages', authHeader)
@@ -1070,6 +1170,8 @@ const DirectorContextProvider = (props) => {
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,
         getFinanceOverview, getPaymentDetail, getBusinessLedger,
+        expenseCategories, getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
+        getExpensesOverview, createExpense, updateExpense, deleteExpense,
         payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, prepaySalary,
         backendUrl,
         getContentSummary, getDayContent, saveVocab, saveGrammar, saveReading, uploadContentImage, resolveContentImage,

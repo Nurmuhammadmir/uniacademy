@@ -2,11 +2,13 @@ import React, { useContext, useEffect, useState } from 'react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import FinancePayments from './FinancePayments.jsx'
+import FinanceExpenses from './FinanceExpenses.jsx'
 import Salary from './Salary.jsx'
 import Ledger from './Ledger.jsx'
 
 const TABS = [
   ['payments', 'financeTabPayments'],
+  ['expenses', 'financeTabExpenses'],
   ['salary', 'financeTabSalary'],
   ['ledger', 'financeTabLedger'],
 ]
@@ -49,6 +51,7 @@ const Finance = () => {
       ) : (
         <>
           {tab === 'payments' && <FinancePayments branchId={branchId} />}
+          {tab === 'expenses' && <FinanceExpenses branchId={branchId} />}
           {tab === 'salary' && <Salary branchId={branchId} />}
           {tab === 'ledger' && <Ledger branchId={branchId} />}
         </>

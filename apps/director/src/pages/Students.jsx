@@ -44,7 +44,7 @@ const Students = () => {
   const exportStudentsCSV = () => {
     const header = ['#', 'Name', 'Phone', 'Branch', 'Status', 'Courses', 'Total balance']
     const rows = visibleStudents.map((s, i) => [
-      i + 1, s.name, s.phone, s.branchId?.name || '', anyActive(s) ? t('active') : t('unpaid'), courseSummary(s), totalBalance(s),
+      i + 1, s.name, s.phone, s.branchId?.name || '', anyActive(s) ? t('active') : t('unpaid'), courseSummary(s), formatMoney(totalBalance(s)),
     ])
     // the leading "sep=," line is an Excel-only directive that forces it to use comma as the column
     // separator regardless of the machine's regional settings - without it, a Windows install whose

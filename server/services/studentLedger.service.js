@@ -8,7 +8,7 @@ import Group from "../models/Group.js"
 import LedgerEntry from "../models/LedgerEntry.js"
 import { getOrCreateAccount } from "./ledger.service.js"
 import Account from "../models/Account.js"
-import { computeCoveredDebtPeriodsBatch, computeAccountAllocation, computeCourseOwed, foldReversalsAndAllocate, ALLOCATION_KINDS } from "./billingCycle.service.js"
+import { computeCoveredDebtPeriodsBatch, computeAccountAllocation, computeCourseOwed, foldReversalsAndAllocate, DISPLAY_KINDS } from "./billingCycle.service.js"
 import { prorateByDateOverlap } from "./attribution.service.js"
 
 // one course's full statement: every Credit (payment received / refund reversed) and Debit (period
@@ -104,13 +104,18 @@ export const computeReconciliation = async (studentIds, dateFrom, dateTo) => {
     const accountByStudent = new Map(accounts.map(a => [String(a.ownerId), a]))
 
     const accountIds = accounts.map(a => a._id)
-    // ALLOCATION_KINDS (not a hand-picked subset) - this used to leave out 'debt_reversal' entirely,
-    // a real bug found live: a student removed from a group (or frozen) mid-period had money
-    // returned to their balance, but this report never even fetched the entry that recorded it, so
-    // it kept reporting them as owing the FULL original charge - "Акт сверки" overstated debt by
-    // exactly however much had already been given back.
+    // DISPLAY_KINDS (not ALLOCATION_KINDS, and not a hand-picked subset) - this used to leave out
+    // 'debt_reversal' entirely, a real bug found live: a student removed from a group (or frozen)
+    // mid-period had money returned to their balance, but this report never even fetched the entry
+    // that recorded it, so it kept reporting them as owing the FULL original charge - "Акт сверки"
+    // overstated debt by exactly however much had already been given back. Later, the same class of
+    // staleness showed up for 'opening_balance' (a director's manual balance correction,
+    // directorController.js's adjustStudentBalance): ALLOCATION_KINDS deliberately excludes it so it
+    // can never count as teacher revenue, but this report has no such concern - it's read-only display,
+    // never consulted by salary calculation - so DISPLAY_KINDS (superset, see billingCycle.service.js)
+    // is the correct choice here, not the salary-facing one.
     const allEntries = accountIds.length
-        ? await LedgerEntry.find({ accountId: { $in: accountIds }, kind: { $in: ALLOCATION_KINDS } })
+        ? await LedgerEntry.find({ accountId: { $in: accountIds }, kind: { $in: DISPLAY_KINDS } })
             .select('accountId languageId direction amount date kind sourceType sourceId').sort({ date: 1, _id: 1 }).lean()
         : []
     const entriesByAccount = new Map()

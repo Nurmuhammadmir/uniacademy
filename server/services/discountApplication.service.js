@@ -11,7 +11,7 @@
 // (see deleteDiscountEntry below).
 import User from "../models/User.js"
 import LedgerEntry from "../models/LedgerEntry.js"
-import { getOrCreateAccount, postEntry, deleteEntries } from "./ledger.service.js"
+import { getOrCreateAccount, postEntry, deleteEntries, formatAmount } from "./ledger.service.js"
 import { recomputeEnrollmentStatus, computeCourseOwed } from "./billingCycle.service.js"
 
 // one student, one course - the building block every scope (single student / whole group / whole
@@ -40,7 +40,7 @@ export const applyDiscountToStudent = async ({ student, languageId, type, value,
     const amount = Math.min(owed, type === 'percent' ? Math.round(owed * value / 100) : Math.round(value))
     if (!(amount > 0)) return null
 
-    const label = type === 'percent' ? `${value}% chegirma` : `${amount.toLocaleString()} chegirma`
+    const label = type === 'percent' ? `${value}% chegirma` : `${formatAmount(amount)} chegirma`
     const entry = await postEntry({
         accountId: studentAccount._id, direction: 'decrease', amount, kind: 'discount',
         meta: { studentId: student._id, groupId: course.groupId, languageId, levelId: course.levelId || null },

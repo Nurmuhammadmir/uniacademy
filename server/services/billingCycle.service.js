@@ -3,11 +3,22 @@ import User from "../models/User.js"
 import Group from "../models/Group.js"
 import Account from "../models/Account.js"
 import LedgerEntry from "../models/LedgerEntry.js"
-import { getOrCreateAccount, postEntry, computePeriodCost, dateOnlyUTC, startOfNextMonthUTC } from "./ledger.service.js"
+import { getOrCreateAccount, postEntry, computePeriodCost, dateOnlyUTC, startOfNextMonthUTC, formatAmount } from "./ledger.service.js"
 
-// the kinds computeAccountAllocation/computeCoveredDebtPeriodsBatch/computeReconciliation all need
-// fetched, in one place so none of them can silently drift out of sync with what the others read
+// the kinds computeCoveredDebtPeriodsBatch (the ONLY teacher-revenue/salary-facing consumer of this
+// fold logic) is allowed to ever see - deliberately excludes 'opening_balance' (see LedgerEntry.js's
+// own comment on that kind) so a director's manual balance correction (directorController.js's
+// adjustStudentBalance) can never be mistaken for real cash a teacher earned a revenue share on.
 export const ALLOCATION_KINDS = ['debt', 'payment', 'refund', 'expense', 'discount', 'debt_reversal']
+// same fold+FIFO math, but for DISPLAY-ONLY reads (computeAccountAllocation, hence
+// computeCourseOwed/computeCourseCovered/computeCourseStatement, and computeReconciliation's own
+// query) - these exist purely to answer "what does this student actually currently owe", so an
+// opening_balance correction MUST count as cash there (otherwise a director who just told the system
+// "this student owes 0" would still see them owing the old amount on the very next report they open)
+// even though it must stay invisible to the salary-facing set above. Confirmed real bug, found live:
+// before this split existed, computeReconciliation/computeCourseOwed stayed frozen at their
+// pre-correction figures forever, silently disagreeing with the account's own real, corrected balance.
+export const DISPLAY_KINDS = [...ALLOCATION_KINDS, 'opening_balance']
 
 // the actual fold+FIFO math, given an already-fetched list of one account's entries (any kind in
 // ALLOCATION_KINDS) - factored out so computeAccountAllocation (one account) and
@@ -57,10 +68,14 @@ export const foldReversalsAndAllocate = (entries) => {
 
     // pass 1: total cash the wallet has ever actually received, regardless of which course (if any)
     // it was nominally recorded against - a discount/expense settles a debt exactly like a real
-    // payment as far as teacher revenue is concerned, a refund gives cash back out.
+    // payment as far as teacher revenue is concerned, a refund gives cash back out. 'opening_balance'
+    // (a director's manual balance correction) counts here too - it can only ever reach this function
+    // via computeAccountAllocation's own DISPLAY_KINDS query, never via computeCoveredDebtPeriodsBatch's
+    // ALLOCATION_KINDS-only query, so treating it as cash here is safe for teacher revenue by
+    // construction: this branch never runs on the entry list salary calculation actually reads.
     let cashAvailable = 0
     for (const e of relevantEntries) {
-        if (e.kind === 'payment' || e.kind === 'expense' || e.kind === 'discount') cashAvailable += e.amount
+        if (e.kind === 'payment' || e.kind === 'expense' || e.kind === 'discount' || e.kind === 'opening_balance') cashAvailable += e.amount
         else if (e.kind === 'refund') cashAvailable -= e.amount
     }
 
@@ -89,7 +104,7 @@ export const foldReversalsAndAllocate = (entries) => {
 // for many accounts at once instead of calling this in a loop.
 export const computeAccountAllocation = async (accountId) => {
     const entries = await LedgerEntry.find({
-        accountId: new mongoose.Types.ObjectId(accountId), kind: { $in: ALLOCATION_KINDS },
+        accountId: new mongoose.Types.ObjectId(accountId), kind: { $in: DISPLAY_KINDS },
     }).sort({ date: 1, _id: 1 })
     return foldReversalsAndAllocate(entries)
 }
@@ -170,7 +185,7 @@ export const recognizeNextPeriod = async (student, course, { createdBy = null, e
     const dayLabel = isFullMonth
         ? `${windowStart.toISOString().slice(0, 10)} – ${windowEnd.toISOString().slice(0, 10)}`
         : `${windowStart.toISOString().slice(0, 10)} – ${windowEnd.toISOString().slice(0, 10)} (partial month)`
-    const description = `${dayLabel} · ${group.price.toLocaleString()}/mo = ${cost.toLocaleString()}`
+    const description = `${dayLabel} · ${formatAmount(group.price)}/mo = ${formatAmount(cost)}`
 
     // a deliberately backdated first period is dated to when it actually started (windowStart), not
     // "today" (when the admin happens to be entering it), so it sorts correctly against anything
@@ -304,7 +319,7 @@ export const reverseUnusedPeriod = async (student, course, group, createdBy = nu
             teacherId: group.teacherId, periodStart: currentDebt.periodStart, periodEnd: currentDebt.periodEnd,
             sourceType: 'ledgerEntry', sourceId: currentDebt._id,
         },
-        description: `${reason} ${today.toISOString().slice(0, 10)} - ${unusedDays}/${totalDays} unused days of ${currentDebt.amount.toLocaleString()} returned = ${reversalAmount.toLocaleString()}`,
+        description: `${reason} ${today.toISOString().slice(0, 10)} - ${unusedDays}/${totalDays} unused days of ${formatAmount(currentDebt.amount)} returned = ${formatAmount(reversalAmount)}`,
         createdBy,
         date: today,
     })

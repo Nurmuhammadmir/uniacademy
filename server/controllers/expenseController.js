@@ -6,7 +6,7 @@ import ExpenseCategory from "../models/ExpenseCategory.js"
 import LedgerEntry from "../models/LedgerEntry.js"
 import { startOfLocalDay, endOfLocalDay, isEditableToday, todayLocalISO } from "../services/businessTime.service.js"
 import { ensureDefaultCategories, OTHER_CATEGORY } from "../services/expenseCategories.service.js"
-import { getOrCreateAccount, postEntry, deleteEntries } from "../services/ledger.service.js"
+import { getOrCreateAccount, postEntry, deleteEntries, formatAmount } from "../services/ledger.service.js"
 
 // ==== Categories ====
 
@@ -224,13 +224,20 @@ export const updateExpense = async (req, res) => {
                 accountId: branchAccount._id, direction: delta > 0 ? 'decrease' : 'increase', amount: Math.abs(delta),
                 kind: 'expense', method: expense.method,
                 meta: { sourceType: 'expense', sourceId: expense._id },
-                description: `Correction to ${expense.name || expense.category} - ${delta > 0 ? 'increased' : 'decreased'} by ${Math.abs(delta).toLocaleString()}`,
+                description: `Correction to ${expense.name || expense.category} - ${delta > 0 ? 'increased' : 'decreased'} by ${formatAmount(Math.abs(delta))}`,
                 createdBy: req.auth.userId, date: new Date(),
             })
             expense.amount = Number(amount)
         }
-        if (method !== undefined && method !== expense.method && expense.ledgerTransactionId) {
-            await LedgerEntry.updateMany({ transactionId: expense.ledgerTransactionId }, { method })
+        if (method !== undefined && method !== expense.method) {
+            // sourceType/sourceId (not ledgerTransactionId) - reaches an earlier amount correction's
+            // own delta entry (separate transactionId, never tracked onto ledgerTransactionId), AND,
+            // for a salary/prepayment payout, the teacher's own matching decrease (adminController's
+            // paySalary/prepaySalary post that as a second, independent postEntry call under the same
+            // sourceId) - the old transactionId-only filter fixed neither, so a same-day method
+            // correction on a payout used to leave the teacher's own ledger row on the old method
+            // forever, and any prior amount edit's delta on whatever method was set at that time.
+            await LedgerEntry.updateMany({ sourceType: 'expense', sourceId: expense._id }, { method })
         }
 
         if (name !== undefined) expense.name = name

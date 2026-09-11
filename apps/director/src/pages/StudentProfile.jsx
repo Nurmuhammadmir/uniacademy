@@ -9,15 +9,26 @@ import Modal from '../components/Modal.jsx'
 // director sees everything admin sees, PLUS address/geo - only the director is allowed to see
 // where a student lives. Read-only except for one deliberate override: adjustStudentBalance below,
 // a director-only manual reconciliation tool - everything else here stays the branch admin's job.
+// deliberately NOT a bare signed number field - Account.balance's own sign convention (>0 = owes,
+// <0 = credit, see server/models/Account.js) reads backwards to plain human intuition ("minus" reads
+// as "owed" to most people, not "credit"), and a raw sign is exactly the kind of thing that's easy to
+// mistype in a money tool with zero visible warning. An explicit debt/credit toggle plus a
+// plain non-negative amount can't be typo'd into the wrong direction the way a missing "-" can -
+// confirmed real confusion: typing "-250000" expecting "250,000 of debt" actually set a 250,000
+// CREDIT (the literal, correct Account.balance result for that input), which is the opposite of what
+// was intended. The resulting signed balance (owes = +amount, credit = -amount) is computed here and
+// handed to adjustStudentBalance exactly as before - the backend/API contract is unchanged.
 const AdjustBalanceModal = ({ studentId, currentBalance, onClose, onAdjusted }) => {
   const { adjustStudentBalance } = useContext(DirectorContext)
   const { t } = useLanguage()
-  const [target, setTarget] = useState(String(currentBalance))
+  const [mode, setMode] = useState(currentBalance < 0 ? 'credit' : 'debt')
+  const [amount, setAmount] = useState(currentBalance !== 0 ? String(Math.abs(currentBalance)) : '')
   const [submitting, setSubmitting] = useState(false)
 
-  const targetNum = Number(target)
-  const diff = Math.round(currentBalance - targetNum)
-  const isValid = target !== '' && Number.isFinite(targetNum)
+  const amountNum = Number(amount)
+  const isValid = amount !== '' && Number.isFinite(amountNum) && amountNum >= 0
+  const resultingBalance = isValid ? (mode === 'debt' ? Math.round(amountNum) : -Math.round(amountNum)) : null
+  const diff = isValid ? Math.round(currentBalance - resultingBalance) : 0
 
   const submit = async (e) => {
     e.preventDefault()
@@ -28,7 +39,7 @@ const AdjustBalanceModal = ({ studentId, currentBalance, onClose, onAdjusted }) 
       : t('confirmIncreaseBalance', { amount: formatMoney(-diff) })
     if (!(await confirm(confirmMessage))) return
     setSubmitting(true)
-    const result = await adjustStudentBalance(studentId, targetNum)
+    const result = await adjustStudentBalance(studentId, resultingBalance)
     setSubmitting(false)
     if (result) onAdjusted()
   }
@@ -40,9 +51,19 @@ const AdjustBalanceModal = ({ studentId, currentBalance, onClose, onAdjusted }) 
           <p className='text-muted text-xs mb-1'>{t('currentBalanceLabel')}</p>
           <p className={`font-mono text-lg ${currentBalance > 0 ? 'text-rose-600' : 'text-ink'}`}>{formatMoney(currentBalance)}</p>
         </div>
+        <div className='grid grid-cols-2 gap-2'>
+          <button type='button' onClick={() => setMode('debt')}
+            className={`py-2 rounded-lg text-sm font-medium border transition-colors ${mode === 'debt' ? 'bg-rose-600 text-white border-rose-600' : 'bg-bg border-hairline text-muted'}`}>
+            {t('balanceModeDebt')}
+          </button>
+          <button type='button' onClick={() => setMode('credit')}
+            className={`py-2 rounded-lg text-sm font-medium border transition-colors ${mode === 'credit' ? 'bg-accent text-white border-accent' : 'bg-bg border-hairline text-muted'}`}>
+            {t('balanceModeCredit')}
+          </button>
+        </div>
         <div>
-          <p className='text-xs text-muted mb-1'>{t('targetBalanceLabel')}</p>
-          <input type='number' value={target} onChange={e => setTarget(e.target.value)}
+          <p className='text-xs text-muted mb-1'>{mode === 'debt' ? t('debtAmountLabel') : t('creditAmountLabel')}</p>
+          <input type='number' min='0' value={amount} onChange={e => setAmount(e.target.value)}
             className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm font-mono' autoFocus />
         </div>
         {isValid && diff !== 0 && (

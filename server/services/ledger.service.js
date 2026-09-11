@@ -21,6 +21,16 @@ export const startOfNextMonthUTC = (date) => new Date(Date.UTC(date.getUTCFullYe
 export const dateOnlyUTC = (date) => new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
 export const monthKeyUTC = (date) => `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`
 
+// comma thousands separator for a money amount baked into a LedgerEntry/Expense/Payment
+// `description` string - confirmed real bug: every one of these used to call the built-in
+// `.toLocaleString()` with no explicit locale, which (same footgun this file's own format.js
+// equivalent on every frontend already documents) renders commas, spaces, dots, or nothing at all
+// depending on the SERVER's own OS/Node locale - on this box it silently rendered non-breaking
+// spaces (300 000, not 300,000), not commas, in every description an admin/director actually reads
+// (payment/expense/refund/correction/discount/billing lines). Matches formatMoney's own regex
+// exactly so a number reads identically whether it was formatted here or on the frontend.
+export const formatAmount = (n) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+
 // windowStart = the first day of the billing chunk being charged (either the 1st of a month for a
 // full month, or some other day for a partial first/only month - a course can run as short as 15
 // days, so a chunk never assumes it reaches a full month). Returns the (rounded) raw cost for that

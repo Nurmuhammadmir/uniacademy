@@ -1,12 +1,13 @@
 // director sees every branch with no restriction - this controller only ever calls services/models,
 // no business rules are decided in here
+import mongoose from "mongoose"
 import bcrypt from "bcrypt"
 import User from "../models/User.js"
 import Branch from "../models/Branch.js"
 import Payment from "../models/Payment.js"
 import Group from "../models/Group.js"
 import Pricing from "../models/Pricing.js"
-import { getOrCreateAccount, postEntry } from "../services/ledger.service.js"
+import { getOrCreateAccount, postEntry, deleteEntries, formatAmount } from "../services/ledger.service.js"
 import Account from "../models/Account.js"
 import { computeCourseOwed, recomputeEnrollmentStatus } from "../services/billingCycle.service.js"
 import Language from "../models/Language.js"
@@ -20,14 +21,16 @@ import Room from "../models/Room.js"
 import Lesson from "../models/Lesson.js"
 import TeacherPayRate, { PAY_RATE_TYPES } from "../models/TeacherPayRate.js"
 import Expense, { EXPENSE_METHODS } from "../models/Expense.js"
+import ExpenseCategory from "../models/ExpenseCategory.js"
+import LedgerEntry from "../models/LedgerEntry.js"
 import { assertNoScheduleConflict } from "../services/scheduleConflict.service.js"
 import { computeDayCounter } from "../services/dayCounter.service.js"
 import { earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
 import { deleteLevelContent, deleteDayContent } from "../services/contentCascade.service.js"
 import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
-import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
-import { ensureDefaultCategories, ensureCategoryExists, SALARY_CATEGORY, PREPAYMENT_CATEGORY } from "../services/expenseCategories.service.js"
+import { startOfLocalDay, endOfLocalDay, isEditableToday } from "../services/businessTime.service.js"
+import { ensureDefaultCategories, ensureCategoryExists, SALARY_CATEGORY, PREPAYMENT_CATEGORY, OTHER_CATEGORY } from "../services/expenseCategories.service.js"
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
 import { hardDeleteStudent } from "../services/studentCascade.service.js"
 import { hardDeleteTeacher } from "../services/teacherCascade.service.js"
@@ -1115,6 +1118,223 @@ export const getBusinessLedger = async (req, res) => {
         if (!dateFrom || !dateTo) return res.status(400).json({ error: 'date_range_required' })
         const result = await computeBusinessLedger(branchId, startOfLocalDay(dateFrom), endOfLocalDay(dateTo))
         res.json(result)
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// ==== Expenses (director) - mirrors expenseController.js's admin-facing Expenses tab exactly
+// (same categories, same Expense/LedgerEntry posting, same same-day edit lock), just scoped to
+// whichever branchId the director's Finance switcher has selected instead of req.auth.branchId,
+// the same adaptation already used above for Finance/Salary. Confirmed gap: admin and Shanti both
+// already had full expense management, director had none at all - a director could only ever VIEW
+// expenses indirectly through the Business Ledger/Net Profit figures, never manage them directly. ====
+
+export const listExpenseCategoriesDirector = async (req, res) => {
+    try {
+        const { branchId } = req.query
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        await ensureDefaultCategories(branchId)
+        const categories = await ExpenseCategory.find({ branchId }).sort({ name: 1 }).lean()
+        res.json({ categories })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const createExpenseCategoryDirector = async (req, res) => {
+    try {
+        const { branchId, name, color } = req.body
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        if (!name?.trim()) return res.status(400).json({ error: 'name_required' })
+        const category = await ExpenseCategory.create({ branchId, name: name.trim(), color: color || '#7A7266' })
+        res.status(201).json({ category })
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ error: 'category_already_exists' })
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const updateExpenseCategoryDirector = async (req, res) => {
+    try {
+        const { branchId, name, color } = req.body
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const category = await ExpenseCategory.findOne({ _id: req.params.id, branchId })
+        if (!category) return res.status(404).json({ error: 'not_found' })
+
+        const oldName = category.name
+        if (name !== undefined && name.trim()) category.name = name.trim()
+        if (color !== undefined) category.color = color
+        await category.save()
+
+        if (category.name !== oldName) {
+            await Expense.updateMany({ branchId, category: oldName }, { category: category.name })
+        }
+        res.json({ category })
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ error: 'category_already_exists' })
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const deleteExpenseCategoryDirector = async (req, res) => {
+    try {
+        const { branchId } = req.query
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const category = await ExpenseCategory.findOne({ _id: req.params.id, branchId })
+        if (!category) return res.status(404).json({ error: 'not_found' })
+        if (category.name === OTHER_CATEGORY) return res.status(400).json({ error: 'cannot_delete_other' })
+
+        await ensureDefaultCategories(branchId)
+        await Expense.updateMany({ branchId, category: category.name }, { category: OTHER_CATEGORY })
+        await category.deleteOne()
+        res.json({ deleted: true })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const getExpensesOverviewDirector = async (req, res) => {
+    try {
+        const { branchId, dateFrom, dateTo, category, categories, method, search, amountMin, amountMax } = req.query
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+
+        const match = { branchId: new mongoose.Types.ObjectId(branchId) }
+        const categoryList = categories ? categories.split(',').filter(Boolean) : (category ? [category] : [])
+        if (categoryList.length > 0) match.category = { $in: categoryList }
+        if (method) match.method = method
+        if (amountMin || amountMax) {
+            match.amount = {}
+            if (amountMin) match.amount.$gte = Number(amountMin)
+            if (amountMax) match.amount.$lte = Number(amountMax)
+        }
+        if (search) {
+            const q = search.trim()
+            match.$or = [{ name: new RegExp(q, 'i') }, { recipient: new RegExp(q, 'i') }]
+        }
+        if (dateFrom || dateTo) {
+            match.date = {}
+            if (dateFrom) match.date.$gte = startOfLocalDay(dateFrom)
+            if (dateTo) match.date.$lte = endOfLocalDay(dateTo)
+        }
+
+        const expenses = await Expense.find(match).sort({ date: -1 }).populate('teacherId', 'name').populate('createdBy', 'name').lean()
+        const totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0)
+        const byCategoryMap = {}
+        expenses.forEach(e => { byCategoryMap[e.category] = (byCategoryMap[e.category] || 0) + e.amount })
+        const byCategory = Object.entries(byCategoryMap).map(([cat, total]) => ({ category: cat, total }))
+
+        res.json({ expenses, totalAmount, byCategory })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const getExpenseDetailDirector = async (req, res) => {
+    try {
+        const { branchId } = req.query
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const expense = await Expense.findOne({ _id: req.params.id, branchId })
+            .populate('teacherId', 'name').populate('createdBy', 'name').lean()
+        if (!expense) return res.status(404).json({ error: 'not_found' })
+        res.json({ expense })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const createExpenseDirector = async (req, res) => {
+    try {
+        const { branchId, name, category, amount, date, recipient, method } = req.body
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        if (!(amount > 0)) return res.status(400).json({ error: 'amount_required' })
+        if (method && !EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
+
+        await ensureDefaultCategories(branchId)
+        const expenseDate = date ? new Date(date) : new Date()
+        const expense = await Expense.create({
+            branchId, name: name || '', category: category || OTHER_CATEGORY,
+            amount, date: expenseDate, recipient: recipient || '',
+            method: method || 'cash', createdBy: req.auth.userId,
+        })
+        const branchAccount = await getOrCreateAccount('branch', branchId)
+        const entry = await postEntry({
+            accountId: branchAccount._id, direction: 'decrease', amount, kind: 'expense', method: expense.method,
+            meta: { sourceType: 'expense', sourceId: expense._id },
+            description: expense.name || expense.category, createdBy: req.auth.userId, date: expenseDate,
+        })
+        if (entry) { expense.ledgerTransactionId = entry.transactionId; await expense.save({ validateModifiedOnly: true }) }
+        res.status(201).json({ expense })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const updateExpenseDirector = async (req, res) => {
+    try {
+        const { branchId, name, category, amount, date, recipient, method } = req.body
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        if (method && !EXPENSE_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
+
+        const expense = await Expense.findOne({ _id: req.params.id, branchId })
+        if (!expense) return res.status(404).json({ error: 'not_found' })
+        if (!isEditableToday(expense)) return res.status(403).json({ error: 'expense_locked' })
+        if (amount !== undefined && !(Number(amount) > 0)) return res.status(400).json({ error: 'amount_required' })
+
+        if (amount !== undefined && Number(amount) !== expense.amount) {
+            const delta = Number(amount) - expense.amount
+            const branchAccount = await getOrCreateAccount('branch', branchId)
+            await postEntry({
+                accountId: branchAccount._id, direction: delta > 0 ? 'decrease' : 'increase', amount: Math.abs(delta),
+                kind: 'expense', method: expense.method,
+                meta: { sourceType: 'expense', sourceId: expense._id },
+                description: `Correction to ${expense.name || expense.category} - ${delta > 0 ? 'increased' : 'decreased'} by ${formatAmount(Math.abs(delta))}`,
+                createdBy: req.auth.userId, date: new Date(),
+            })
+            expense.amount = Number(amount)
+        }
+        // sourceType/sourceId (not ledgerTransactionId) - see expenseController.updateExpense's own
+        // comment for why: reaches an earlier amount correction's delta entry AND, for a salary/
+        // prepayment payout, the teacher's own matching decrease (a second, independent postEntry
+        // call under the same sourceId)
+        if (method !== undefined && method !== expense.method) {
+            await LedgerEntry.updateMany({ sourceType: 'expense', sourceId: expense._id }, { method })
+        }
+
+        if (name !== undefined) expense.name = name
+        if (category !== undefined) expense.category = category
+        if (date !== undefined) expense.date = new Date(date)
+        if (recipient !== undefined) expense.recipient = recipient
+        if (method !== undefined) expense.method = method
+        await expense.save()
+
+        res.json({ expense })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const deleteExpenseDirector = async (req, res) => {
+    try {
+        const { branchId } = req.query
+        if (!branchId) return res.status(400).json({ error: 'branch_required' })
+        const expense = await Expense.findOne({ _id: req.params.id, branchId })
+        if (!expense) return res.status(404).json({ error: 'not_found' })
+        if (!isEditableToday(expense)) return res.status(403).json({ error: 'expense_locked' })
+
+        await deleteEntries({ sourceType: 'expense', sourceId: expense._id })
+
+        await expense.deleteOne()
+        res.json({ deleted: true })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

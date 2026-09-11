@@ -295,7 +295,7 @@ const Students = () => {
     const header = ['#', 'Name', 'Phone', 'Status', 'Courses', 'Total balance', 'Passport info', 'Registered on']
     const rows = filteredStudents.map((s, i) => [
       i + 1, s.name, s.phone, anyActive(s) ? t('active') : t('unpaid'),
-      courseSummary(s), -(s.owed || 0), s.passportInfo || '', new Date(s.createdAt).toLocaleDateString('en-GB'),
+      courseSummary(s), formatMoney(-(s.owed || 0)), s.passportInfo || '', new Date(s.createdAt).toLocaleDateString('en-GB'),
     ])
     // the leading "sep=," line is an Excel-only directive that forces it to use comma as the column
     // separator regardless of the machine's regional settings - without it, a Windows install whose
