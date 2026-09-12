@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState } from 'react'
-import { Plus, Settings, Pencil, X, Lock } from 'lucide-react'
+import { Plus, Settings, Pencil, X } from 'lucide-react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
@@ -11,12 +11,12 @@ import MoneyInput from '../components/MoneyInput.jsx'
 const METHODS = ['cash', 'card', 'click', 'bank_transfer', 'payme', 'apelsin']
 const DEFAULT_FILTERS = { dateFrom: firstOfMonthISO(), dateTo: todayISO(), search: '', method: '' }
 const emptyExpenseForm = () => ({ name: '', date: todayISO(), category: '', recipient: '', amount: '', method: 'cash' })
-const isEditableToday = (expense) => expense.date.slice(0, 10) === todayISO()
 
-// director's counterpart of admin's Expenses tab - same categories/CRUD/same-day lock, just scoped
-// to whichever branch the Finance switcher has selected. Confirmed gap: admin and Shanti both
-// already had full expense management, director had none at all - only an indirect read via the
-// Business Ledger/Net Profit figures, never the ability to actually log or correct one.
+// director's counterpart of admin's Expenses tab - same categories/CRUD, but deliberately WITHOUT
+// admin's same-day edit lock: confirmed with the user, a director must have full authority to
+// correct or remove any expense regardless of age, not just today's. Confirmed gap: admin and
+// Shanti both already had full expense management, director had none at all - only an indirect
+// read via the Business Ledger/Net Profit figures, never the ability to actually log or correct one.
 const FinanceExpenses = ({ branchId }) => {
   const {
     expenseCategories, getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
@@ -235,14 +235,8 @@ const FinanceExpenses = ({ branchId }) => {
                   <td className='px-4 py-3 font-mono text-rose-600'>-{formatMoney(e.amount)}</td>
                   <td className='px-4 py-3 text-muted'>{t('expenseMethod_' + e.method)}</td>
                   <td className='px-4 py-3 text-right whitespace-nowrap'>
-                    {isEditableToday(e) ? (
-                      <>
-                        <button onClick={() => openEditExpense(e)} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-sm font-medium mr-2'>{t('edit')}</button>
-                        <button onClick={() => handleDeleteExpense(e._id)} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('removeBtn')}</button>
-                      </>
-                    ) : (
-                      <span title={t('expenseLockedHint')} className='inline-flex items-center gap-1 text-muted text-xs'><Lock size={13} strokeWidth={1.5} /></span>
-                    )}
+                    <button onClick={() => openEditExpense(e)} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-sm font-medium mr-2'>{t('edit')}</button>
+                    <button onClick={() => handleDeleteExpense(e._id)} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('removeBtn')}</button>
                   </td>
                 </tr>
               )
@@ -273,12 +267,10 @@ const FinanceExpenses = ({ branchId }) => {
               <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{e.category}</span>
               <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t('expenseMethod_' + e.method)}</span>
             </div>
-            {isEditableToday(e) && (
-              <div className='flex gap-2 mt-3'>
-                <button onClick={() => openEditExpense(e)} className='flex-1 px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-sm font-medium'>{t('edit')}</button>
-                <button onClick={() => handleDeleteExpense(e._id)} className='flex-1 px-3 py-1.5 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('removeBtn')}</button>
-              </div>
-            )}
+            <div className='flex gap-2 mt-3'>
+              <button onClick={() => openEditExpense(e)} className='flex-1 px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-sm font-medium'>{t('edit')}</button>
+              <button onClick={() => handleDeleteExpense(e._id)} className='flex-1 px-3 py-1.5 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('removeBtn')}</button>
+            </div>
           </div>
         ))}
       </div>

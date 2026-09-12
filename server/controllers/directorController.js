@@ -29,7 +29,7 @@ import { earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDay
 import { deleteLevelContent, deleteDayContent } from "../services/contentCascade.service.js"
 import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
-import { startOfLocalDay, endOfLocalDay, isEditableToday } from "../services/businessTime.service.js"
+import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
 import { ensureDefaultCategories, ensureCategoryExists, SALARY_CATEGORY, PREPAYMENT_CATEGORY, OTHER_CATEGORY } from "../services/expenseCategories.service.js"
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
 import { hardDeleteStudent } from "../services/studentCascade.service.js"
@@ -1299,7 +1299,12 @@ export const updateExpenseDirector = async (req, res) => {
 
         const expense = await Expense.findOne({ _id: req.params.id, branchId })
         if (!expense) return res.status(404).json({ error: 'not_found' })
-        if (!isEditableToday(expense)) return res.status(403).json({ error: 'expense_locked' })
+        // deliberately NOT gated by isEditableToday, unlike expenseController.updateExpense's admin
+        // version - confirmed with the user: a director must have full authority to correct any
+        // expense regardless of how long ago it was recorded, not just same-day. Safe by
+        // construction either way - the delta-correction entry below is always dated `new Date()`
+        // (today, when the correction actually happens), and restampAccount already keeps
+        // balanceAfter correct for a correction posted long after the entries around it.
         if (amount !== undefined && !(Number(amount) > 0)) return res.status(400).json({ error: 'amount_required' })
 
         if (amount !== undefined && Number(amount) !== expense.amount) {
@@ -1342,7 +1347,8 @@ export const deleteExpenseDirector = async (req, res) => {
         if (!branchId) return res.status(400).json({ error: 'branch_required' })
         const expense = await Expense.findOne({ _id: req.params.id, branchId })
         if (!expense) return res.status(404).json({ error: 'not_found' })
-        if (!isEditableToday(expense)) return res.status(403).json({ error: 'expense_locked' })
+        // same deliberate difference from expenseController.deleteExpense as updateExpenseDirector
+        // above - a director can delete any expense, any age, not just today's
 
         await deleteEntries({ sourceType: 'expense', sourceId: expense._id })
 
