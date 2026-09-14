@@ -3,6 +3,12 @@ import mongoose from "mongoose"
 
 const connectDB = async () => {
     mongoose.connection.on('connected', () => console.log('database connected'))
+    mongoose.connection.on('disconnected', () => console.log('database disconnected - will retry'))
+    // an 'error' event with no listener crashes the whole process (Node EventEmitter default
+    // behavior) - without this, a transient hiccup (e.g. the box's mongod restarting, or - in local
+    // dev - the SSH tunnel dropping) takes down every one of the 6 apps sharing this connection
+    // instead of just logging and letting the driver's own reconnect logic recover it.
+    mongoose.connection.on('error', (error) => console.error('database connection error:', error.message))
     await mongoose.connect(`${process.env.MONGO_URI}/uniacademy`, {
         // the driver's own default (100) opens up to 100 sockets, each holding its own read/write
         // buffers, regardless of how many are actually busy - on a RAM-capped box that's paid for

@@ -1,0 +1,11 @@
+{
+  "title": "Lamus",
+  "description": "Lamus Water Delivery CRM",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
