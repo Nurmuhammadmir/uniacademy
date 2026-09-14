@@ -64,6 +64,7 @@ export const TRANSLATIONS = {
     studentsTitle: 'Students', allStudentsTitle: 'All students', searchStudents: 'Search by name or phone…', anyBranch: 'Any branch', anyCourse: 'Any course', exportBtn: 'Export to Excel',
     noStudentsFound: 'No students found.', anyLanguage: 'Any language', anyLevel: 'Any level', clear: 'Clear', unpaid: 'unpaid',
     nameCol: 'Name', phoneCol: 'Phone', coursesCol: 'Courses', balanceCol: 'Balance', noStudentsYetPlain: 'No students yet.', noStudentsMatchFilters: 'No students match these filters.',
+    debtorsFilterBtn: 'Debtors', debtorsOnlyHint: 'Showing only students who currently owe money', totalDebtLabel: 'Total student debt',
 
     // Admins
     adminsTitle: 'Admins', addAdmin: '+ Add admin', addAdminTitle: 'Add admin', adminName: 'Full name', adminPhone: 'Phone number',
@@ -388,6 +389,7 @@ export const TRANSLATIONS = {
     studentsTitle: 'Студенты', allStudentsTitle: 'Все студенты', searchStudents: 'Поиск по имени или телефону…', anyBranch: 'Любой филиал', anyCourse: 'Любой курс', exportBtn: 'Экспорт в Excel',
     noStudentsFound: 'Студенты не найдены.', anyLanguage: 'Любой язык', anyLevel: 'Любой уровень', clear: 'Очистить', unpaid: 'не оплачен',
     nameCol: 'Имя', phoneCol: 'Телефон', coursesCol: 'Курсы', balanceCol: 'Баланс', noStudentsYetPlain: 'Пока нет студентов.', noStudentsMatchFilters: 'Нет студентов по этим фильтрам.',
+    debtorsFilterBtn: 'Должники', debtorsOnlyHint: 'Показаны только ученики с текущим долгом', totalDebtLabel: 'Общий долг учеников',
 
     adminsTitle: 'Админы', addAdmin: '+ Добавить админа', addAdminTitle: 'Добавить админа', adminName: 'Полное имя', adminPhone: 'Номер телефона',
     adminPassword: 'Пароль', adminBranch: 'Филиал', noAdminsYet: 'Пока нет админов.', editAdmin: 'Изменить админа',
@@ -702,6 +704,7 @@ export const TRANSLATIONS = {
     studentsTitle: 'Talabalar', allStudentsTitle: 'Barcha talabalar', searchStudents: 'Ism yoki telefon bo\'yicha qidirish…', anyCourse: 'Har qanday kurs', anyBranch: 'Har qanday filial', exportBtn: "Excelga eksport",
     noStudentsFound: 'Talabalar topilmadi.', anyLanguage: 'Har qanday til', anyLevel: 'Har qanday daraja', clear: 'Tozalash', unpaid: "to'lanmagan",
     nameCol: 'Ism', phoneCol: 'Telefon', coursesCol: 'Kurslar', balanceCol: 'Balans', noStudentsYetPlain: "Hozircha talabalar yo'q.", noStudentsMatchFilters: "Bu filtrlarga mos talaba yo'q.",
+    debtorsFilterBtn: 'Qarzdorlar', debtorsOnlyHint: "Faqat hozir qarzi bor talabalar ko'rsatilmoqda", totalDebtLabel: "Talabalarning jami qarzi",
 
     adminsTitle: 'Adminlar', addAdmin: "+ Admin qo'shish", addAdminTitle: "Admin qo'shish", adminName: "To'liq ism", adminPhone: 'Telefon raqami',
     adminPassword: 'Parol', adminBranch: 'Filial', noAdminsYet: "Hozircha adminlar yo'q.", editAdmin: "Adminni o'zgartirish",

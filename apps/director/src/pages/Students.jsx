@@ -1,6 +1,6 @@
 import React, { useContext, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Download } from 'lucide-react'
+import { Search, Download, AlertCircle } from 'lucide-react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
@@ -28,6 +28,7 @@ const Students = () => {
   const [branchFilter, setBranchFilter] = useState('')
   const [languageFilter, setLanguageFilter] = useState('')
   const [levelFilter, setLevelFilter] = useState('')
+  const [debtorsOnly, setDebtorsOnly] = useState(false)
 
   // a course a student has since left keeps its entry (groupId cleared) only so admin-side balance
   // history can still trace what was ever billed for it - not something they're "currently taking"
@@ -59,7 +60,11 @@ const Students = () => {
     URL.revokeObjectURL(url)
   }
 
-  const visibleStudents = useMemo(() => {
+  // computed BEFORE the debtors toggle itself, so switching branch/language/level/search always
+  // re-scopes the debtors count/total to just what's currently selected (e.g. pick one branch,
+  // immediately see just that branch's debtor count and total owed) without the toggle's own state
+  // hiding the very number it's about to filter to
+  const preDebtorsFilterStudents = useMemo(() => {
     const q = search.trim().toLowerCase()
     return allStudents.filter(s => {
       if (q && !s.name.toLowerCase().includes(q) && !s.phone.toLowerCase().includes(q)) return false
@@ -70,6 +75,13 @@ const Students = () => {
     })
   }, [allStudents, search, branchFilter, languageFilter, levelFilter])
 
+  const debtorsCount = useMemo(() => preDebtorsFilterStudents.filter(s => totalBalance(s) > 0).length, [preDebtorsFilterStudents])
+  const debtTotal = useMemo(() => preDebtorsFilterStudents.reduce((sum, s) => sum + Math.max(0, totalBalance(s)), 0), [preDebtorsFilterStudents])
+
+  const visibleStudents = useMemo(() => (
+    debtorsOnly ? preDebtorsFilterStudents.filter(s => totalBalance(s) > 0) : preDebtorsFilterStudents
+  ), [preDebtorsFilterStudents, debtorsOnly])
+
   return (
     <div>
       <div className='flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4'>
@@ -79,6 +91,17 @@ const Students = () => {
         </div>
         <button onClick={exportStudentsCSV} className='px-4 py-2 rounded-xl bg-bg-elevated border border-hairline text-muted hover:text-ink hover:border-accent/30 text-sm font-medium flex items-center gap-1.5 transition-colors'>
           <Download size={14} /> {t('exportBtn')}
+        </button>
+      </div>
+
+      <div className='bg-bg-elevated border-l-4 border-rose-500 rounded-2xl p-4 mb-4 flex items-center justify-between flex-wrap gap-2'>
+        <div>
+          <p className='text-muted text-xs mb-1'>{t('totalDebtLabel')}{branchFilter ? ` · ${branches.find(b => b._id === branchFilter)?.name || ''}` : ''}</p>
+          <p className='font-mono text-xl text-rose-600'>-{formatMoney(debtTotal)}</p>
+        </div>
+        <button onClick={() => setDebtorsOnly(v => !v)}
+          className={`px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 transition-colors ${debtorsOnly ? 'bg-rose-500 text-white' : 'bg-bg border border-hairline text-muted'}`}>
+          <AlertCircle size={15} strokeWidth={2} /> {t('debtorsFilterBtn')} {debtorsCount > 0 && <span className='text-xs opacity-80'>({debtorsCount})</span>}
         </button>
       </div>
 
@@ -94,10 +117,11 @@ const Students = () => {
           options={[{ value: '', label: t('anyLanguage') }, ...languages.map(l => ({ value: l._id, label: l.name }))]} />
         <Select className='w-44' value={levelFilter} onChange={setLevelFilter} placeholder={t('anyLevel')}
           options={[{ value: '', label: t('anyLevel') }, ...levels.map(l => ({ value: l._id, label: l.name }))]} />
-        {(search || branchFilter || languageFilter || levelFilter) && (
-          <button onClick={() => { setSearch(''); setBranchFilter(''); setLanguageFilter(''); setLevelFilter('') }} className='text-muted hover:text-ink text-sm transition-colors'>{t('clear')}</button>
+        {(search || branchFilter || languageFilter || levelFilter || debtorsOnly) && (
+          <button onClick={() => { setSearch(''); setBranchFilter(''); setLanguageFilter(''); setLevelFilter(''); setDebtorsOnly(false) }} className='text-muted hover:text-ink text-sm transition-colors'>{t('clear')}</button>
         )}
       </div>
+      {debtorsOnly && <p className='text-xs text-muted -mt-2 mb-4'>{t('debtorsOnlyHint')}</p>}
 
       <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden overflow-x-auto shadow-sm'>
         <table className='w-full text-sm'>
