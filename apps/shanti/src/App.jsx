@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useContext, useState } from 'react'
-import { Routes, Route, Navigate, Link } from 'react-router-dom'
+import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom'
 import { Toaster } from 'sonner'
 import { CheckCircle2, AlertCircle, Menu as MenuIcon } from 'lucide-react'
 import { ShantiContext } from './context/ShantiContext.jsx'
@@ -9,6 +9,7 @@ import BalanceBar from './components/BalanceBar.jsx'
 import ConfirmHost from './components/ConfirmHost.jsx'
 import Spinner from './components/Spinner.jsx'
 import Splash from './components/Splash.jsx'
+import PullToRefresh from './components/PullToRefresh.jsx'
 import Login from './pages/Login.jsx'
 
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'))
@@ -27,6 +28,7 @@ const AuthenticatedApp = () => {
   const { token, initialLoading } = useContext(ShantiContext)
   const { t } = useLanguage()
   const [navOpen, setNavOpen] = useState(false)
+  const location = useLocation()
 
   if (!token) {
     return <div className='min-h-screen bg-bg'><Login /></div>
@@ -44,7 +46,7 @@ const AuthenticatedApp = () => {
     <div className='min-h-screen bg-bg flex'>
       <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
       <div className='flex-1 flex flex-col min-w-0 lg:ml-60'>
-        <header className='lg:hidden sticky top-0 z-30 flex items-center gap-3 bg-bg-elevated border-b border-hairline pt-4 pb-2 px-4'>
+        <header className='safe-top lg:hidden sticky top-0 z-30 flex items-center gap-3 bg-bg-elevated border-b border-hairline pt-4 pb-2 px-4'>
           <button onClick={() => setNavOpen(true)} aria-label={t('menuLabel')} className='plain text-ink text-2xl leading-none px-1'><MenuIcon size={24} /></button>
           <Link to='/dashboard' className='plain'>
             <p className='font-logo text-2xl text-[#DC2626]'>Lamussa</p>
@@ -53,17 +55,20 @@ const AuthenticatedApp = () => {
         <div className='sticky top-0 lg:top-0 z-20'>
           <BalanceBar />
         </div>
-        <main className='flex-1 p-4 sm:p-8'>
+        <main className='flex-1 p-4 sm:p-8 safe-bottom'>
+          <PullToRefresh />
           <Suspense fallback={<PageFallback />}>
-            <Routes>
-              <Route path='/' element={<Navigate to='/dashboard' replace />} />
-              <Route path='/dashboard' element={<Dashboard />} />
-              <Route path='/purchases/:tab' element={<Purchases />} />
-              <Route path='/sales/:tab' element={<Sales />} />
-              <Route path='/finance/:tab' element={<Finance />} />
-              <Route path='/settings' element={<Settings />} />
-              <Route path='*' element={<Navigate to='/dashboard' replace />} />
-            </Routes>
+            <div key={location.pathname} className='page-transition'>
+              <Routes>
+                <Route path='/' element={<Navigate to='/dashboard' replace />} />
+                <Route path='/dashboard' element={<Dashboard />} />
+                <Route path='/purchases/:tab' element={<Purchases />} />
+                <Route path='/sales/:tab' element={<Sales />} />
+                <Route path='/finance/:tab' element={<Finance />} />
+                <Route path='/settings' element={<Settings />} />
+                <Route path='*' element={<Navigate to='/dashboard' replace />} />
+              </Routes>
+            </div>
           </Suspense>
         </main>
       </div>
