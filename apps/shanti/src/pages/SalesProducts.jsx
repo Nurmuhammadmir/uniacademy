@@ -108,7 +108,7 @@ const ProductEditPanel = ({ product, onClose }) => {
   }
 
   return (
-    <div className='border-t border-hairline p-4 flex flex-col gap-3.5'>
+    <div className='flex flex-col gap-3.5'>
       <div className='flex items-center gap-3'>
         <Thumb url={product.imageUrl} size='w-20 h-20' />
         <div className='flex flex-col gap-1.5'>
@@ -148,10 +148,10 @@ const ProductEditPanel = ({ product, onClose }) => {
           <div className='flex flex-col gap-1.5'>
             {recipe.map((line, idx) => (
               <div key={idx} className='flex gap-1.5 items-center'>
-                <Select forceSearch className='flex-1' value={line.materialId} onChange={v => setRecipeLine(idx, { materialId: v })}
+                <Select forceSearch className='flex-1 min-w-0' value={line.materialId} onChange={v => setRecipeLine(idx, { materialId: v })}
                   placeholder={t('chooseMaterialPlaceholder')}
                   options={materials.map(m => ({ value: m._id, label: `${m.name} (${m.unit})` }))} />
-                <NumberInput value={line.quantity} onChange={v => setRecipeLine(idx, { quantity: v })} placeholder={t('quantityLabel')} className='w-20 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+                <NumberInput value={line.quantity} onChange={v => setRecipeLine(idx, { quantity: v })} placeholder={t('quantityLabel')} className='w-16 sm:w-20 flex-shrink-0 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
                 <button type='button' onClick={() => removeRecipeLine(idx)} className='plain w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-50 flex-shrink-0'>
                   <X size={14} strokeWidth={1.5} />
                 </button>
@@ -177,23 +177,21 @@ const ProductEditPanel = ({ product, onClose }) => {
   )
 }
 
-// collapsed by default (a click anywhere on the header expands it in place) - confirmed with the
-// user: the catalog is small enough that a bare table felt heavier than it needed to be, and
-// Edit/Delete sitting exposed on every row at all times was more chrome than a handful of products
-// calls for. Only the expanded card's own ProductEditPanel loads material/recipe editing state, and
+// a click anywhere on the card opens its editor in a popup (Modal), not inline - the catalog is
+// small enough that a bare table felt heavier than it needed to be, and Edit/Delete sitting exposed
+// on every row at all times was more chrome than a handful of products calls for. The popup's own
+// ProductEditPanel only mounts (and only then loads material/recipe editing state) while open, and
 // photos are already tiny (resized+compressed server-side, see shantiUploadController.js) and
-// lazy-loaded, so opening/closing cards costs nothing extra on the server.
-const ProductCard = ({ product, isOpen, onToggle }) => (
-  <div className={`bg-bg-elevated border border-hairline rounded-2xl overflow-hidden transition-shadow ${isOpen ? 'shadow-md' : 'shadow-sm hover:shadow-md'}`}>
-    <button type='button' onClick={onToggle} className='plain w-full flex items-center gap-3 p-3 text-left'>
-      <Thumb url={product.imageUrl} size='w-12 h-12' />
-      <span className='flex-1 min-w-0'>
-        <p className='text-ink font-medium text-sm truncate'>{product.name}</p>
-        <p className='text-muted text-xs font-mono mt-0.5'>{formatMoney(product.price)} · {product.stock} {product.unit}</p>
-      </span>
-    </button>
-    {isOpen && <ProductEditPanel product={product} onClose={onToggle} />}
-  </div>
+// lazy-loaded, so opening/closing the popup costs nothing extra on the server.
+const ProductCard = ({ product, onOpen }) => (
+  <button type='button' onClick={onOpen}
+    className='plain bg-bg-elevated border border-hairline rounded-2xl shadow-sm hover:shadow-md transition-shadow w-full flex items-center gap-3 p-3 text-left'>
+    <Thumb url={product.imageUrl} size='w-12 h-12' />
+    <span className='flex-1 min-w-0'>
+      <p className='text-ink font-medium text-sm truncate'>{product.name}</p>
+      <p className='text-muted text-xs font-mono mt-0.5'>{formatMoney(product.price)} · {product.stock} {product.unit}</p>
+    </span>
+  </button>
 )
 
 const SalesProducts = () => {
@@ -203,6 +201,7 @@ const SalesProducts = () => {
   const [showRestock, setShowRestock] = useState(false)
   const [openId, setOpenId] = useState(null)
   const [newProduct, setNewProduct] = useState({ name: '', unit: '', price: '', stock: '' })
+  const openProduct = products.find(p => p._id === openId)
 
   const submitNewProduct = async (e) => {
     e.preventDefault()
@@ -224,10 +223,16 @@ const SalesProducts = () => {
 
       <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
         {products.map(p => (
-          <ProductCard key={p._id} product={p} isOpen={openId === p._id} onToggle={() => setOpenId(id => id === p._id ? null : p._id)} />
+          <ProductCard key={p._id} product={p} onOpen={() => setOpenId(p._id)} />
         ))}
         {products.length === 0 && <p className='text-muted text-sm col-span-full text-center py-8'>{t('noProductsYet')}</p>}
       </div>
+
+      {openProduct && (
+        <Modal title={openProduct.name} onClose={() => setOpenId(null)} wide>
+          <ProductEditPanel product={openProduct} onClose={() => setOpenId(null)} />
+        </Modal>
+      )}
 
       {showNew && (
         <Modal title={t('newProductTitle')} onClose={() => setShowNew(false)}>

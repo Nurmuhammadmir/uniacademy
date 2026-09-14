@@ -93,16 +93,18 @@ const NewSaleModal = ({ sale, onClose, onCreated }) => {
         <p className='text-xs text-muted mt-1'>{t('itemsLabel')}</p>
         <div className='flex flex-col gap-2'>
           {items.map((line, idx) => (
-            <div key={idx} className='flex gap-2 items-center'>
-              <Select forceSearch className='flex-1' value={line.productId} onChange={(v) => setLine(idx, { productId: v })} placeholder={t('productLabel')}
+            <div key={idx} className='flex flex-col sm:flex-row gap-2 sm:items-center bg-bg/60 sm:bg-transparent rounded-xl p-2 sm:p-0'>
+              <Select forceSearch className='flex-1 min-w-0' value={line.productId} onChange={(v) => setLine(idx, { productId: v })} placeholder={t('productLabel')}
                 options={products.map(p => ({ value: p._id, label: `${p.name} · ${p.unit} · ${t('stockLabel')} ${p.stock}` }))} />
-              <NumberInput placeholder={t('quantityShort')} value={line.quantity} onChange={v => setLine(idx, { quantity: v })} className='w-24 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
-              <NumberInput placeholder={t('priceLabel')} value={line.price} onChange={v => setLine(idx, { price: v })} className='w-28 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
-              {items.length > 1 && (
-                <button type='button' onClick={() => removeLine(idx)} className='plain w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-50 flex-shrink-0'>
-                  <X size={15} strokeWidth={1.5} />
-                </button>
-              )}
+              <div className='flex gap-2 items-center'>
+                <NumberInput placeholder={t('quantityShort')} value={line.quantity} onChange={v => setLine(idx, { quantity: v })} className='flex-1 sm:flex-none sm:w-24 min-w-0 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+                <NumberInput placeholder={t('priceLabel')} value={line.price} onChange={v => setLine(idx, { price: v })} className='flex-1 sm:flex-none sm:w-28 min-w-0 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+                {items.length > 1 && (
+                  <button type='button' onClick={() => removeLine(idx)} className='plain w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-50 flex-shrink-0'>
+                    <X size={15} strokeWidth={1.5} />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

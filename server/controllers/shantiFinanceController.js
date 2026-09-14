@@ -4,7 +4,6 @@ import mongoose from "mongoose"
 import ShantiClient from "../models/ShantiClient.js"
 import ShantiPayment from "../models/ShantiPayment.js"
 import { SHANTI_METHODS } from "../models/shantiConstants.js"
-import { getClientDebt } from "../services/shantiDebt.service.js"
 import { bucketConfig } from "../services/shantiChartBuckets.service.js"
 import { validateMethodBreakdown, normalizeMethodBreakdown } from "../services/shantiMethodBreakdown.service.js"
 
@@ -51,9 +50,6 @@ export const createPayment = async (req, res) => {
         if (breakdownError) return res.status(400).json({ error: breakdownError })
         const normalizedBreakdown = normalizeMethodBreakdown(methodBreakdown)
 
-        const debt = await getClientDebt(clientId)
-        if (resolvedAmount > debt + 0.0001) return res.status(400).json({ error: 'amount_exceeds_debt' })
-
         const payment = await ShantiPayment.create({
             clientId, amount: resolvedAmount,
             method: normalizedBreakdown.length ? normalizedBreakdown[0].method : (method || 'cash'),
@@ -79,8 +75,6 @@ export const updatePayment = async (req, res) => {
         if (amount !== undefined) {
             const resolvedAmount = Number(amount)
             if (!(resolvedAmount > 0)) return res.status(400).json({ error: 'invalid_amount' })
-            const debtIncludingThisPayment = (await getClientDebt(payment.clientId)) + payment.amount
-            if (resolvedAmount > debtIncludingThisPayment + 0.0001) return res.status(400).json({ error: 'amount_exceeds_debt' })
             payment.amount = resolvedAmount
         }
         if (methodBreakdown !== undefined) {

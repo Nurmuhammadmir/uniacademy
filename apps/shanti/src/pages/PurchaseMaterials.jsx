@@ -5,6 +5,65 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
 import Select from '../components/Select.jsx'
 
+// a click anywhere on the card opens its editor in a popup, same pattern (and same reasoning - a
+// small catalog, edit/delete not worth exposing on every row at all times) as the Sales products
+// cards in SalesProducts.jsx.
+const MaterialCard = ({ material, categoryColor, onOpen }) => (
+  <button type='button' onClick={onOpen}
+    className='plain bg-bg-elevated border border-hairline rounded-2xl shadow-sm hover:shadow-md transition-shadow w-full flex items-center gap-3 p-3 text-left'>
+    <span className='w-2.5 h-2.5 rounded-full flex-shrink-0' style={{ backgroundColor: categoryColor }} />
+    <span className='flex-1 min-w-0'>
+      <p className='text-ink font-medium text-sm truncate'>{material.name}</p>
+      <p className='text-muted text-xs font-mono mt-0.5'>{material.category} · {material.stock} {material.unit}</p>
+    </span>
+  </button>
+)
+
+// mounted only while its popup is open, so its form state always starts fresh from the current
+// `material` prop - same reasoning as ProductEditPanel in SalesProducts.jsx. No stock field here:
+// stock only ever moves through purchases (create/edit/delete), by design.
+const MaterialEditPanel = ({ material, materialCategories, units, updateMaterial, deleteMaterial, onClose }) => {
+  const { t } = useLanguage()
+  const [form, setForm] = useState({ name: material.name, category: material.category, unit: material.unit })
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    const ok = await updateMaterial(material._id, form)
+    setSaving(false)
+    if (ok) onClose()
+  }
+  const handleDelete = async () => {
+    if (await deleteMaterial(material._id)) onClose()
+  }
+
+  return (
+    <form onSubmit={handleSave} className='flex flex-col gap-3'>
+      <p className='text-xs text-muted'>{t('stockLabel')}: <span className='font-mono font-semibold text-ink'>{material.stock} {material.unit}</span></p>
+      <div>
+        <p className='text-xs text-muted mb-1'>{t('itemNameLabel')}</p>
+        <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+      </div>
+      <div>
+        <p className='text-xs text-muted mb-1'>{t('categoryLabel')}</p>
+        <Select value={form.category} onChange={(v) => setForm({ ...form, category: v })}
+          options={materialCategories.map(c => ({ value: c.name, label: c.name }))} />
+      </div>
+      <div>
+        <p className='text-xs text-muted mb-1'>{t('unitLabel')}</p>
+        <Select value={form.unit} onChange={(v) => setForm({ ...form, unit: v })}
+          options={units.map(u => ({ value: u.name, label: u.name }))} />
+      </div>
+      <div className='flex gap-2 mt-1'>
+        <button type='submit' disabled={saving} className='flex-1 py-2 rounded-xl bg-accent text-white text-sm font-medium disabled:opacity-50'>{t('save')}</button>
+        <button type='button' onClick={onClose} className='px-4 py-2 rounded-xl bg-bg border border-hairline text-muted text-sm font-medium'>{t('cancel')}</button>
+        <button type='button' onClick={handleDelete} className='px-4 py-2 rounded-xl bg-bg border border-hairline text-rose-600 text-sm font-medium'>{t('delete')}</button>
+      </div>
+    </form>
+  )
+}
+
 const PurchaseMaterials = () => {
   const {
     materialCategories, createMaterialCategory, updateMaterialCategory, deleteMaterialCategory,
@@ -22,9 +81,11 @@ const PurchaseMaterials = () => {
   const [newUnitName, setNewUnitName] = useState('')
   const [showNewMaterial, setShowNewMaterial] = useState(false)
   const [newMaterial, setNewMaterial] = useState({ name: '', category: '', unit: '' })
-  const [editingMaterial, setEditingMaterial] = useState(null)
+  const [openId, setOpenId] = useState(null)
 
   const filteredMaterials = categoryFilter ? materials.filter(m => m.category === categoryFilter) : materials
+  const openMaterial = materials.find(m => m._id === openId)
+  const colorForCategory = (name) => materialCategories.find(c => c.name === name)?.color || '#7A7266'
 
   const submitNewCategory = async (e) => {
     e.preventDefault()
@@ -44,10 +105,6 @@ const PurchaseMaterials = () => {
     e.preventDefault()
     if (!newMaterial.name.trim() || !newMaterial.unit) return
     if (await createMaterial(newMaterial)) { setNewMaterial({ name: '', category: '', unit: '' }); setShowNewMaterial(false) }
-  }
-  const submitEditMaterial = async (e) => {
-    e.preventDefault()
-    if (await updateMaterial(editingMaterial._id, { name: editingMaterial.name, category: editingMaterial.category, unit: editingMaterial.unit })) setEditingMaterial(null)
   }
 
   return (
@@ -71,52 +128,19 @@ const PurchaseMaterials = () => {
         </button>
       </div>
 
-      <div className='bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
-        <table className='w-full text-sm'>
-          <thead>
-            <tr className='text-left text-muted border-b border-hairline'>
-              <th className='px-4 py-3 font-medium'>{t('itemNameLabel')}</th>
-              <th className='px-4 py-3 font-medium'>{t('categoryLabel')}</th>
-              <th className='px-4 py-3 font-medium'>{t('unitLabel')}</th>
-              <th className='px-4 py-3 font-medium'>{t('stockLabel')}</th>
-              <th className='px-4 py-3 font-medium'></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredMaterials.map(m => (
-              editingMaterial?._id === m._id ? (
-                <tr key={m._id} className='border-b border-hairline last:border-0'>
-                  <td colSpan={5} className='px-4 py-3'>
-                    <form onSubmit={submitEditMaterial} className='flex flex-wrap gap-2 items-end'>
-                      <input value={editingMaterial.name} onChange={e => setEditingMaterial({ ...editingMaterial, name: e.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm flex-1' required />
-                      <Select className='w-40' value={editingMaterial.category} onChange={(v) => setEditingMaterial({ ...editingMaterial, category: v })}
-                        options={materialCategories.map(c => ({ value: c.name, label: c.name }))} />
-                      <Select className='w-32' value={editingMaterial.unit} onChange={(v) => setEditingMaterial({ ...editingMaterial, unit: v })}
-                        options={units.map(u => ({ value: u.name, label: u.name }))} />
-                      <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>{t('save')}</button>
-                      <button type='button' onClick={() => setEditingMaterial(null)} className='px-4 py-2 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('cancel')}</button>
-                    </form>
-                  </td>
-                </tr>
-              ) : (
-                <tr key={m._id} className='border-b border-hairline last:border-0'>
-                  <td className='px-4 py-3 text-ink'>{m.name}</td>
-                  <td className='px-4 py-3 text-muted'>{m.category}</td>
-                  <td className='px-4 py-3 text-muted'>{m.unit}</td>
-                  <td className='px-4 py-3 font-mono text-ink'>{m.stock}</td>
-                  <td className='px-4 py-3 text-right whitespace-nowrap'>
-                    <button onClick={() => setEditingMaterial(m)} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-sm font-medium mr-2'>{t('edit')}</button>
-                    <button onClick={() => deleteMaterial(m._id)} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('delete')}</button>
-                  </td>
-                </tr>
-              )
-            ))}
-            {filteredMaterials.length === 0 && (
-              <tr><td colSpan={5} className='px-4 py-8 text-center text-muted'>{t('noMaterialsYet')}</td></tr>
-            )}
-          </tbody>
-        </table>
+      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
+        {filteredMaterials.map(m => (
+          <MaterialCard key={m._id} material={m} categoryColor={colorForCategory(m.category)} onOpen={() => setOpenId(m._id)} />
+        ))}
+        {filteredMaterials.length === 0 && <p className='text-muted text-sm col-span-full text-center py-8'>{t('noMaterialsYet')}</p>}
       </div>
+
+      {openMaterial && (
+        <Modal title={openMaterial.name} onClose={() => setOpenId(null)}>
+          <MaterialEditPanel material={openMaterial} materialCategories={materialCategories} units={units}
+            updateMaterial={updateMaterial} deleteMaterial={deleteMaterial} onClose={() => setOpenId(null)} />
+        </Modal>
+      )}
 
       {showManageCategories && (
         <Modal title={t('manageCategoriesTitle')} onClose={() => { setShowManageCategories(false); setEditingCategory(null) }}>

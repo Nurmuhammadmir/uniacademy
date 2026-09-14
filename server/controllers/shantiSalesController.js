@@ -164,6 +164,17 @@ export const listProducts = async (req, res) => {
     }
 }
 
+// producing `quantity` units of a product consumes its recipe from the material warehouse, the same
+// way selling a unit does (see applyStockDelta below) - a negative quantity (a downward stock
+// correction) symmetrically gives materials back. Always applied against the recipe as it stands
+// AFTER whatever save just happened, matching applyStockDelta's own "never a snapshot" convention.
+const applyMaterialsForProductionDelta = async (materialsUsed, quantity) => {
+    if (!quantity) return
+    for (const usage of materialsUsed || []) {
+        await ShantiMaterial.updateOne({ _id: usage.materialId }, { $inc: { stock: -quantity * usage.quantity } })
+    }
+}
+
 export const createProduct = async (req, res) => {
     try {
         const { name, unit, price, stock, materialsUsed } = req.body
@@ -171,10 +182,13 @@ export const createProduct = async (req, res) => {
         if (!unit?.trim()) return res.status(400).json({ error: 'unit_required' })
         const cleanedMaterials = await resolveMaterialsUsed(materialsUsed)
         if (cleanedMaterials === null) return res.status(400).json({ error: 'invalid_materials_used' })
+        const resolvedStock = stock || 0
+        const resolvedMaterials = cleanedMaterials || []
         const product = await ShantiProduct.create({
-            name: name.trim(), unit: unit.trim(), price: price || 0, stock: stock || 0,
-            materialsUsed: cleanedMaterials || [],
+            name: name.trim(), unit: unit.trim(), price: price || 0, stock: resolvedStock,
+            materialsUsed: resolvedMaterials,
         })
+        await applyMaterialsForProductionDelta(resolvedMaterials, resolvedStock)
         res.status(201).json({ product })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'product_already_exists' })
@@ -190,12 +204,14 @@ export const updateProduct = async (req, res) => {
         if (!product) return res.status(404).json({ error: 'not_found' })
         const cleanedMaterials = await resolveMaterialsUsed(materialsUsed)
         if (cleanedMaterials === null) return res.status(400).json({ error: 'invalid_materials_used' })
+        const stockDelta = stock !== undefined ? Number(stock) - product.stock : 0
         if (name !== undefined && name.trim()) product.name = name.trim()
         if (unit !== undefined && unit.trim()) product.unit = unit.trim()
         if (price !== undefined) product.price = price
         if (stock !== undefined) product.stock = stock
         if (cleanedMaterials !== undefined) product.materialsUsed = cleanedMaterials
         await product.save()
+        await applyMaterialsForProductionDelta(product.materialsUsed, stockDelta)
         res.json({ product })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'product_already_exists' })
@@ -213,6 +229,7 @@ export const restockProduct = async (req, res) => {
             req.params.id, { $inc: { stock: resolvedQuantity } }, { new: true }
         )
         if (!product) return res.status(404).json({ error: 'not_found' })
+        await applyMaterialsForProductionDelta(product.materialsUsed, resolvedQuantity)
         res.json({ product })
     } catch (error) {
         console.log(error)

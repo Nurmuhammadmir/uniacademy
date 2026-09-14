@@ -48,9 +48,9 @@ const MethodPicker = ({ amount, method, setMethod, split, setSplit, breakdown, s
         <div className='mt-3 flex flex-col gap-2'>
           {breakdown.map((row, i) => (
             <div key={i} className='flex gap-2 items-center'>
-              <Select className='flex-1' value={row.method} onChange={v => updateRow(i, { method: v })}
+              <Select className='flex-1 min-w-0' value={row.method} onChange={v => updateRow(i, { method: v })}
                 options={SPLIT_METHODS.map(v => ({ value: v, label: METHOD_LABEL[v] }))} />
-              <NumberInput className='w-32 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' placeholder={t('amountLabel')}
+              <NumberInput className='w-28 sm:w-32 flex-shrink-0 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' placeholder={t('amountLabel')}
                 value={row.amount} onChange={v => updateRow(i, { amount: v })} />
               {breakdown.length > 1 && (
                 <button type='button' onClick={() => removeRow(i)} className='plain w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-50 flex-shrink-0'>

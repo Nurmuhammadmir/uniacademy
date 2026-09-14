@@ -1,26 +1,79 @@
 import React, { useContext, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, User } from 'lucide-react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
+
+// a click anywhere on the card opens its editor in a popup - same small-catalog reasoning as the
+// Sales/Materials cards (SalesProducts.jsx, PurchaseMaterials.jsx): sellers are few, and edit/delete
+// don't need to sit exposed on every row at all times.
+const SellerCard = ({ seller, onOpen }) => (
+  <button type='button' onClick={onOpen}
+    className='plain bg-bg-elevated border border-hairline rounded-2xl shadow-sm hover:shadow-md transition-shadow w-full flex items-center gap-3 p-3 text-left'>
+    <span className='w-10 h-10 rounded-xl bg-bg flex items-center justify-center flex-shrink-0 border border-hairline text-muted'>
+      <User size={18} strokeWidth={1.5} />
+    </span>
+    <span className='flex-1 min-w-0'>
+      <p className='text-ink font-medium text-sm truncate'>{seller.name}</p>
+      <p className='text-muted text-xs mt-0.5 truncate'>{seller.phone || seller.comment || '—'}</p>
+    </span>
+  </button>
+)
+
+// mounted only while its popup is open, so its form state always starts fresh from the current
+// `seller` prop - same reasoning as ProductEditPanel/MaterialEditPanel.
+const SellerEditPanel = ({ seller, updateSeller, deleteSeller, onClose }) => {
+  const { t } = useLanguage()
+  const [form, setForm] = useState({ name: seller.name, phone: seller.phone || '', comment: seller.comment || '' })
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    const ok = await updateSeller(seller._id, form)
+    setSaving(false)
+    if (ok) onClose()
+  }
+  const handleDelete = async () => {
+    if (await deleteSeller(seller._id)) onClose()
+  }
+
+  return (
+    <form onSubmit={handleSave} className='flex flex-col gap-3'>
+      <div>
+        <p className='text-xs text-muted mb-1'>{t('personNameLabel')}</p>
+        <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+      </div>
+      <div>
+        <p className='text-xs text-muted mb-1'>{t('phoneLabel')}</p>
+        <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+      </div>
+      <div>
+        <p className='text-xs text-muted mb-1'>{t('commentLabel')}</p>
+        <textarea value={form.comment} onChange={e => setForm({ ...form, comment: e.target.value })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' rows={2} />
+      </div>
+      <div className='flex gap-2 mt-1'>
+        <button type='submit' disabled={saving} className='flex-1 py-2 rounded-xl bg-accent text-white text-sm font-medium disabled:opacity-50'>{t('save')}</button>
+        <button type='button' onClick={onClose} className='px-4 py-2 rounded-xl bg-bg border border-hairline text-muted text-sm font-medium'>{t('cancel')}</button>
+        <button type='button' onClick={handleDelete} className='px-4 py-2 rounded-xl bg-bg border border-hairline text-rose-600 text-sm font-medium'>{t('delete')}</button>
+      </div>
+    </form>
+  )
+}
 
 const PurchaseSellers = () => {
   const { sellers, createSeller, updateSeller, deleteSeller } = useContext(ShantiContext)
   const { t } = useLanguage()
   const [showNew, setShowNew] = useState(false)
   const [newSeller, setNewSeller] = useState({ name: '', phone: '', comment: '' })
-  const [editingSeller, setEditingSeller] = useState(null)
+  const [openId, setOpenId] = useState(null)
+  const openSeller = sellers.find(s => s._id === openId)
 
   const submitNewSeller = async (e) => {
     e.preventDefault()
     if (!newSeller.name.trim()) return
     const ok = await createSeller(newSeller)
     if (ok) { setNewSeller({ name: '', phone: '', comment: '' }); setShowNew(false) }
-  }
-  const submitEditSeller = async (e) => {
-    e.preventDefault()
-    const ok = await updateSeller(editingSeller._id, { name: editingSeller.name, phone: editingSeller.phone, comment: editingSeller.comment })
-    if (ok) setEditingSeller(null)
   }
 
   return (
@@ -31,48 +84,18 @@ const PurchaseSellers = () => {
         </button>
       </div>
 
-      <div className='bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
-        <table className='w-full text-sm'>
-          <thead>
-            <tr className='text-left text-muted border-b border-hairline'>
-              <th className='px-4 py-3 font-medium'>{t('personNameLabel')}</th>
-              <th className='px-4 py-3 font-medium'>{t('phoneLabel')}</th>
-              <th className='px-4 py-3 font-medium'>{t('commentLabel')}</th>
-              <th className='px-4 py-3 font-medium'></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sellers.map(s => (
-              editingSeller?._id === s._id ? (
-                <tr key={s._id} className='border-b border-hairline last:border-0'>
-                  <td colSpan={4} className='px-4 py-3'>
-                    <form onSubmit={submitEditSeller} className='flex flex-wrap gap-2 items-end'>
-                      <input value={editingSeller.name} onChange={e => setEditingSeller({ ...editingSeller, name: e.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm flex-1' required />
-                      <input value={editingSeller.phone} onChange={e => setEditingSeller({ ...editingSeller, phone: e.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm w-40' placeholder={t('phoneLabel')} />
-                      <input value={editingSeller.comment} onChange={e => setEditingSeller({ ...editingSeller, comment: e.target.value })} className='px-2 py-1.5 rounded-lg bg-bg border border-hairline text-sm flex-1' placeholder={t('commentLabel')} />
-                      <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium'>{t('save')}</button>
-                      <button type='button' onClick={() => setEditingSeller(null)} className='px-4 py-2 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('cancel')}</button>
-                    </form>
-                  </td>
-                </tr>
-              ) : (
-                <tr key={s._id} className='border-b border-hairline last:border-0'>
-                  <td className='px-4 py-3 text-ink'>{s.name}</td>
-                  <td className='px-4 py-3 text-muted'>{s.phone || '—'}</td>
-                  <td className='px-4 py-3 text-muted'>{s.comment || '—'}</td>
-                  <td className='px-4 py-3 text-right whitespace-nowrap'>
-                    <button onClick={() => setEditingSeller(s)} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-sm font-medium mr-2'>{t('edit')}</button>
-                    <button onClick={() => deleteSeller(s._id)} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-muted text-sm font-medium'>{t('delete')}</button>
-                  </td>
-                </tr>
-              )
-            ))}
-            {sellers.length === 0 && (
-              <tr><td colSpan={4} className='px-4 py-8 text-center text-muted'>{t('noSellersYet')}</td></tr>
-            )}
-          </tbody>
-        </table>
+      <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3'>
+        {sellers.map(s => (
+          <SellerCard key={s._id} seller={s} onOpen={() => setOpenId(s._id)} />
+        ))}
+        {sellers.length === 0 && <p className='text-muted text-sm col-span-full text-center py-8'>{t('noSellersYet')}</p>}
       </div>
+
+      {openSeller && (
+        <Modal title={openSeller.name} onClose={() => setOpenId(null)}>
+          <SellerEditPanel seller={openSeller} updateSeller={updateSeller} deleteSeller={deleteSeller} onClose={() => setOpenId(null)} />
+        </Modal>
+      )}
 
       {showNew && (
         <Modal title={t('newSellerTitle')} onClose={() => setShowNew(false)}>

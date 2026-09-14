@@ -19,7 +19,7 @@ const SalesDebtors = () => {
         <p className='font-bold tracking-tight text-lg text-amber-700'>{data ? formatMoney(totalDebt) : '—'}</p>
       </div>
 
-      <div className='bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
+      <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
         <table className='w-full text-sm'>
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
@@ -48,6 +48,23 @@ const SalesDebtors = () => {
             )}
           </tbody>
         </table>
+      </div>
+
+      <div className='block md:hidden flex flex-col gap-2.5'>
+        {!data && <p className='text-muted text-sm text-center py-8'>{t('loading')}</p>}
+        {data && data.debtors.length === 0 && <p className='text-muted text-sm text-center py-8'>{t('noDebtorsYet')}</p>}
+        {(data?.debtors || []).map(d => (
+          <div key={d.clientId} className='bg-amber-50/60 rounded-xl border border-amber-200 p-4'>
+            <div className='flex justify-between items-start'>
+              <div className='min-w-0'>
+                <p className='font-semibold text-[#1D1D1F] text-sm truncate'>{d.name}</p>
+                <p className='text-xs text-slate-400 mt-1'>{d.category}{d.phone ? ` · ${d.phone}` : ''}</p>
+              </div>
+              <p className='text-base font-bold text-amber-700 flex-shrink-0 ml-3'>{formatMoney(d.totalDebt)}</p>
+            </div>
+            <p className='text-xs text-muted mt-2'>{t('salesWithDebtLabel')}: {d.saleCount}</p>
+          </div>
+        ))}
       </div>
     </div>
   )

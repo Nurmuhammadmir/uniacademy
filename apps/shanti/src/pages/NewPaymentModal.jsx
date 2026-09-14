@@ -13,9 +13,14 @@ import { todayISO } from '../lib/date.js'
 
 const breakdownFromPayment = (payment) => (payment?.methodBreakdown || []).map(r => ({ method: r.method, amount: String(r.amount) }))
 
-// `payment` present means edit mode (pre-filled, PUT + confirmation) instead of create
+// `payment` present means edit mode (pre-filled, PUT + confirmation) instead of create. Any client
+// can receive a payment, not just debtors - clients sometimes pay in advance, and the underlying
+// debt math (see shantiDebt.service.js) already handles that correctly: a payment against a client
+// with no outstanding debt just makes their computed debt negative, i.e. a credit that the next
+// sale's unpaid balance will draw down against. Debtors are still listed first since that is the
+// common case.
 const NewPaymentModal = ({ payment, onClose, onSaved }) => {
-  const { createPayment, updatePayment, getSalesDebtors } = useContext(ShantiContext)
+  const { clients, createPayment, updatePayment, getSalesDebtors } = useContext(ShantiContext)
   const { t } = useLanguage()
   const isEditing = !!payment
   const [debtors, setDebtors] = useState([])
@@ -30,9 +35,12 @@ const NewPaymentModal = ({ payment, onClose, onSaved }) => {
 
   useEffect(() => { getSalesDebtors().then(d => { if (d) setDebtors(d.debtors) }) }, [])
 
-  const selectedDebtor = debtors.find(d => d.clientId === clientId)
+  const debtMap = Object.fromEntries(debtors.map(d => [d.clientId, d.totalDebt]))
+  const editingPaymentClientId = payment?.clientId?._id || payment?.clientId || null
   // editing an existing payment: what it already reduced still counts as "available" debt for it
-  const availableDebt = selectedDebtor ? selectedDebtor.totalDebt + (isEditing ? payment.amount : 0) : null
+  const debtForSelected = clientId ? (debtMap[clientId] || 0) + (isEditing && editingPaymentClientId === clientId ? payment.amount : 0) : 0
+  const clientOptions = [...clients].sort((a, b) => (debtMap[b._id] || 0) - (debtMap[a._id] || 0))
+    .map(c => ({ value: c._id, label: debtMap[c._id] > 0 ? `${c.name} · ${formatMoney(debtMap[c._id])}` : c.name }))
 
   const resolvedAmount = Number(amount) || 0
 
@@ -56,17 +64,20 @@ const NewPaymentModal = ({ payment, onClose, onSaved }) => {
     <Modal title={isEditing ? t('confirmEditPayment') : t('newPaymentTitle')} onClose={onClose}>
       <form onSubmit={submit} className='flex flex-col gap-3'>
         <div>
-          <p className='text-xs text-muted mb-1'>{t('chooseDebtorPlaceholder')}</p>
-          <Select forceSearch value={clientId} onChange={setClientId} placeholder={t('chooseDebtorPlaceholder')}
-            options={debtors.map(d => ({ value: d.clientId, label: `${d.name} · ${formatMoney(d.totalDebt)}` }))} />
-          {debtors.length === 0 && <p className='text-xs text-muted mt-1.5'>{t('noDebtorsToPayLabel')}</p>}
+          <p className='text-xs text-muted mb-1'>{t('chooseClientPlaceholder')}</p>
+          <Select forceSearch value={clientId} onChange={setClientId} placeholder={t('chooseClientPlaceholder')}
+            options={clientOptions} />
         </div>
 
-        {selectedDebtor && (
-          <div className='bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between'>
-            <span className='text-amber-700 text-xs font-medium'>{t('currentDebtLabel')}</span>
-            <span className='text-amber-700 font-bold font-mono'>{formatMoney(availableDebt)}</span>
-          </div>
+        {clientId && (
+          debtForSelected > 0 ? (
+            <div className='bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between'>
+              <span className='text-amber-700 text-xs font-medium'>{t('currentDebtLabel')}</span>
+              <span className='text-amber-700 font-bold font-mono'>{formatMoney(debtForSelected)}</span>
+            </div>
+          ) : (
+            <p className='text-xs text-muted px-1'>{t('advancePaymentHint')}</p>
+          )
         )}
 
         <div className='grid grid-cols-2 gap-3'>

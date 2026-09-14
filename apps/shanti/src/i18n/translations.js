@@ -111,6 +111,7 @@ export const TRANSLATIONS = {
         newPaymentTitle: 'Новый платёж', chooseDebtorPlaceholder: 'Выберите должника', currentDebtLabel: 'Текущий долг',
         paymentAmountLabel: 'Сумма платежа', confirmDeletePayment: 'Удалить этот платёж?',
         confirmEditPayment: 'Изменить этот платёж?', noPaymentsYet: 'Платежей пока нет', noDebtorsToPayLabel: 'Нет должников для оплаты',
+        advancePaymentHint: 'У клиента нет долга — платёж будет учтён как аванс',
         receiptsTab: 'Поступления', expensesTab: 'Расходы',
         // Expenses
         expensesTotalLabel: 'Сумма расходов', newExpenseBtn: 'Новый расход', newExpenseTitle: 'Новый расход',
@@ -216,6 +217,7 @@ export const TRANSLATIONS = {
         newPaymentTitle: "Yangi to'lov", chooseDebtorPlaceholder: 'Qarzdorni tanlang', currentDebtLabel: 'Joriy qarz',
         paymentAmountLabel: "To'lov summasi", confirmDeletePayment: "Bu to'lovni o'chirasizmi?",
         confirmEditPayment: "Bu to'lovni o'zgartirasizmi?", noPaymentsYet: "Hozircha to'lovlar yo'q", noDebtorsToPayLabel: "To'lov uchun qarzdorlar yo'q",
+        advancePaymentHint: "Mijozda qarz yo'q — to'lov avans sifatida hisobga olinadi",
         receiptsTab: 'Tushumlar', expensesTab: 'Xarajatlar',
         // Expenses
         expensesTotalLabel: 'Xarajatlar summasi', newExpenseBtn: 'Yangi xarajat', newExpenseTitle: 'Yangi xarajat',
