@@ -58,7 +58,10 @@ app.use(cors({
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    // 'token' is LamusWater's own auth header (its middleware reads req.headers.token directly,
+    // rather than 'Authorization: Bearer ...' like the rest of this codebase) - every one of its
+    // authenticated requests fails CORS preflight without it explicitly allowed here.
+    allowedHeaders: ['Content-Type', 'Authorization', 'token']
 }));
 
 // serves everything in /server/public at /static - this is where vocab/reading concept images
