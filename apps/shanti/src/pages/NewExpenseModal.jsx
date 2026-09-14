@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
@@ -14,10 +14,10 @@ import { todayISO } from '../lib/date.js'
 const breakdownFromExpense = (expense) => (expense?.methodBreakdown || []).map(r => ({ method: r.method, amount: String(r.amount) }))
 
 // `expense` present means edit mode (pre-filled, PUT + confirmation) instead of create. Picking a
-// seller turns this into "pay down what we owe them" - amount gets validated against their real
-// outstanding purchase debt (see shantiSellerDebt.service.js) instead of just needing to be positive.
+// seller shows what we currently owe them (informational only - amount is NOT capped by it, since a
+// seller sometimes gets paid in advance of any purchase, see shantiExpenseController.js).
 const NewExpenseModal = ({ expense, onClose, onSaved }) => {
-  const { expenseCategories, sellers, createExpense, updateExpense } = useContext(ShantiContext)
+  const { expenseCategories, sellers, getSellerDebts, createExpense, updateExpense } = useContext(ShantiContext)
   const { t } = useLanguage()
   const isEditing = !!expense
   const [category, setCategory] = useState(expense?.category || '')
@@ -29,6 +29,10 @@ const NewExpenseModal = ({ expense, onClose, onSaved }) => {
   const [sellerId, setSellerId] = useState(expense?.sellerId?._id || expense?.sellerId || '')
   const [comment, setComment] = useState(expense?.comment || '')
   const [submitting, setSubmitting] = useState(false)
+  const [sellerDebtors, setSellerDebtors] = useState([])
+
+  useEffect(() => { getSellerDebts().then(d => { if (d) setSellerDebtors(d.debtors) }) }, [])
+  const sellerDebt = sellerId ? (sellerDebtors.find(d => d.sellerId === sellerId)?.totalDebt || 0) : 0
 
   const resolvedAmount = Number(amount) || 0
 
@@ -41,7 +45,10 @@ const NewExpenseModal = ({ expense, onClose, onSaved }) => {
     const payload = {
       category: category || undefined, amount: resolvedAmount, date, sellerId: sellerId || null, comment,
       method: split ? undefined : method,
-      methodBreakdown: split ? breakdown.map(r => ({ method: r.method, amount: Number(r.amount) || 0 })) : [],
+      // zero/blank rows dropped rather than sent as amount:0 - the server rejects any breakdown row
+      // that isn't strictly positive, which used to surface as a confusing error whenever paidAmount
+      // was 0 (enableSplit's default row starts blank) or an added-but-unfilled row was left behind
+      methodBreakdown: split ? breakdown.filter(r => Number(r.amount) > 0).map(r => ({ method: r.method, amount: Number(r.amount) })) : [],
     }
     const ok = isEditing ? await updateExpense(expense._id, payload) : await createExpense(payload)
     setSubmitting(false)
@@ -71,6 +78,18 @@ const NewExpenseModal = ({ expense, onClose, onSaved }) => {
           <Select forceSearch value={sellerId} onChange={setSellerId} placeholder={t('notSpecified')}
             options={[{ value: '', label: t('notSpecified') }, ...sellers.map(s => ({ value: s._id, label: s.phone ? `${s.name} · ${s.phone}` : s.name }))]} />
         </div>
+
+        {sellerId && (
+          sellerDebt > 0 ? (
+            <div className='bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between'>
+              <span className='text-amber-700 text-xs font-medium'>{t('currentDebtLabel')}</span>
+              <span className='text-amber-700 font-bold font-mono'>{formatMoney(sellerDebt)}</span>
+            </div>
+          ) : (
+            <p className='text-xs text-muted px-1'>{t('advanceSupplierPaymentHint')}</p>
+          )
+        )}
+
         <MethodPicker amount={resolvedAmount} method={method} setMethod={setMethod}
           split={split} setSplit={setSplit} breakdown={breakdown} setBreakdown={setBreakdown} />
         <div>

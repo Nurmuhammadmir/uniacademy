@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
@@ -8,6 +8,7 @@ import Spinner from '../components/Spinner.jsx'
 import NumberInput from '../components/NumberInput.jsx'
 import MethodPicker, { isMethodSplitValid } from '../components/MethodPicker.jsx'
 import { confirm } from '../lib/confirm.js'
+import { formatMoney } from '../lib/format.js'
 import { todayISO } from '../lib/date.js'
 
 const emptyForm = () => ({ materialId: '', quantity: '', date: todayISO(), amount: '', paidAmount: '', method: 'cash', sellerId: '', comment: '' })
@@ -20,6 +21,15 @@ const formFromPurchase = (purchase) => ({
   sellerId: purchase.sellerId?._id || purchase.sellerId || '', comment: purchase.comment || '',
 })
 
+// price-per-unit is a pure calculator aid, not a stored field on the purchase itself - when editing
+// an existing purchase, back-derive a starting value from its own amount/quantity so the field isn't
+// just blank, but this is only ever a convenience default (see amountTouched below).
+const pricePerUnitFromPurchase = (purchase) => {
+  if (!purchase || !(purchase.quantity > 0)) return ''
+  const perUnit = purchase.amount / purchase.quantity
+  return String(Math.round(perUnit * 100) / 100)
+}
+
 const breakdownFromPurchase = (purchase) => (purchase?.methodBreakdown || []).map(r => ({ method: r.method, amount: String(r.amount) }))
 
 // `purchase` present means edit mode (pre-filled, PUT + confirmation) instead of create
@@ -27,10 +37,20 @@ const NewPurchaseModal = ({ purchase, onClose, onCreated }) => {
   const { materials, sellers, createPurchase, updatePurchase } = useContext(ShantiContext)
   const { t } = useLanguage()
   const [form, setForm] = useState(() => purchase ? formFromPurchase(purchase) : emptyForm())
+  const [pricePerUnit, setPricePerUnit] = useState(() => pricePerUnitFromPurchase(purchase))
+  // editing starts "touched" - the loaded amount is the purchase's own recorded total, which must
+  // not get silently recomputed out from under someone who hasn't changed anything yet (same
+  // reasoning as NewSaleModal's amountTouched)
+  const [amountTouched, setAmountTouched] = useState(!!purchase)
   const [split, setSplit] = useState(() => (purchase?.methodBreakdown || []).length > 0)
   const [breakdown, setBreakdown] = useState(() => breakdownFromPurchase(purchase))
   const [submitting, setSubmitting] = useState(false)
   const isEditing = !!purchase
+
+  const computedTotal = (Number(form.quantity) || 0) * (Number(pricePerUnit) || 0)
+  useEffect(() => {
+    if (!amountTouched) setForm(f => ({ ...f, amount: computedTotal ? String(computedTotal) : '' }))
+  }, [computedTotal, amountTouched])
 
   const resolvedPaid = form.paidAmount === '' ? Number(form.amount) || 0 : Number(form.paidAmount)
 
@@ -44,7 +64,10 @@ const NewPurchaseModal = ({ purchase, onClose, onCreated }) => {
       materialId: form.materialId, quantity: Number(form.quantity), date: form.date, amount: Number(form.amount),
       paidAmount: resolvedPaid, sellerId: form.sellerId || undefined, comment: form.comment,
       method: split ? undefined : form.method,
-      methodBreakdown: split ? breakdown.map(r => ({ method: r.method, amount: Number(r.amount) || 0 })) : [],
+      // zero/blank rows dropped rather than sent as amount:0 - the server rejects any breakdown row
+      // that isn't strictly positive, which used to surface as a confusing error whenever paidAmount
+      // was 0 (enableSplit's default row starts blank) or an added-but-unfilled row was left behind
+      methodBreakdown: split ? breakdown.filter(r => Number(r.amount) > 0).map(r => ({ method: r.method, amount: Number(r.amount) })) : [],
     }
     const ok = isEditing ? await updatePurchase(purchase._id, payload) : await createPurchase(payload)
     setSubmitting(false)
@@ -71,9 +94,15 @@ const NewPurchaseModal = ({ purchase, onClose, onCreated }) => {
             <DatePicker value={form.date} onChange={(v) => setForm({ ...form, date: v })} />
           </div>
         </div>
-        <div>
-          <p className='text-xs text-muted mb-1'>{t('purchasePriceLabel')}</p>
-          <NumberInput value={form.amount} onChange={v => setForm({ ...form, amount: v })} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+        <div className='grid grid-cols-2 gap-3'>
+          <div>
+            <p className='text-xs text-muted mb-1'>{t('pricePerUnitLabel')} {material ? `(${material.unit})` : ''}</p>
+            <NumberInput value={pricePerUnit} onChange={setPricePerUnit} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' />
+          </div>
+          <div>
+            <p className='text-xs text-muted mb-1'>{t('saleTotalDefaultLabel', { total: formatMoney(computedTotal) })}</p>
+            <NumberInput value={form.amount} onChange={v => { setForm({ ...form, amount: v }); setAmountTouched(true) }} className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+          </div>
         </div>
         <div>
           <p className='text-xs text-muted mb-1'>{t('paidDefaultFullLabel')}</p>

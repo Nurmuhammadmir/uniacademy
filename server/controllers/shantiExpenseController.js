@@ -7,7 +7,6 @@ import ShantiExpense from "../models/ShantiExpense.js"
 import ShantiSeller from "../models/ShantiSeller.js"
 import { SHANTI_METHODS } from "../models/shantiConstants.js"
 import { ensureOtherExpenseCategoryExists, OTHER_EXPENSE_CATEGORY } from "../services/shantiCatalog.service.js"
-import { getSellerDebt } from "../services/shantiSellerDebt.service.js"
 import { validateMethodBreakdown, normalizeMethodBreakdown } from "../services/shantiMethodBreakdown.service.js"
 import { bucketConfig } from "../services/shantiChartBuckets.service.js"
 
@@ -132,8 +131,6 @@ export const createExpense = async (req, res) => {
         if (sellerId) {
             const seller = await ShantiSeller.findById(sellerId)
             if (!seller) return res.status(404).json({ error: 'seller_not_found' })
-            const debt = await getSellerDebt(sellerId)
-            if (resolvedAmount > debt + 0.0001) return res.status(400).json({ error: 'amount_exceeds_debt' })
         }
 
         const expense = await ShantiExpense.create({
@@ -158,14 +155,9 @@ export const updateExpense = async (req, res) => {
         const { category, amount, date, method, methodBreakdown, sellerId, comment } = req.body
         if (method !== undefined && !SHANTI_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
-        const effectiveSellerId = sellerId !== undefined ? sellerId : expense.sellerId
         if (amount !== undefined) {
             const resolvedAmount = Number(amount)
             if (!(resolvedAmount > 0)) return res.status(400).json({ error: 'invalid_amount' })
-            if (effectiveSellerId) {
-                const debtIncludingThisExpense = (await getSellerDebt(effectiveSellerId)) + (String(expense.sellerId) === String(effectiveSellerId) ? expense.amount : 0)
-                if (resolvedAmount > debtIncludingThisExpense + 0.0001) return res.status(400).json({ error: 'amount_exceeds_debt' })
-            }
             expense.amount = resolvedAmount
         }
         if (methodBreakdown !== undefined) {

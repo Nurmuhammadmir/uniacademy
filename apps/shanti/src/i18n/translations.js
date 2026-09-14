@@ -36,7 +36,7 @@ export const TRANSLATIONS = {
         couldNotUploadImage: 'Не удалось загрузить фото',
         couldNotLoadUnits: 'Не удалось загрузить единицы измерения', unitAdded: 'Единица измерения добавлена',
         couldNotLoadCategories: 'Не удалось загрузить категории', categoryAdded: 'Категория добавлена',
-        couldNotLoadMaterials: 'Не удалось загрузить материалы', materialAdded: 'Материал добавлен',
+        couldNotLoadMaterials: 'Не удалось загрузить сырьё', materialAdded: 'Сырьё добавлено',
         couldNotLoadSellers: 'Не удалось загрузить продавцов', sellerAdded: 'Продавец добавлен',
         couldNotLoadPurchases: 'Не удалось загрузить покупки', couldNotLoadDebts: 'Не удалось загрузить долги',
         purchaseAdded: 'Покупка добавлена', couldNotAddPurchase: 'Не удалось добавить покупку',
@@ -49,28 +49,29 @@ export const TRANSLATIONS = {
         couldNotAddPayment: 'Не удалось добавить платёж', amountExceedsDebtError: 'Сумма больше долга клиента',
         couldNotLoadDashboard: 'Не удалось загрузить дашборд',
         balanceAdjustmentAdded: 'Баланс пополнен', couldNotAddBalanceAdjustment: 'Не удалось пополнить баланс',
-        materialRestocked: 'Материал пополнен', couldNotRestockMaterial: 'Не удалось пополнить материал',
+        materialRestocked: 'Сырьё пополнено', couldNotRestockMaterial: 'Не удалось пополнить сырьё',
         productRestocked: 'Продукция пополнена', couldNotRestockProduct: 'Не удалось пополнить продукцию',
         couldNotLoadExpenses: 'Не удалось загрузить расходы', expenseAdded: 'Расход добавлен', couldNotAddExpense: 'Не удалось добавить расход',
 
         // Purchases tabs
-        purchasesTab: 'Покупки', materialsTab: 'Материалы', sellersTab: 'Продавцы', debtsTab: 'Долги',
+        purchasesTab: 'Покупки', materialsTab: 'Сырьё', sellersTab: 'Продавцы', debtsTab: 'Долги',
         // Sales tabs
         salesTab: 'Продажи', clientsTab: 'Клиенты', productsTab: 'Товары', debtorsTab: 'Должники',
 
         // PurchasesList
         purchasesTotalLabel: 'Сумма покупок', filterBtn: 'Фильтр', newPurchaseBtn: 'Новая покупка',
-        materialLabel: 'Материал', sellerLabel: 'Продавец', quantityShort: 'Кол-во',
+        materialLabel: 'Сырьё', sellerLabel: 'Продавец', quantityShort: 'Кол-во',
         addCommentPlaceholder: '+ добавить', confirmDeletePurchase: 'Удалить эту покупку?',
         noPurchasesYet: 'Покупок пока нет',
         // SalesList
-        salesTotalLabel: 'Сумма продаж', newSaleBtn: 'Новая продажа', clientLabel: 'Клиент',
+        salesTotalLabel: 'Сумма продаж', newSaleBtn: 'Новая продажа', clientLabel: 'Клиент', allPeriodLabel: 'За весь период',
         productLabel: 'Товар', itemsLabel: 'Товары', clientCategoryLabel: 'Категория клиента',
         confirmDeleteSale: 'Удалить эту продажу?', noSalesYet: 'Продаж пока нет',
 
         // New/edit purchase modal
         newPurchaseTitle: 'Новая покупка', editPurchaseTitle: 'Изменить покупку',
-        chooseMaterialPlaceholder: 'Выберите материал', purchasePriceLabel: 'Цена (сколько заплатили за покупку)',
+        chooseMaterialPlaceholder: 'Выберите сырьё',
+        pricePerUnitLabel: 'Цена за единицу',
         paidDefaultFullLabel: 'Оплачено (по умолчанию — вся сумма)', paymentMethodLabel: 'Способ оплаты',
         confirmEditPurchase: 'Изменить эту покупку?',
 
@@ -83,7 +84,7 @@ export const TRANSLATIONS = {
         // Materials
         manageUnitsTitle: 'Единицы измерения', unitExamplePlaceholder: 'Например: коробка',
         categoryNamePlaceholder: 'Название категории', addCategoryBtn: 'Добавить категорию', unitsBtn: 'Единицы измерения',
-        newMaterialTitle: 'Новый материал', noMaterialsYet: 'Материалов пока нет',
+        newMaterialTitle: 'Новое сырьё', noMaterialsYet: 'Сырья пока нет',
         // Sellers
         newSellerTitle: 'Новый продавец', noSellersYet: 'Продавцов пока нет',
         // Debts
@@ -93,9 +94,9 @@ export const TRANSLATIONS = {
         // Products
         newProductTitle: 'Новый товар', noProductsYet: 'Товаров пока нет',
         salePriceDefaultLabel: 'Цена продажи (по умолчанию для новой продажи)', initialStockLabel: 'Начальный остаток на складе',
-        materialsUsedLabel: 'Расход материалов на 1 ед.', addMaterialRowBtn: 'Добавить материал',
-        chooseMaterialPlaceholder: 'Выберите материал', noMaterialsUsedYet: 'Материалы не выбраны',
-        materialsAutoDeductedHint: 'При продаже эти материалы автоматически списываются со склада',
+        materialsUsedLabel: 'Расход сырья на 1 ед.', addMaterialRowBtn: 'Добавить сырьё',
+        chooseMaterialPlaceholder: 'Выберите сырьё', noMaterialsUsedYet: 'Сырьё не выбрано',
+        materialsAutoDeductedHint: 'При продаже это сырьё автоматически списывается со склада',
         changePhotoLabel: 'Изменить фото', removePhotoLabel: 'Удалить фото', addPhotoLabel: 'Добавить фото',
         // Debtors
         totalClientDebtLabel: 'Общий долг клиентов', salesWithDebtLabel: 'Продаж с долгом', noDebtorsYet: 'Должников нет',
@@ -112,17 +113,18 @@ export const TRANSLATIONS = {
         paymentAmountLabel: 'Сумма платежа', confirmDeletePayment: 'Удалить этот платёж?',
         confirmEditPayment: 'Изменить этот платёж?', noPaymentsYet: 'Платежей пока нет', noDebtorsToPayLabel: 'Нет должников для оплаты',
         advancePaymentHint: 'У клиента нет долга — платёж будет учтён как аванс',
+        advanceSupplierPaymentHint: 'У поставщика нет долга — расход будет учтён как аванс',
         receiptsTab: 'Поступления', expensesTab: 'Расходы',
         // Expenses
         expensesTotalLabel: 'Сумма расходов', newExpenseBtn: 'Новый расход', newExpenseTitle: 'Новый расход',
         editExpenseTitle: 'Изменить расход', confirmDeleteExpense: 'Удалить этот расход?', confirmEditExpense: 'Изменить этот расход?',
         noExpensesYet: 'Расходов пока нет', paySupplierLabel: 'Оплата поставщику (если есть)',
         // Settings
-        settingsTitle: 'Настройки', topUpBalanceTitle: 'Пополнить баланс', restockMaterialTitle: 'Пополнить материал',
+        settingsTitle: 'Настройки', topUpBalanceTitle: 'Пополнить баланс', restockMaterialTitle: 'Пополнить сырьё',
         restockBtn: 'Пополнить', restockProductBtn: 'Пополнить продукцию', restockProductTitle: 'Пополнить продукцию',
         balanceAdjustmentsListTitle: 'История пополнений баланса', noBalanceAdjustmentsYet: 'Пополнений пока нет',
         confirmDeleteBalanceAdjustment: 'Удалить это пополнение?', confirmEditBalanceAdjustment: 'Изменить это пополнение?',
-        chooseMaterialToRestockPlaceholder: 'Выберите материал', chooseProductPlaceholder: 'Выберите товар',
+        chooseMaterialToRestockPlaceholder: 'Выберите сырьё', chooseProductPlaceholder: 'Выберите товар',
         quantityToAddLabel: 'Количество для добавления', settingsHint: 'Ручные корректировки для приведения платформы в соответствие с реальным бизнесом',
     },
     uz: {
@@ -154,7 +156,7 @@ export const TRANSLATIONS = {
         couldNotUploadImage: "Rasmni yuklab bo'lmadi",
         couldNotLoadUnits: "O'lchov birliklarini yuklab bo'lmadi", unitAdded: "O'lchov birligi qo'shildi",
         couldNotLoadCategories: 'Kategoriyalarni yuklab bo\'lmadi', categoryAdded: "Kategoriya qo'shildi",
-        couldNotLoadMaterials: 'Materiallarni yuklab bo\'lmadi', materialAdded: "Material qo'shildi",
+        couldNotLoadMaterials: "Xomashyoni yuklab bo'lmadi", materialAdded: "Xomashyo qo'shildi",
         couldNotLoadSellers: 'Sotuvchilarni yuklab bo\'lmadi', sellerAdded: "Sotuvchi qo'shildi",
         couldNotLoadPurchases: 'Xaridlarni yuklab bo\'lmadi', couldNotLoadDebts: 'Qarzlarni yuklab bo\'lmadi',
         purchaseAdded: "Xarid qo'shildi", couldNotAddPurchase: "Xaridni qo'shib bo'lmadi",
@@ -167,23 +169,24 @@ export const TRANSLATIONS = {
         couldNotAddPayment: "To'lovni qo'shib bo'lmadi", amountExceedsDebtError: 'Summa mijoz qarzidan katta',
         couldNotLoadDashboard: "Dashboardni yuklab bo'lmadi",
         balanceAdjustmentAdded: "Balans to'ldirildi", couldNotAddBalanceAdjustment: "Balansni to'ldirib bo'lmadi",
-        materialRestocked: "Material to'ldirildi", couldNotRestockMaterial: "Materialni to'ldirib bo'lmadi",
+        materialRestocked: "Xomashyo to'ldirildi", couldNotRestockMaterial: "Xomashyoni to'ldirib bo'lmadi",
         productRestocked: "Mahsulot to'ldirildi", couldNotRestockProduct: "Mahsulotni to'ldirib bo'lmadi",
         couldNotLoadExpenses: "Xarajatlarni yuklab bo'lmadi", expenseAdded: "Xarajat qo'shildi", couldNotAddExpense: "Xarajatni qo'shib bo'lmadi",
 
-        purchasesTab: 'Xaridlar', materialsTab: 'Materiallar', sellersTab: 'Sotuvchilar', debtsTab: 'Qarzlar',
+        purchasesTab: 'Xaridlar', materialsTab: 'Xomashyo', sellersTab: 'Sotuvchilar', debtsTab: 'Qarzlar',
         salesTab: 'Sotuvlar', clientsTab: 'Mijozlar', productsTab: 'Mahsulotlar', debtorsTab: 'Qarzdorlar',
 
         purchasesTotalLabel: 'Xaridlar summasi', filterBtn: 'Filtr', newPurchaseBtn: 'Yangi xarid',
-        materialLabel: 'Material', sellerLabel: 'Sotuvchi', quantityShort: 'Miqdori',
+        materialLabel: 'Xomashyo', sellerLabel: 'Sotuvchi', quantityShort: 'Miqdori',
         addCommentPlaceholder: "+ qo'shish", confirmDeletePurchase: 'Bu xaridni o\'chirasizmi?',
         noPurchasesYet: "Hozircha xaridlar yo'q",
-        salesTotalLabel: 'Sotuvlar summasi', newSaleBtn: 'Yangi sotuv', clientLabel: 'Mijoz',
+        salesTotalLabel: 'Sotuvlar summasi', newSaleBtn: 'Yangi sotuv', clientLabel: 'Mijoz', allPeriodLabel: "Butun davr uchun",
         productLabel: 'Mahsulot', itemsLabel: 'Mahsulotlar', clientCategoryLabel: 'Mijoz kategoriyasi',
         confirmDeleteSale: 'Bu sotuvni o\'chirasizmi?', noSalesYet: "Hozircha sotuvlar yo'q",
 
         newPurchaseTitle: 'Yangi xarid', editPurchaseTitle: "Xaridni o'zgartirish",
-        chooseMaterialPlaceholder: 'Materialni tanlang', purchasePriceLabel: 'Narx (xarid uchun to\'langan summa)',
+        chooseMaterialPlaceholder: "Xomashyoni tanlang",
+        pricePerUnitLabel: 'Birlik narxi',
         paidDefaultFullLabel: "To'langan (odatda - to'liq summa)", paymentMethodLabel: "To'lov usuli",
         confirmEditPurchase: 'Bu xaridni o\'zgartirasizmi?',
 
@@ -194,15 +197,15 @@ export const TRANSLATIONS = {
 
         manageUnitsTitle: "O'lchov birliklari", unitExamplePlaceholder: 'Masalan: quti',
         categoryNamePlaceholder: 'Kategoriya nomi', addCategoryBtn: "Kategoriya qo'shish", unitsBtn: "O'lchov birliklari",
-        newMaterialTitle: 'Yangi material', noMaterialsYet: "Hozircha materiallar yo'q",
+        newMaterialTitle: 'Yangi xomashyo', noMaterialsYet: "Hozircha xomashyo yo'q",
         newSellerTitle: 'Yangi sotuvchi', noSellersYet: "Hozircha sotuvchilar yo'q",
         totalSupplierDebtLabel: 'Yetkazib beruvchilarga umumiy qarz', noDebtsYet: "Qarzlar yo'q",
         newClientTitle: 'Yangi mijoz', noClientsYet: "Hozircha mijozlar yo'q",
         newProductTitle: 'Yangi mahsulot', noProductsYet: "Hozircha mahsulotlar yo'q",
         salePriceDefaultLabel: "Sotuv narxi (yangi sotuv uchun odatdagi)", initialStockLabel: 'Boshlang\'ich ombordagi miqdor',
-        materialsUsedLabel: '1 birlik uchun material sarfi', addMaterialRowBtn: "Material qo'shish",
-        chooseMaterialPlaceholder: 'Materialni tanlang', noMaterialsUsedYet: 'Materiallar tanlanmagan',
-        materialsAutoDeductedHint: "Sotilganda bu materiallar ombordan avtomatik yechiladi",
+        materialsUsedLabel: '1 birlik uchun xomashyo sarfi', addMaterialRowBtn: "Xomashyo qo'shish",
+        chooseMaterialPlaceholder: "Xomashyoni tanlang", noMaterialsUsedYet: "Xomashyo tanlanmagan",
+        materialsAutoDeductedHint: "Sotilganda bu xomashyo ombordan avtomatik yechiladi",
         changePhotoLabel: "Rasmni o'zgartirish", removePhotoLabel: "Rasmni o'chirish", addPhotoLabel: 'Rasm qo\'shish',
         totalClientDebtLabel: 'Mijozlarning umumiy qarzi', salesWithDebtLabel: 'Qarzdor sotuvlar', noDebtorsYet: "Qarzdorlar yo'q",
 
@@ -218,17 +221,18 @@ export const TRANSLATIONS = {
         paymentAmountLabel: "To'lov summasi", confirmDeletePayment: "Bu to'lovni o'chirasizmi?",
         confirmEditPayment: "Bu to'lovni o'zgartirasizmi?", noPaymentsYet: "Hozircha to'lovlar yo'q", noDebtorsToPayLabel: "To'lov uchun qarzdorlar yo'q",
         advancePaymentHint: "Mijozda qarz yo'q — to'lov avans sifatida hisobga olinadi",
+        advanceSupplierPaymentHint: "Sotuvchida qarz yo'q — xarajat avans sifatida hisobga olinadi",
         receiptsTab: 'Tushumlar', expensesTab: 'Xarajatlar',
         // Expenses
         expensesTotalLabel: 'Xarajatlar summasi', newExpenseBtn: 'Yangi xarajat', newExpenseTitle: 'Yangi xarajat',
         editExpenseTitle: "Xarajatni o'zgartirish", confirmDeleteExpense: "Bu xarajatni o'chirasizmi?", confirmEditExpense: "Bu xarajatni o'zgartirasizmi?",
         noExpensesYet: "Hozircha xarajatlar yo'q", paySupplierLabel: 'Yetkazib beruvchiga to\'lov (bo\'lsa)',
         // Settings
-        settingsTitle: 'Sozlamalar', topUpBalanceTitle: "Balansni to'ldirish", restockMaterialTitle: "Materialni to'ldirish",
+        settingsTitle: 'Sozlamalar', topUpBalanceTitle: "Balansni to'ldirish", restockMaterialTitle: "Xomashyoni to'ldirish",
         restockBtn: "To'ldirish", restockProductBtn: "Mahsulotni to'ldirish", restockProductTitle: "Mahsulotni to'ldirish",
         balanceAdjustmentsListTitle: "Balans to'ldirishlar tarixi", noBalanceAdjustmentsYet: "Hozircha to'ldirishlar yo'q",
         confirmDeleteBalanceAdjustment: "Bu to'ldirishni o'chirasizmi?", confirmEditBalanceAdjustment: "Bu to'ldirishni o'zgartirasizmi?",
-        chooseMaterialToRestockPlaceholder: 'Materialni tanlang', chooseProductPlaceholder: 'Mahsulotni tanlang',
+        chooseMaterialToRestockPlaceholder: "Xomashyoni tanlang", chooseProductPlaceholder: 'Mahsulotni tanlang',
         quantityToAddLabel: "Qo'shiladigan miqdor", settingsHint: 'Platformani haqiqiy biznes holatiga moslashtirish uchun qo\'lda tuzatishlar',
     },
 }

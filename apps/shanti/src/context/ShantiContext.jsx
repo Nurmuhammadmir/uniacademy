@@ -198,6 +198,10 @@ const ShantiContextProvider = (props) => {
         try { const { data } = await axios.get(backendUrl + '/api/shanti/purchases/debts', { ...authHeader, params: filters }); return data }
         catch (error) { toast.error(error.response?.data?.error || t('couldNotLoadDebts')); return false }
     }
+    const getSellerDebts = async () => {
+        try { const { data } = await axios.get(backendUrl + '/api/shanti/purchases/seller-debts', authHeader); return data }
+        catch (error) { toast.error(error.response?.data?.error || t('couldNotLoadDebts')); return false }
+    }
     const createPurchase = async (payload) => {
         try { await axios.post(backendUrl + '/api/shanti/purchases', payload, authHeader); toast.success(t('purchaseAdded')); getMaterials(); getBalance(); return true }
         catch (error) { toast.error(error.response?.data?.error || t('couldNotAddPurchase')); return false }
@@ -384,7 +388,7 @@ const ShantiContextProvider = (props) => {
         sellers, getSellers, createSeller, updateSeller, deleteSeller,
         expenseCategories, getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
         getExpensesOverview, getExpensesChart, createExpense, updateExpense, deleteExpense,
-        getPurchasesOverview, getPurchaseDebts, createPurchase, updatePurchase, deletePurchase,
+        getPurchasesOverview, getPurchaseDebts, getSellerDebts, createPurchase, updatePurchase, deletePurchase,
         clientCategories, getClientCategories, createClientCategory, updateClientCategory, deleteClientCategory,
         clients, getClients, createClient, updateClient, deleteClient,
         products, getProducts, createProduct, updateProduct, deleteProduct, restockProduct, uploadProductPhoto, deleteProductPhoto,

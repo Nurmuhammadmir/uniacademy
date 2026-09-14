@@ -68,7 +68,10 @@ const NewSaleModal = ({ sale, onClose, onCreated }) => {
       clientId, date, items: validItems.map(i => ({ productId: i.productId, quantity: Number(i.quantity), price: Number(i.price) || 0 })),
       amount: finalAmount, paidAmount: resolvedPaid, comment,
       method: split ? undefined : method,
-      methodBreakdown: split ? breakdown.map(r => ({ method: r.method, amount: Number(r.amount) || 0 })) : [],
+      // zero/blank rows dropped rather than sent as amount:0 - the server rejects any breakdown row
+      // that isn't strictly positive, which used to surface as a confusing error whenever paidAmount
+      // was 0 (enableSplit's default row starts blank) or an added-but-unfilled row was left behind
+      methodBreakdown: split ? breakdown.filter(r => Number(r.amount) > 0).map(r => ({ method: r.method, amount: Number(r.amount) })) : [],
     }
     const ok = isEditing ? await updateSale(sale._id, payload) : await createSale(payload)
     setSubmitting(false)

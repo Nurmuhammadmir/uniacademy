@@ -36,7 +36,10 @@ const TopUpBalanceSection = () => {
     const ok = await createBalanceAdjustment({
       amount: resolvedAmount, date, comment,
       method: split ? undefined : method,
-      methodBreakdown: split ? breakdown.map(r => ({ method: r.method, amount: Number(r.amount) || 0 })) : [],
+      // zero/blank rows dropped rather than sent as amount:0 - the server rejects any breakdown row
+      // that isn't strictly positive, which used to surface as a confusing error whenever paidAmount
+      // was 0 (enableSplit's default row starts blank) or an added-but-unfilled row was left behind
+      methodBreakdown: split ? breakdown.filter(r => Number(r.amount) > 0).map(r => ({ method: r.method, amount: Number(r.amount) })) : [],
     })
     setSubmitting(false)
     if (ok) { setAmount(''); setComment(''); setSplit(false); setBreakdown([]); load() }

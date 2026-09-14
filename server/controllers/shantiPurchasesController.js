@@ -12,6 +12,7 @@ import ShantiExpense from "../models/ShantiExpense.js"
 import { SHANTI_METHODS } from "../models/shantiConstants.js"
 import { ensureDefaultShantiUnits, ensureOtherMaterialCategoryExists, OTHER_MATERIAL_CATEGORY } from "../services/shantiCatalog.service.js"
 import { validateMethodBreakdown, normalizeMethodBreakdown } from "../services/shantiMethodBreakdown.service.js"
+import { getSellerDebtMap } from "../services/shantiSellerDebt.service.js"
 
 // ==== Units ====
 
@@ -281,6 +282,25 @@ export const getPurchasesOverview = async (req, res) => {
         const purchases = await ShantiPurchase.find(match).sort({ date: -1 }).populate('materialId', 'name category unit').populate('sellerId', 'name phone').populate('createdBy', 'name').lean()
         const totalAmount = purchases.reduce((sum, p) => sum + p.amount, 0)
         res.json({ purchases, totalAmount })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// Per-seller totals (not per-purchase, see getPurchaseDebts below) - lets a form that's paying down
+// a specific seller (NewExpenseModal's "pay supplier" field) show that seller's real current debt
+// with one lookup, the same way NewPaymentModal already does for a client via getSalesDebtors.
+export const getSellerDebts = async (req, res) => {
+    try {
+        const debtMap = await getSellerDebtMap()
+        const ids = [...debtMap.entries()].filter(([, v]) => v.debt > 0.0001).map(([id]) => id)
+        const sellers = await ShantiSeller.find({ _id: { $in: ids } }).select('name phone').lean()
+        const debtors = sellers
+            .map(s => ({ sellerId: s._id, name: s.name, phone: s.phone, ...debtMap.get(String(s._id)) }))
+            .map(d => ({ ...d, totalDebt: d.debt }))
+            .sort((a, b) => b.totalDebt - a.totalDebt)
+        res.json({ debtors })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

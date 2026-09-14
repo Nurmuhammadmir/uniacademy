@@ -8,10 +8,11 @@ import NumberInput from '../components/NumberInput.jsx'
 import { methodDisplay } from '../components/MethodPicker.jsx'
 import { confirm } from '../lib/confirm.js'
 import { formatMoney } from '../lib/format.js'
-import { firstOfMonthISO, todayISO, formatDateTime } from '../lib/date.js'
+import { formatDateTime } from '../lib/date.js'
 import NewPurchaseModal from './NewPurchaseModal.jsx'
 
-const DEFAULT_FILTERS = { dateFrom: firstOfMonthISO(), dateTo: todayISO(), category: '', materialId: '', sellerId: '', amountMin: '', amountMax: '' }
+// no date bounds by default - shows the whole history rather than just this month
+const DEFAULT_FILTERS = { dateFrom: '', dateTo: '', category: '', materialId: '', sellerId: '', amountMin: '', amountMax: '' }
 
 const PurchasesList = () => {
   const { materialCategories, materials, sellers, getPurchasesOverview, updatePurchase, deletePurchase } = useContext(ShantiContext)
@@ -47,7 +48,7 @@ const PurchasesList = () => {
         <div className='bg-white border border-slate-100 rounded-2xl px-5 py-3 shadow-sm'>
           <p className='text-muted text-[11px] leading-tight'>{t('purchasesTotalLabel')}</p>
           <p className='font-bold tracking-tight text-lg text-[#1D1D1F] leading-tight'>{data ? formatMoney(data.totalAmount) : '—'}</p>
-          <p className='text-[10px] text-slate-400 mt-0.5'>{appliedFilters.dateFrom} — {appliedFilters.dateTo}</p>
+          <p className='text-[10px] text-slate-400 mt-0.5'>{appliedFilters.dateFrom || appliedFilters.dateTo ? `${appliedFilters.dateFrom} — ${appliedFilters.dateTo}` : t('allPeriodLabel')}</p>
         </div>
         <div className='flex gap-2'>
           <button onClick={() => setShowFilters(v => !v)}
