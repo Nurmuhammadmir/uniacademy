@@ -293,8 +293,8 @@ const ShantiContextProvider = (props) => {
         try { const { data } = await axios.get(backendUrl + '/api/shanti/sales', { ...authHeader, params: filters }); return data }
         catch (error) { toast.error(error.response?.data?.error || t('couldNotLoadSales')); return false }
     }
-    const getSalesDebtors = async () => {
-        try { const { data } = await axios.get(backendUrl + '/api/shanti/sales/debtors', authHeader); return data }
+    const getSalesDebtors = async (filters) => {
+        try { const { data } = await axios.get(backendUrl + '/api/shanti/sales/debtors', { ...authHeader, params: filters }); return data }
         catch (error) { toast.error(error.response?.data?.error || t('couldNotLoadDebtors')); return false }
     }
     const createSale = async (payload) => {

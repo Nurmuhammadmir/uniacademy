@@ -59,7 +59,7 @@ export const TRANSLATIONS = {
         salesTab: 'Продажи', clientsTab: 'Клиенты', productsTab: 'Товары', debtorsTab: 'Должники',
 
         // PurchasesList
-        purchasesTotalLabel: 'Сумма покупок', filterBtn: 'Фильтр', newPurchaseBtn: 'Новая покупка',
+        purchasesTotalLabel: 'Сумма покупок', filterBtn: 'Фильтр', newPurchaseBtn: 'Новая покупка', clearFiltersBtn: 'Сбросить фильтр',
         materialLabel: 'Сырьё', sellerLabel: 'Продавец', quantityShort: 'Кол-во',
         addCommentPlaceholder: '+ добавить', confirmDeletePurchase: 'Удалить эту покупку?',
         noPurchasesYet: 'Покупок пока нет',
@@ -176,7 +176,7 @@ export const TRANSLATIONS = {
         purchasesTab: 'Xaridlar', materialsTab: 'Xomashyo', sellersTab: 'Sotuvchilar', debtsTab: 'Qarzlar',
         salesTab: 'Sotuvlar', clientsTab: 'Mijozlar', productsTab: 'Mahsulotlar', debtorsTab: 'Qarzdorlar',
 
-        purchasesTotalLabel: 'Xaridlar summasi', filterBtn: 'Filtr', newPurchaseBtn: 'Yangi xarid',
+        purchasesTotalLabel: 'Xaridlar summasi', filterBtn: 'Filtr', newPurchaseBtn: 'Yangi xarid', clearFiltersBtn: 'Filtrni tozalash',
         materialLabel: 'Xomashyo', sellerLabel: 'Sotuvchi', quantityShort: 'Miqdori',
         addCommentPlaceholder: "+ qo'shish", confirmDeletePurchase: 'Bu xaridni o\'chirasizmi?',
         noPurchasesYet: "Hozircha xaridlar yo'q",

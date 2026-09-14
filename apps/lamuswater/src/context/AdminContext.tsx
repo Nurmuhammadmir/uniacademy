@@ -104,8 +104,10 @@ interface AdminContextType {
   addManager: (data: { name: string; email: string; password: string; phone: string }) => Promise<boolean>
   editManager: (id: string, data: Partial<Manager>) => Promise<boolean>
   removeManager: (id: string) => Promise<boolean>
+  addClient: (data: { name: string; phone: string; address: string; notes: string; lat: number; lng: number; managerId: string }) => Promise<boolean>
   editClient: (id: string, data: { name: string; phone: string; address: string; notes: string }) => Promise<boolean>
   removeClient: (id: string) => Promise<boolean>
+  recordOrder: (data: { clientId: string; bottlesGiven: number; bottlesReturned: number; notes: string; paymentAmount: number; paymentMethod: string }) => Promise<boolean>
   updateBottlePrice: (price: number) => Promise<boolean>
   updateExpenseCategories: (categories: string[]) => Promise<boolean>
   updateOpeningBalance: (balance: { cash: number; card: number; transfer: number }) => Promise<boolean>
@@ -314,6 +316,38 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     openingBalance: { cash: settings.openingBalance?.cash || 0, card: settings.openingBalance?.card || 0, transfer: settings.openingBalance?.transfer || 0 },
   })
 
+  const addClient = async (data: { name: string; phone: string; address: string; notes: string; lat: number; lng: number; managerId: string }) => {
+    try {
+      const { data: res } = await axios.post(`${backendUrl}/api/lamus/client`, data)
+      if (!res.success) {
+        toast.error(tServer(res.message))
+        return false
+      }
+      await loadClients()
+      toast.success(t('toast.clientAdded'))
+      return true
+    } catch (error: any) {
+      toast.error(tError(error, backendUrl))
+      return false
+    }
+  }
+
+  const recordOrder = async (data: { clientId: string; bottlesGiven: number; bottlesReturned: number; notes: string; paymentAmount: number; paymentMethod: string }) => {
+    try {
+      const { data: res } = await axios.post(`${backendUrl}/api/lamus/order`, data)
+      if (!res.success) {
+        toast.error(tServer(res.message))
+        return false
+      }
+      await Promise.all([loadClients(), loadOperations(), loadStock(), loadFinanceReport()])
+      toast.success(t('toast.deliveryRecorded'))
+      return true
+    } catch (error: any) {
+      toast.error(tError(error, backendUrl))
+      return false
+    }
+  }
+
   const editClient = async (id: string, data: { name: string; phone: string; address: string; notes: string }) => {
     try {
       const { data: res } = await axios.put(`${backendUrl}/api/lamus/client/${id}`, data)
@@ -463,7 +497,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   return (
     <AdminContext.Provider value={{
       managers, clients, operations, financeSettings, transactions, financeSummary, stock, managerLocations,
-      addManager, editManager, removeManager, editClient, removeClient,
+      addManager, editManager, removeManager, addClient, editClient, removeClient, recordOrder,
       updateBottlePrice, updateExpenseCategories, updateOpeningBalance, addTransaction, updateTransaction, deleteTransaction, adjustStock,
     }}>
       {children}

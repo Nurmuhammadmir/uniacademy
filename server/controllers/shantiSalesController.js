@@ -290,9 +290,13 @@ export const getSalesOverview = async (req, res) => {
 
 export const getSalesDebtors = async (req, res) => {
     try {
+        const { clientId, category } = req.query
         const debtMap = await getClientDebtMap()
         const ids = [...debtMap.entries()].filter(([, v]) => v.debt > 0.0001).map(([id]) => id)
-        const clients = await ShantiClient.find({ _id: { $in: ids } }).select('name phone category').lean()
+        const match = { _id: { $in: ids } }
+        if (clientId) match._id = new mongoose.Types.ObjectId(clientId)
+        if (category) match.category = category
+        const clients = await ShantiClient.find(match).select('name phone category').lean()
         const debtors = clients
             .map(c => ({ clientId: c._id, name: c.name, phone: c.phone, category: c.category, ...debtMap.get(String(c._id)) }))
             .map(d => ({ ...d, totalDebt: d.debt }))

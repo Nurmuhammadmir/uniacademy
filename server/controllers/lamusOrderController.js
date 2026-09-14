@@ -4,17 +4,23 @@ import { getOrCreateStock } from './lamusStockController.js'
 import financialSettingsModel from '../models/LamusFinancialSettings.js'
 import financialTransactionModel from '../models/LamusFinancialTransaction.js'
 
-// record a delivery
+// record a delivery - unlike addClient, an order never needs the caller to pick a manager: the
+// client being delivered to already has one (set when the client was created), so an admin
+// recording an order just inherits that client's existing manager rather than choosing separately
+// (keeps every one of a client's orders attributed to the same manager as the client itself).
 export const recordOrder = async (req, res) => {
   try {
     const { clientId, bottlesGiven, bottlesReturned, notes, paymentAmount = 0, paymentMethod = 'later' } = req.body
+    const client = await clientModel.findById(clientId)
+    if (!client) return res.json({ success: false, message: 'Client not found' })
+    const ownerId = req.userRole === 'admin' ? client.managerId : req.userId
     const settings = await financialSettingsModel.findOne({}) || await financialSettingsModel.create({})
     const paid = Math.max(0, Number(paymentAmount) || 0)
     const saleAmount = Math.max(0, Number(bottlesGiven) || 0) * settings.bottlePrice
     const net = bottlesGiven - bottlesReturned
     const order = new orderModel({
       clientId,
-      managerId: req.userId,
+      managerId: ownerId,
       bottlesGiven,
       bottlesReturned,
       netBottles: net,

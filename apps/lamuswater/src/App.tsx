@@ -15,6 +15,7 @@ import AdminDashboard from './pages/admin/Dashboard'
 import AdminOperations from './pages/admin/Operations'
 import AdminManagers from './pages/admin/Managers'
 import AdminClients from './pages/admin/Clients'
+import AdminAddClient from './pages/admin/AddClient'
 import AdminMapPage from './pages/admin/MapPage'
 import AdminFinance from './pages/admin/Finance'
 import AdminSettings from './pages/admin/Settings'
@@ -46,6 +47,7 @@ const RoleRoutes = () => {
             <Route path="finance" element={<AdminFinance />} />
             <Route path="managers" element={<AdminManagers />} />
             <Route path="clients" element={<AdminClients />} />
+            <Route path="clients/add" element={<AdminAddClient />} />
             <Route path="map" element={<AdminMapPage />} />
             <Route path="settings" element={<AdminSettings />} />
             <Route path="operations" element={<AdminOperations />} />

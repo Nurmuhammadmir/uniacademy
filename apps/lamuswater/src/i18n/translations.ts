@@ -135,6 +135,10 @@ const en: Dict = {
   'adminClients.colAddress': 'Address',
   'adminClients.colBottles': 'Bottles',
   'adminClients.noneFound': 'No clients found',
+  'adminClients.newClient': 'New Client',
+  'adminClients.assignManager': 'Assign to manager',
+  'adminClients.selectManagerPlaceholder': 'Select a manager',
+  'operations.newDelivery': 'New Delivery',
 
   'operations.title': 'Operations Log',
   'operations.subtitle': 'All manager actions with timestamps',
@@ -493,6 +497,10 @@ const ru: Dict = {
   'adminClients.colAddress': 'Адрес',
   'adminClients.colBottles': 'Бутылки',
   'adminClients.noneFound': 'Клиенты не найдены',
+  'adminClients.newClient': 'Новый клиент',
+  'adminClients.assignManager': 'Закрепить за менеджером',
+  'adminClients.selectManagerPlaceholder': 'Выберите менеджера',
+  'operations.newDelivery': 'Новая доставка',
 
   'operations.title': 'Журнал операций',
   'operations.subtitle': 'Все действия менеджеров с указанием времени',
@@ -851,6 +859,10 @@ const uz: Dict = {
   'adminClients.colAddress': 'Manzil',
   'adminClients.colBottles': 'Butilkalar',
   'adminClients.noneFound': 'Mijozlar topilmadi',
+  'adminClients.newClient': "Yangi mijoz",
+  'adminClients.assignManager': 'Menejerga biriktirish',
+  'adminClients.selectManagerPlaceholder': 'Menejerni tanlang',
+  'operations.newDelivery': 'Yangi yetkazib berish',
 
   'operations.title': 'Operatsiyalar jurnali',
   'operations.subtitle': 'Barcha menejer harakatlari vaqt bilan',

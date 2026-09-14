@@ -1,8 +1,9 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAdmin, type AdminClient } from '../../context/AdminContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useConfirm } from '../../context/ConfirmContext'
-import { Phone, MapPin, Package, Search, Users, MoreVertical, Pencil, Trash2, X, Check } from 'lucide-react'
+import { Phone, MapPin, Package, Search, Users, MoreVertical, Pencil, Trash2, X, Check, Plus } from 'lucide-react'
 import ClientHistoryModal from '../../components/ClientHistoryModal'
 import Select from '../../components/Select'
 
@@ -60,6 +61,7 @@ const AdminClients = () => {
   const { clients, managers, operations, transactions, financeSettings, removeClient } = useAdmin()
   const { t } = useLanguage()
   const confirm = useConfirm()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [filterManager, setFilterManager] = useState('all')
   const [historyClient, setHistoryClient] = useState<{ _id: string; name: string; bottlesHeld: number; balance: number } | null>(null)
@@ -149,9 +151,17 @@ const AdminClients = () => {
       )}
       {editingClient && <EditClientModal client={editingClient} onClose={() => setEditingClient(null)} />}
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-display text-gray-900">{t('adminClients.title')}</h1>
-        <p className="text-gray-400 text-sm mt-0.5">{t('adminClients.subtitle', { count: clients.length, bottles: totalBottles })}</p>
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-6">
+        <div>
+          <h1 className="text-2xl font-display text-gray-900">{t('adminClients.title')}</h1>
+          <p className="text-gray-400 text-sm mt-0.5">{t('adminClients.subtitle', { count: clients.length, bottles: totalBottles })}</p>
+        </div>
+        <button
+          onClick={() => navigate('/dashboard/clients/add')}
+          className="flex items-center gap-2 bg-[#0066CC] text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-[#0052A3] transition-colors"
+        >
+          <Plus size={16} /> {t('adminClients.newClient')}
+        </button>
       </div>
 
       <div className="flex gap-3 mb-5">

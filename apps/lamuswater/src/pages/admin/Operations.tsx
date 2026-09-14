@@ -3,9 +3,159 @@ import { useAdmin } from '../../context/AdminContext'
 import { useLanguage } from '../../context/LanguageContext'
 import DatePicker from '../../components/DatePicker'
 import Select from '../../components/Select'
-import { Filter, Truck, Receipt } from 'lucide-react'
+import { Filter, Truck, Receipt, Plus, X } from 'lucide-react'
 
 type Tab = 'deliveries' | 'finance'
+
+const formatBalance = (t: (key: string, vars?: Record<string, string | number>) => string, balance: number, currency: string) => {
+  if (balance > 0) return t('balance.owes', { amount: `${balance.toLocaleString()} ${currency}` })
+  if (balance < 0) return t('balance.credit', { amount: `${Math.abs(balance).toLocaleString()} ${currency}` })
+  return t('balance.settled')
+}
+
+// Admin's version of manager/Orders.tsx's NewOrderForm - the client picker spans ALL clients
+// (across every manager) rather than just one manager's own, since admin isn't tied to a route.
+// No manager field here: recordOrder (server-side) inherits whichever manager the chosen client
+// already belongs to, so an order never disagrees with its own client about who it's for.
+const NewDeliveryModal = ({ onClose }: { onClose: () => void }) => {
+  const { clients, recordOrder, financeSettings } = useAdmin()
+  const { t } = useLanguage()
+  const [clientId, setClientId] = useState('')
+  const [given, setGiven] = useState(1)
+  const [returned, setReturned] = useState(0)
+  const [notes, setNotes] = useState('')
+  const [paymentAmount, setPaymentAmount] = useState(0)
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'transfer' | 'later'>('later')
+  const [saving, setSaving] = useState(false)
+
+  const selectedClient = clients.find(c => c._id === clientId)
+  const orderTotal = Math.max(0, given) * financeSettings.bottlePrice
+  const newBalance = selectedClient ? selectedClient.balance + orderTotal - paymentAmount : 0
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!clientId) return
+    setSaving(true)
+    const ok = await recordOrder({ clientId, bottlesGiven: given, bottlesReturned: returned, notes, paymentAmount, paymentMethod })
+    setSaving(false)
+    if (ok) onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50 p-4 modal-backdrop" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl modal-card w-full max-w-md max-h-[85vh] overflow-y-auto p-6" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="font-semibold text-gray-900">{t('orders.recordDelivery')}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={18} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">{t('orders.client')}</label>
+            <Select
+              value={clientId}
+              onChange={setClientId}
+              placeholder={t('orders.selectClient')}
+              options={clients.map(c => ({ value: c._id, label: `${c.name} (${c.bottlesHeld} ${t('orders.held')}) · ${formatBalance(t, c.balance, financeSettings.currency)}` }))}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">{t('orders.bottlesGiven')}</label>
+              <input
+                type="number"
+                min={0}
+                max={50}
+                value={given}
+                onChange={e => setGiven(Number(e.target.value))}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono-data text-gray-900
+                  focus:outline-none focus:border-[#0066CC] focus:ring-2 focus:ring-[#0066CC]/10 transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">{t('orders.returned')}</label>
+              <input
+                type="number"
+                min={0}
+                max={50}
+                value={returned}
+                onChange={e => setReturned(Number(e.target.value))}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono-data text-gray-900
+                  focus:outline-none focus:border-[#0066CC] focus:ring-2 focus:ring-[#0066CC]/10 transition-all"
+              />
+            </div>
+          </div>
+          {given > 0 || returned > 0 ? (
+            <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
+              <span className="text-gray-500">{t('orders.netChange')}</span>
+              <span className={`font-mono-data font-medium ${given - returned > 0 ? 'text-amber-600' : 'text-green-600'}`}>
+                {given - returned > 0 ? '+' : ''}{given - returned} {t('orders.bottles')}
+              </span>
+            </div>
+          ) : null}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">{t('orders.paymentAmount')} ({financeSettings.currency})</label>
+              <input type="number" min={0} value={paymentAmount} onChange={e => setPaymentAmount(Number(e.target.value))}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono-data text-gray-900 focus:outline-none focus:border-[#0066CC]" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">{t('orders.paymentMethod')}</label>
+              <Select
+                value={paymentMethod}
+                onChange={v => setPaymentMethod(v as typeof paymentMethod)}
+                options={[
+                  { value: 'later', label: t('orders.payLater') },
+                  { value: 'cash', label: t('orders.cash') },
+                  { value: 'card', label: t('orders.card') },
+                  { value: 'transfer', label: t('orders.transfer') },
+                ]}
+              />
+            </div>
+          </div>
+          {selectedClient && (given > 0 || paymentAmount > 0) ? (
+            <div className="bg-gray-50 rounded-xl px-4 py-3 space-y-1.5 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">{t('orders.currentBalance')}</span>
+                <span className="font-mono-data text-gray-700">{formatBalance(t, selectedClient.balance, financeSettings.currency)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-500">{t('orders.orderTotal')}</span>
+                <span className="font-mono-data text-gray-700">{orderTotal.toLocaleString()} {financeSettings.currency}</span>
+              </div>
+              <div className="flex items-center justify-between pt-1.5 border-t border-gray-200">
+                <span className="text-gray-600 font-medium">{t('orders.newBalance')}</span>
+                <span className={`font-mono-data font-semibold ${newBalance > 0 ? 'text-amber-600' : newBalance < 0 ? 'text-green-600' : 'text-gray-500'}`}>
+                  {formatBalance(t, newBalance, financeSettings.currency)}
+                </span>
+              </div>
+            </div>
+          ) : null}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wider">{t('common.notes')}</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder={t('orders.notesPlaceholder')}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-300
+                focus:outline-none focus:border-[#0066CC] focus:ring-2 focus:ring-[#0066CC]/10 transition-all"
+            />
+          </div>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+              {t('common.cancel')}
+            </button>
+            <button type="submit" disabled={saving || !clientId}
+              className="flex-1 py-2.5 rounded-xl bg-[#0066CC] text-white text-sm font-medium hover:bg-[#0052A3] transition-colors disabled:opacity-60">
+              {saving ? t('common.saving') : t('orders.record')}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
 
 const AdminOperations = () => {
   const { operations, managers, transactions, financeSettings } = useAdmin()
@@ -14,6 +164,7 @@ const AdminOperations = () => {
   const [filterManager, setFilterManager] = useState('all')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [showNewDelivery, setShowNewDelivery] = useState(false)
 
   const inRange = (iso: string) => {
     const d = iso.slice(0, 10)
@@ -42,11 +193,22 @@ const AdminOperations = () => {
 
   return (
     <div className="p-6 max-w-5xl">
+      {showNewDelivery && <NewDeliveryModal onClose={() => setShowNewDelivery(false)} />}
+
       <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
         <div>
           <h1 className="text-2xl font-display text-gray-900">{t('operations.title')}</h1>
           <p className="text-gray-400 text-sm mt-0.5">{t('operations.subtitle')}</p>
         </div>
+        <div className="flex items-center gap-3">
+          {tab === 'deliveries' && (
+            <button
+              onClick={() => setShowNewDelivery(true)}
+              className="flex items-center gap-2 bg-[#0066CC] text-white px-4 py-2.5 rounded-xl text-sm font-medium hover:bg-[#0052A3] transition-colors"
+            >
+              <Plus size={16} /> {t('operations.newDelivery')}
+            </button>
+          )}
         <div className="flex bg-gray-100 rounded-lg p-1">
           <button
             onClick={() => setTab('deliveries')}
@@ -60,6 +222,7 @@ const AdminOperations = () => {
           >
             <Receipt size={13} /> {t('operations.tabFinance')}
           </button>
+        </div>
         </div>
       </div>
 

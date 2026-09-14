@@ -1,23 +1,60 @@
 import React, { useContext, useEffect, useState } from 'react'
+import { SlidersHorizontal } from 'lucide-react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import Select from '../components/Select.jsx'
 import { formatMoney } from '../lib/format.js'
 
+const DEFAULT_FILTERS = { clientId: '', category: '' }
+
 const SalesDebtors = () => {
-  const { getSalesDebtors } = useContext(ShantiContext)
+  const { clientCategories, clients, getSalesDebtors } = useContext(ShantiContext)
   const { t } = useLanguage()
+  const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS)
+  const [showFilters, setShowFilters] = useState(false)
   const [data, setData] = useState(null)
 
-  useEffect(() => { getSalesDebtors().then(d => { if (d) setData(d) }) }, [])
+  useEffect(() => { getSalesDebtors(appliedFilters).then(d => { if (d) setData(d) }) }, [appliedFilters])
+
+  const applyFilters = (e) => { e.preventDefault(); setAppliedFilters(filters) }
+  const hasActiveFilters = appliedFilters.clientId || appliedFilters.category
 
   const totalDebt = (data?.debtors || []).reduce((sum, d) => sum + d.totalDebt, 0)
 
   return (
     <div>
-      <div className='bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 mb-4 inline-block'>
-        <p className='text-amber-700 text-[11px]'>{t('totalClientDebtLabel')}</p>
-        <p className='font-bold tracking-tight text-lg text-amber-700'>{data ? formatMoney(totalDebt) : '—'}</p>
+      <div className='flex justify-between items-center mb-4 gap-3 flex-wrap'>
+        <div className='bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 inline-block'>
+          <p className='text-amber-700 text-[11px]'>{t('totalClientDebtLabel')}</p>
+          <p className='font-bold tracking-tight text-lg text-amber-700'>{data ? formatMoney(totalDebt) : '—'}</p>
+        </div>
+        <button onClick={() => setShowFilters(v => !v)}
+          className={`h-10 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors ${showFilters || hasActiveFilters ? 'bg-accent-soft text-accent' : 'bg-slate-100 text-slate-700'}`}>
+          <SlidersHorizontal size={15} strokeWidth={1.75} /> {t('filterBtn')}
+        </button>
       </div>
+
+      {showFilters && (
+        <form onSubmit={applyFilters} className='flex flex-wrap gap-3 items-end mb-4 bg-white border border-slate-200/60 rounded-2xl p-4'>
+          <div>
+            <p className='text-xs text-muted mb-1'>{t('clientLabel')}</p>
+            <Select forceSearch className='w-52' value={filters.clientId} onChange={(v) => setFilters({ ...filters, clientId: v })} placeholder={t('anyOption')}
+              options={[{ value: '', label: t('anyOption') }, ...clients.map(c => ({ value: c._id, label: c.name }))]} />
+          </div>
+          <div>
+            <p className='text-xs text-muted mb-1'>{t('categoryLabel')}</p>
+            <Select className='w-44' value={filters.category} onChange={(v) => setFilters({ ...filters, category: v })} placeholder={t('anyCategoryOption')}
+              options={[{ value: '', label: t('anyCategoryOption') }, ...clientCategories.map(c => ({ value: c.name, label: c.name }))]} />
+          </div>
+          <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium transition-colors'>{t('apply')}</button>
+          {hasActiveFilters && (
+            <button type='button' onClick={() => { setFilters(DEFAULT_FILTERS); setAppliedFilters(DEFAULT_FILTERS) }} className='text-xs text-muted underline'>
+              {t('clearFiltersBtn')}
+            </button>
+          )}
+        </form>
+      )}
 
       <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
         <table className='w-full text-sm'>
