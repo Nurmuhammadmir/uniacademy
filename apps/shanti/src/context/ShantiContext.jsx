@@ -376,7 +376,7 @@ const ShantiContextProvider = (props) => {
     }, [token])
 
     const value = {
-        token, login, logout, initialLoading,
+        token, login, logout, initialLoading, backendUrl,
         balance, getBalance,
         units, getUnits, createUnit, updateUnit, deleteUnit,
         materialCategories, getMaterialCategories, createMaterialCategory, updateMaterialCategory, deleteMaterialCategory,

@@ -55,11 +55,19 @@ const RestockProductModal = ({ onClose }) => {
   )
 }
 
-const Thumb = ({ url, size }) => (
-  <span className={`${size} rounded-xl bg-bg flex items-center justify-center overflow-hidden flex-shrink-0 border border-hairline`}>
-    {url ? <img src={url} alt='' loading='lazy' className='w-full h-full object-cover' /> : <Package size={size === 'w-20 h-20' ? 24 : 18} className='text-muted' strokeWidth={1.5} />}
-  </span>
-)
+// `url` is a relative path (e.g. /static/images/shanti-products/<id>.jpg) served by the BACKEND,
+// not this frontend's own origin - the browser would otherwise resolve a bare <img src="/static/...">
+// against shanti.uniacademy.uz itself (getting the SPA's index.html back, hence a broken-image icon)
+// instead of backend.uniacademy.uz where the file actually lives.
+const Thumb = ({ url, size }) => {
+  const { backendUrl } = useContext(ShantiContext)
+  const fullUrl = url ? (/^https?:\/\//.test(url) ? url : backendUrl + url) : null
+  return (
+    <span className={`${size} rounded-xl bg-bg flex items-center justify-center overflow-hidden flex-shrink-0 border border-hairline`}>
+      {fullUrl ? <img src={fullUrl} alt='' loading='lazy' className='w-full h-full object-cover' /> : <Package size={size === 'w-20 h-20' ? 24 : 18} className='text-muted' strokeWidth={1.5} />}
+    </span>
+  )
+}
 
 const emptyRecipeLine = () => ({ materialId: '', quantity: '' })
 
