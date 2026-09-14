@@ -5,11 +5,29 @@ import mongoose from "mongoose"
 import ShantiClientCategory from "../models/ShantiClientCategory.js"
 import ShantiClient from "../models/ShantiClient.js"
 import ShantiProduct from "../models/ShantiProduct.js"
+import ShantiMaterial from "../models/ShantiMaterial.js"
 import ShantiSale from "../models/ShantiSale.js"
 import { SHANTI_METHODS } from "../models/shantiConstants.js"
 import { ensureOtherClientCategoryExists, OTHER_CLIENT_CATEGORY } from "../services/shantiCatalog.service.js"
 import { getClientDebtMap } from "../services/shantiDebt.service.js"
 import { validateMethodBreakdown, normalizeMethodBreakdown } from "../services/shantiMethodBreakdown.service.js"
+import { deleteProductPhotoFile } from "./shantiUploadController.js"
+
+// validates a product's recipe - each row needs a real ShantiMaterial and a positive quantity (how
+// much of it one unit of the product consumes). Returns the cleaned array (materialId/quantity
+// only, dropping anything else the client sent) so a bad/extra field never sneaks into storage.
+const resolveMaterialsUsed = async (materialsUsed) => {
+    if (materialsUsed === undefined) return undefined
+    if (!Array.isArray(materialsUsed)) return null
+    const cleaned = []
+    for (const row of materialsUsed) {
+        if (!row?.materialId || !(row.quantity > 0)) return null
+        const material = await ShantiMaterial.findById(row.materialId).select('_id').lean()
+        if (!material) return null
+        cleaned.push({ materialId: row.materialId, quantity: Number(row.quantity) })
+    }
+    return cleaned
+}
 
 // ==== Client categories ====
 
@@ -148,10 +166,15 @@ export const listProducts = async (req, res) => {
 
 export const createProduct = async (req, res) => {
     try {
-        const { name, unit, price, stock } = req.body
+        const { name, unit, price, stock, materialsUsed } = req.body
         if (!name?.trim()) return res.status(400).json({ error: 'name_required' })
         if (!unit?.trim()) return res.status(400).json({ error: 'unit_required' })
-        const product = await ShantiProduct.create({ name: name.trim(), unit: unit.trim(), price: price || 0, stock: stock || 0 })
+        const cleanedMaterials = await resolveMaterialsUsed(materialsUsed)
+        if (cleanedMaterials === null) return res.status(400).json({ error: 'invalid_materials_used' })
+        const product = await ShantiProduct.create({
+            name: name.trim(), unit: unit.trim(), price: price || 0, stock: stock || 0,
+            materialsUsed: cleanedMaterials || [],
+        })
         res.status(201).json({ product })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'product_already_exists' })
@@ -162,13 +185,16 @@ export const createProduct = async (req, res) => {
 
 export const updateProduct = async (req, res) => {
     try {
-        const { name, unit, price, stock } = req.body
+        const { name, unit, price, stock, materialsUsed } = req.body
         const product = await ShantiProduct.findById(req.params.id)
         if (!product) return res.status(404).json({ error: 'not_found' })
+        const cleanedMaterials = await resolveMaterialsUsed(materialsUsed)
+        if (cleanedMaterials === null) return res.status(400).json({ error: 'invalid_materials_used' })
         if (name !== undefined && name.trim()) product.name = name.trim()
         if (unit !== undefined && unit.trim()) product.unit = unit.trim()
         if (price !== undefined) product.price = price
         if (stock !== undefined) product.stock = stock
+        if (cleanedMaterials !== undefined) product.materialsUsed = cleanedMaterials
         await product.save()
         res.json({ product })
     } catch (error) {
@@ -200,6 +226,7 @@ export const deleteProduct = async (req, res) => {
         if (!product) return res.status(404).json({ error: 'not_found' })
         const inUse = await ShantiSale.countDocuments({ 'items.productId': product._id })
         if (inUse > 0) return res.status(409).json({ error: 'product_in_use' })
+        deleteProductPhotoFile(product._id) // never leave an orphaned photo file behind on disk
         await product.deleteOne()
         res.json({ deleted: true })
     } catch (error) {
@@ -281,9 +308,19 @@ const validateItems = async (items) => {
     return null
 }
 
+// symmetric in both directions: selling (sign -1) decrements the product AND every material in its
+// recipe by quantity*perUnit; reversing a sale (sign +1, from an edit or delete) gives all of it
+// back. Reads each product's CURRENT recipe rather than a snapshot from when the sale was made -
+// same convention the product stock delta itself already follows (also read fresh, never
+// snapshotted) - so editing a recipe after the fact intentionally affects how older sales reverse,
+// consistent rather than silently disagreeing with the product's own stock math.
 const applyStockDelta = async (items, sign) => {
     for (const item of items) {
         await ShantiProduct.updateOne({ _id: item.productId }, { $inc: { stock: sign * item.quantity } })
+        const product = await ShantiProduct.findById(item.productId).select('materialsUsed').lean()
+        for (const usage of product?.materialsUsed || []) {
+            await ShantiMaterial.updateOne({ _id: usage.materialId }, { $inc: { stock: sign * item.quantity * usage.quantity } })
+        }
     }
 }
 

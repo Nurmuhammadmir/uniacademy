@@ -268,6 +268,21 @@ const ShantiContextProvider = (props) => {
         try { await axios.post(backendUrl + '/api/shanti/products/' + id + '/restock', payload, authHeader); toast.success(t('productRestocked')); getProducts(); return true }
         catch (error) { toast.error(error.response?.data?.error || t('couldNotRestockProduct')); return false }
     }
+    // resized server-side (see shantiUploadController.js) before it's ever written to disk - the
+    // original file picked here never leaves the browser except as this one upload
+    const uploadProductPhoto = async (id, file) => {
+        try {
+            const form = new FormData()
+            form.append('image', file)
+            await axios.post(backendUrl + '/api/shanti/products/' + id + '/photo', form, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' } })
+            getProducts()
+            return true
+        } catch (error) { toast.error(error.response?.data?.error || t('couldNotUploadImage')); return false }
+    }
+    const deleteProductPhoto = async (id) => {
+        try { await axios.delete(backendUrl + '/api/shanti/products/' + id + '/photo', authHeader); getProducts(); return true }
+        catch (error) { toast.error(error.response?.data?.error || t('couldNotDelete')); return false }
+    }
 
     // ==== Sales ====
     const getSalesOverview = async (filters) => {
@@ -372,7 +387,7 @@ const ShantiContextProvider = (props) => {
         getPurchasesOverview, getPurchaseDebts, createPurchase, updatePurchase, deletePurchase,
         clientCategories, getClientCategories, createClientCategory, updateClientCategory, deleteClientCategory,
         clients, getClients, createClient, updateClient, deleteClient,
-        products, getProducts, createProduct, updateProduct, deleteProduct, restockProduct,
+        products, getProducts, createProduct, updateProduct, deleteProduct, restockProduct, uploadProductPhoto, deleteProductPhoto,
         getSalesOverview, getSalesDebtors, createSale, updateSale, deleteSale,
         getDashboardSummary, getDashboardSeries,
         getPaymentsOverview, getPaymentsChart, createPayment, updatePayment, deletePayment,

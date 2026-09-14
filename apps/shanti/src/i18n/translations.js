@@ -33,6 +33,7 @@ export const TRANSLATIONS = {
 
         // toasts (generic)
         couldNotAdd: 'Не удалось добавить', couldNotEdit: 'Не удалось изменить', couldNotDelete: 'Не удалось удалить',
+        couldNotUploadImage: 'Не удалось загрузить фото',
         couldNotLoadUnits: 'Не удалось загрузить единицы измерения', unitAdded: 'Единица измерения добавлена',
         couldNotLoadCategories: 'Не удалось загрузить категории', categoryAdded: 'Категория добавлена',
         couldNotLoadMaterials: 'Не удалось загрузить материалы', materialAdded: 'Материал добавлен',
@@ -92,6 +93,10 @@ export const TRANSLATIONS = {
         // Products
         newProductTitle: 'Новый товар', noProductsYet: 'Товаров пока нет',
         salePriceDefaultLabel: 'Цена продажи (по умолчанию для новой продажи)', initialStockLabel: 'Начальный остаток на складе',
+        materialsUsedLabel: 'Расход материалов на 1 ед.', addMaterialRowBtn: 'Добавить материал',
+        chooseMaterialPlaceholder: 'Выберите материал', noMaterialsUsedYet: 'Материалы не выбраны',
+        materialsAutoDeductedHint: 'При продаже эти материалы автоматически списываются со склада',
+        changePhotoLabel: 'Изменить фото', removePhotoLabel: 'Удалить фото', addPhotoLabel: 'Добавить фото',
         // Debtors
         totalClientDebtLabel: 'Общий долг клиентов', salesWithDebtLabel: 'Продаж с долгом', noDebtorsYet: 'Должников нет',
 
@@ -145,6 +150,7 @@ export const TRANSLATIONS = {
         confirmLogout: 'Hisobdan chiqasizmi?', welcomeMessage: 'Xush kelibsiz',
 
         couldNotAdd: "Qo'shib bo'lmadi", couldNotEdit: "O'zgartirib bo'lmadi", couldNotDelete: "O'chirib bo'lmadi",
+        couldNotUploadImage: "Rasmni yuklab bo'lmadi",
         couldNotLoadUnits: "O'lchov birliklarini yuklab bo'lmadi", unitAdded: "O'lchov birligi qo'shildi",
         couldNotLoadCategories: 'Kategoriyalarni yuklab bo\'lmadi', categoryAdded: "Kategoriya qo'shildi",
         couldNotLoadMaterials: 'Materiallarni yuklab bo\'lmadi', materialAdded: "Material qo'shildi",
@@ -193,6 +199,10 @@ export const TRANSLATIONS = {
         newClientTitle: 'Yangi mijoz', noClientsYet: "Hozircha mijozlar yo'q",
         newProductTitle: 'Yangi mahsulot', noProductsYet: "Hozircha mahsulotlar yo'q",
         salePriceDefaultLabel: "Sotuv narxi (yangi sotuv uchun odatdagi)", initialStockLabel: 'Boshlang\'ich ombordagi miqdor',
+        materialsUsedLabel: '1 birlik uchun material sarfi', addMaterialRowBtn: "Material qo'shish",
+        chooseMaterialPlaceholder: 'Materialni tanlang', noMaterialsUsedYet: 'Materiallar tanlanmagan',
+        materialsAutoDeductedHint: "Sotilganda bu materiallar ombordan avtomatik yechiladi",
+        changePhotoLabel: "Rasmni o'zgartirish", removePhotoLabel: "Rasmni o'chirish", addPhotoLabel: 'Rasm qo\'shish',
         totalClientDebtLabel: 'Mijozlarning umumiy qarzi', salesWithDebtLabel: 'Qarzdor sotuvlar', noDebtorsYet: "Qarzdorlar yo'q",
 
         // Dashboard

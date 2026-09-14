@@ -23,6 +23,7 @@ import {
     listExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
     getExpensesOverview, getExpensesChart, createExpense, updateExpense, deleteExpense,
 } from "../controllers/shantiExpenseController.js"
+import { uploadProductPhotoMiddleware, uploadProductPhoto, deleteProductPhoto } from "../controllers/shantiUploadController.js"
 
 const shantiRouter = express.Router()
 shantiRouter.use(requireRole('shanti'))
@@ -99,6 +100,8 @@ shantiRouter.post('/products', createProduct)
 shantiRouter.put('/products/:id', updateProduct)
 shantiRouter.delete('/products/:id', deleteProduct)
 shantiRouter.post('/products/:id/restock', restockProduct)
+shantiRouter.post('/products/:id/photo', uploadProductPhotoMiddleware, uploadProductPhoto)
+shantiRouter.delete('/products/:id/photo', deleteProductPhoto)
 
 // same ordering note as purchases/debts above
 shantiRouter.get('/sales/debtors', getSalesDebtors)
