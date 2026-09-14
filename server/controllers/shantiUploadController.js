@@ -4,11 +4,15 @@
 // Stored ON DISK under server/public/images/shanti-products, served by the same /static route
 // server.js already exposes - no Mongo blob, no third-party image host.
 //
-// Every upload is resized down before it ever touches disk (see resizeAndSave below) - confirmed
-// real constraint: this VPS has ~1GB RAM and a mostly-full disk, so saving raw phone-camera photos
-// (routinely 3-10MB each) was never an option. sharp/libvips streams the resize instead of decoding
-// the whole image into a JS buffer, keeping this cheap even if several photos are uploaded close
-// together.
+// Every upload is resized down before it ever touches disk - confirmed real constraint: this VPS has
+// ~1GB RAM and a mostly-full disk, so saving raw phone-camera photos (routinely 3-10MB each) was
+// never an option. Uses jimp (pure JS, no native binary) rather than sharp - sharp's prebuilt binary
+// needs x86-64-v2 CPU features this VPS's virtualized CPU doesn't have, which crash-looped the whole
+// shared backend the one time it got installed on production (see git history). jimp is slower per
+// image (no native SIMD), but resizing a single product photo is cheap regardless, and "works on any
+// CPU" matters more than raw speed here. Known gap vs. the old sharp version: no EXIF-orientation
+// auto-rotate, so a phone photo taken in certain portrait orientations can save sideways - jimp has
+// no built-in equivalent to sharp's .rotate().
 import multer from "multer"
 import fs from "fs"
 import path from "path"
@@ -47,21 +51,21 @@ export const uploadProductPhoto = async (req, res) => {
         // cleanup needed the way uploadController.js's name-keyed files require. mkdirSync here too
         // (not just in multer's own storage.destination) so this function doesn't depend on having
         // been reached via that exact middleware to work correctly.
-        // loaded lazily, not as a top-level import - sharp is a native binary per-platform, and a
-        // broken/missing install (confirmed to happen on this VPS's CPU - see git history) must only
-        // ever fail THIS request, never crash the entire shared backend process at boot for every app
-        // sharing it.
-        const { default: sharp } = await import("sharp")
+        // loaded lazily, not as a top-level import - even a pure-JS image library is still a sizeable
+        // dependency, and a future problem with it (like sharp's) must only ever fail THIS request,
+        // never crash the entire shared backend process at boot for every app sharing it.
+        const { Jimp } = await import("jimp")
 
         fs.mkdirSync(PRODUCTS_DIR, { recursive: true })
         const filename = `${product._id}.jpg`
         const finalPath = path.join(PRODUCTS_DIR, filename)
-        await sharp(tempPath)
-            .rotate() // applies the photo's own EXIF orientation before resizing - otherwise a
-            // phone photo taken in portrait can be saved sideways once EXIF is stripped below
-            .resize({ width: 480, withoutEnlargement: true })
-            .jpeg({ quality: 72 })
-            .toFile(finalPath + '.new')
+        const image = await Jimp.read(tempPath)
+        if (image.width > 480) image.resize({ w: 480 }) // withoutEnlargement equivalent - never upscale a small source photo
+        // getBuffer (not .write()) so the JPEG mime type is explicit rather than inferred from the
+        // destination filename - the atomic-swap temp path below doesn't end in .jpg, which jimp's
+        // extension-sniffing write() would otherwise choke on.
+        const jpegBuffer = await image.getBuffer('image/jpeg', { quality: 72 })
+        fs.writeFileSync(finalPath + '.new', jpegBuffer)
         fs.renameSync(finalPath + '.new', finalPath) // atomic swap - a request for the photo mid-write never sees a half-written file
         fs.unlink(tempPath, () => {})
         tempPath = null
