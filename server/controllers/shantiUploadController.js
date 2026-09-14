@@ -10,7 +10,6 @@
 // the whole image into a JS buffer, keeping this cheap even if several photos are uploaded close
 // together.
 import multer from "multer"
-import sharp from "sharp"
 import fs from "fs"
 import path from "path"
 import { fileURLToPath } from "url"
@@ -48,6 +47,12 @@ export const uploadProductPhoto = async (req, res) => {
         // cleanup needed the way uploadController.js's name-keyed files require. mkdirSync here too
         // (not just in multer's own storage.destination) so this function doesn't depend on having
         // been reached via that exact middleware to work correctly.
+        // loaded lazily, not as a top-level import - sharp is a native binary per-platform, and a
+        // broken/missing install (confirmed to happen on this VPS's CPU - see git history) must only
+        // ever fail THIS request, never crash the entire shared backend process at boot for every app
+        // sharing it.
+        const { default: sharp } = await import("sharp")
+
         fs.mkdirSync(PRODUCTS_DIR, { recursive: true })
         const filename = `${product._id}.jpg`
         const finalPath = path.join(PRODUCTS_DIR, filename)
