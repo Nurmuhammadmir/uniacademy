@@ -1,5 +1,4 @@
 import mongoose from 'mongoose'
-import lamusConnection from '../config/lamusMongodb.js'
 
 const financialSettingsSchema = new mongoose.Schema({
   bottlePrice: { type: Number, required: true, default: 0 },
@@ -15,5 +14,5 @@ const financialSettingsSchema = new mongoose.Schema({
   },
 }, { timestamps: true })
 
-const financialSettingsModel = lamusConnection.models.financialSettings || lamusConnection.model('financialSettings', financialSettingsSchema)
+const financialSettingsModel = mongoose.models.LamusFinancialSettings || mongoose.model('LamusFinancialSettings', financialSettingsSchema)
 export default financialSettingsModel

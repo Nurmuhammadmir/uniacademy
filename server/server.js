@@ -18,7 +18,6 @@ import publicRouter from './routes/publicRoute.js'
 import shantiAuthRouter from './routes/shantiAuthRoute.js'
 import shantiRouter from './routes/shantiRoute.js'
 import lamusRouter from './routes/lamusRoute.js'
-import './config/lamusMongodb.js'
 import { sendDailyParentDigest } from './services/parentNotifications.service.js'
 import { runDailyBillingCycle } from './services/billingCycle.service.js'
 
@@ -82,9 +81,9 @@ app.use('/api/public', publicRouter)
 app.use('/api/shanti-auth', shantiAuthRouter)
 app.use('/api/shanti', shantiRouter)
 // LamusWater - a separate water-delivery CRM for another unrelated company, sharing this VPS/backend
-// process but its own "lamuswater" database (see config/lamusMongodb.js) - unlike Shanti, its models
-// reuse generic names ('user', 'client', 'order'...) that would collide with this platform's own if
-// they shared a database, so full isolation was simpler than prefixing every collection by hand.
+// process and the "uniacademy" database - same isolation approach as Shanti, every model registered
+// under a Lamus*-prefixed name so its collections (lamususers, lamusclients, ...) can never collide
+// with this platform's own.
 app.use('/api/lamus', lamusRouter)
 
 app.get('/', (req, res) => res.send('uniacademy api working'))

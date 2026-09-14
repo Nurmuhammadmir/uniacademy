@@ -1,5 +1,4 @@
 import mongoose from 'mongoose'
-import lamusConnection from '../config/lamusMongodb.js'
 
 const clientSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -8,11 +7,11 @@ const clientSchema = new mongoose.Schema({
   lat: { type: Number, required: true },
   lng: { type: Number, required: true },
   notes: { type: String, default: '' },
-  managerId: { type: mongoose.Schema.Types.ObjectId, ref: 'user', required: true },
+  managerId: { type: mongoose.Schema.Types.ObjectId, ref: 'LamusUser', required: true },
   bottlesHeld: { type: Number, default: 0 },
   // Positive means the client owes the company; negative means prepaid credit.
   balance: { type: Number, default: 0 },
 }, { timestamps: true })
 
-const clientModel = lamusConnection.models.client || lamusConnection.model('client', clientSchema)
+const clientModel = mongoose.models.LamusClient || mongoose.model('LamusClient', clientSchema)
 export default clientModel

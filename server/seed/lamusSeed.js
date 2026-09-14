@@ -3,7 +3,8 @@
 // first account has to be created directly against the database. Run from server/: `npm run seed:lamus`.
 import 'dotenv/config'
 import bcrypt from 'bcrypt'
-import lamusConnection from '../config/lamusMongodb.js'
+import mongoose from 'mongoose'
+import connectDB from '../config/mongodb.js'
 import userModel from '../models/LamusUser.js'
 
 const accounts = [
@@ -12,10 +13,7 @@ const accounts = [
 ]
 
 const run = async () => {
-    await new Promise((resolve, reject) => {
-        lamusConnection.once('connected', resolve)
-        lamusConnection.once('error', reject)
-    })
+    await connectDB()
 
     const salt = await bcrypt.genSalt(10)
     for (const acc of accounts) {
@@ -27,7 +25,7 @@ const run = async () => {
         )
         console.log(`${acc.role}: ${acc.email} / ${acc.password}`)
     }
-    await lamusConnection.close()
+    await mongoose.disconnect()
 }
 
 run().catch(error => {

@@ -1,5 +1,4 @@
 import mongoose from 'mongoose'
-import lamusConnection from '../config/lamusMongodb.js'
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -9,5 +8,5 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
 }, { timestamps: true })
 
-const userModel = lamusConnection.models.user || lamusConnection.model('user', userSchema)
+const userModel = mongoose.models.LamusUser || mongoose.model('LamusUser', userSchema)
 export default userModel
