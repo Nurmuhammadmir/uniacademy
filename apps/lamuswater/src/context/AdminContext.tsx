@@ -89,6 +89,7 @@ export interface ManagerLocation {
   managerName: string
   lat: number
   lng: number
+  accuracy?: number
   updatedAt: string
 }
 
@@ -229,6 +230,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           managerName: l.managerId?.name || '',
           lat: l.lat,
           lng: l.lng,
+          accuracy: l.accuracy,
           updatedAt: l.updatedAt,
         })))
       }

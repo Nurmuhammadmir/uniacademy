@@ -10,6 +10,7 @@ import Pricing from "../models/Pricing.js"
 import { getOrCreateAccount, postEntry, deleteEntries, formatAmount } from "../services/ledger.service.js"
 import Account from "../models/Account.js"
 import { computeCourseOwed, recomputeEnrollmentStatus } from "../services/billingCycle.service.js"
+import { computeOwedByPeriod } from "../services/studentLedger.service.js"
 import Language from "../models/Language.js"
 import CourseCategory from "../models/CourseCategory.js"
 import Level from "../models/Level.js"
@@ -193,6 +194,26 @@ export const getAllStudents = async (req, res) => {
         for (const student of students) student.owed = balanceByStudentId.get(String(student._id)) || 0
 
         res.json({ students })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// director-side counterpart of adminController.getStudentsDebtorsByPeriod - see that function's own
+// comment. Same branchOnlyFilter scoping as getAllStudents above (a sub_director only ever sees their
+// own branch's students; a real director sees everyone).
+export const getStudentsDebtorsByPeriod = async (req, res) => {
+    try {
+        const { periodFrom, periodTo } = req.query
+        if (!periodFrom || !periodTo) return res.status(400).json({ error: 'period_required' })
+        const students = await User.find({ role: 'student', ...branchOnlyFilter(req) }).select('_id').lean()
+        const owedMap = await computeOwedByPeriod(
+            students.map(s => s._id),
+            new Date(`${periodFrom}T00:00:00.000Z`),
+            new Date(`${periodTo}T23:59:59.999Z`),
+        )
+        res.json({ owedByStudentId: Object.fromEntries(owedMap) })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

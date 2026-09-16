@@ -1,10 +1,23 @@
-import React, { useContext, useMemo, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, Download, AlertCircle } from 'lucide-react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
+import { lastDayOfMonthISO } from '../lib/date.js'
 import Select from '../components/Select.jsx'
+
+// last 12 calendar months (this one first), as 'YYYY-MM' strings - backs the debtors period filter
+const debtorsMonthOptions = () => {
+  const months = []
+  const now = new Date()
+  for (let i = 0; i <= 11; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))
+    months.push(d.toISOString().slice(0, 7))
+  }
+  return months
+}
+const monthLabel = (m) => new Date(m + '-01').toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
 
 // no photo field exists on a student - every avatar is initials on a gradient, picked
 // deterministically from the name so the same student always lands on the same color
@@ -21,7 +34,7 @@ const avatarGradient = (name) => {
 const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() || '').join('')
 
 const Students = () => {
-  const { allStudents, branches, languages, levels, getLevels } = useContext(DirectorContext)
+  const { allStudents, branches, languages, levels, getLevels, getStudentsDebtorsByPeriod } = useContext(DirectorContext)
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -29,6 +42,23 @@ const Students = () => {
   const [languageFilter, setLanguageFilter] = useState('')
   const [levelFilter, setLevelFilter] = useState('')
   const [debtorsOnly, setDebtorsOnly] = useState(false)
+  // '' = all time (default, real current balance) - a specific 'YYYY-MM' switches the debtors
+  // filter/count/total to that month's own billed-and-still-unpaid amount instead, see
+  // adminController.getStudentsDebtorsByPeriod. Kept out of allStudents itself so the balance
+  // column keeps showing each student's real total regardless of which month is selected here.
+  const [debtPeriod, setDebtPeriod] = useState('')
+  const [periodOwedMap, setPeriodOwedMap] = useState(null)
+  const [loadingPeriodOwed, setLoadingPeriodOwed] = useState(false)
+
+  useEffect(() => {
+    if (!debtPeriod) { setPeriodOwedMap(null); return }
+    let cancelled = false
+    setLoadingPeriodOwed(true)
+    getStudentsDebtorsByPeriod(`${debtPeriod}-01`, lastDayOfMonthISO(debtPeriod)).then(map => {
+      if (!cancelled) { setPeriodOwedMap(map); setLoadingPeriodOwed(false) }
+    })
+    return () => { cancelled = true }
+  }, [debtPeriod])
 
   // a course a student has since left keeps its entry (groupId cleared) only so admin-side balance
   // history can still trace what was ever billed for it - not something they're "currently taking"
@@ -39,6 +69,9 @@ const Students = () => {
   // per-course balance was retired when billing moved to one pooled Account per student - this
   // reads that same real stored balance (see server/models/Account.js), not a per-course sum
   const totalBalance = (student) => student.owed || 0
+  // the debtors filter/count/total use this instead - real balance (above) whenever debtPeriod is
+  // '' (all time, the default), or that month's own still-unpaid amount once a month is picked
+  const debtForFilter = (student) => periodOwedMap ? (periodOwedMap[student._id] || 0) : (student.owed || 0)
 
   // one row per student, every detail in its own column - exports exactly whatever's currently
   // visible (respects the search/branch/language/level filters)
@@ -75,12 +108,12 @@ const Students = () => {
     })
   }, [allStudents, search, branchFilter, languageFilter, levelFilter])
 
-  const debtorsCount = useMemo(() => preDebtorsFilterStudents.filter(s => totalBalance(s) > 0).length, [preDebtorsFilterStudents])
-  const debtTotal = useMemo(() => preDebtorsFilterStudents.reduce((sum, s) => sum + Math.max(0, totalBalance(s)), 0), [preDebtorsFilterStudents])
+  const debtorsCount = useMemo(() => preDebtorsFilterStudents.filter(s => debtForFilter(s) > 0).length, [preDebtorsFilterStudents, periodOwedMap])
+  const debtTotal = useMemo(() => preDebtorsFilterStudents.reduce((sum, s) => sum + Math.max(0, debtForFilter(s)), 0), [preDebtorsFilterStudents, periodOwedMap])
 
   const visibleStudents = useMemo(() => (
-    debtorsOnly ? preDebtorsFilterStudents.filter(s => totalBalance(s) > 0) : preDebtorsFilterStudents
-  ), [preDebtorsFilterStudents, debtorsOnly])
+    debtorsOnly ? preDebtorsFilterStudents.filter(s => debtForFilter(s) > 0) : preDebtorsFilterStudents
+  ), [preDebtorsFilterStudents, debtorsOnly, periodOwedMap])
 
   return (
     <div>
@@ -103,6 +136,10 @@ const Students = () => {
           className={`px-3 py-2 rounded-xl text-sm font-medium flex items-center gap-1.5 transition-colors ${debtorsOnly ? 'bg-rose-500 text-white' : 'bg-bg border border-hairline text-muted'}`}>
           <AlertCircle size={15} strokeWidth={2} /> {t('debtorsFilterBtn')} {debtorsCount > 0 && <span className='text-xs opacity-80'>({debtorsCount})</span>}
         </button>
+        {debtorsOnly && (
+          <Select className='w-44' value={debtPeriod} onChange={setDebtPeriod}
+            options={[{ value: '', label: t('debtorsPeriodAllTime') }, ...debtorsMonthOptions().map(m => ({ value: m, label: monthLabel(m) }))]} />
+        )}
       </div>
 
       <div className='flex flex-wrap gap-3 mb-4'>
@@ -118,10 +155,14 @@ const Students = () => {
         <Select className='w-44' value={levelFilter} onChange={setLevelFilter} placeholder={t('anyLevel')}
           options={[{ value: '', label: t('anyLevel') }, ...levels.map(l => ({ value: l._id, label: l.name }))]} />
         {(search || branchFilter || languageFilter || levelFilter || debtorsOnly) && (
-          <button onClick={() => { setSearch(''); setBranchFilter(''); setLanguageFilter(''); setLevelFilter(''); setDebtorsOnly(false) }} className='text-muted hover:text-ink text-sm transition-colors'>{t('clear')}</button>
+          <button onClick={() => { setSearch(''); setBranchFilter(''); setLanguageFilter(''); setLevelFilter(''); setDebtorsOnly(false); setDebtPeriod('') }} className='text-muted hover:text-ink text-sm transition-colors'>{t('clear')}</button>
         )}
       </div>
-      {debtorsOnly && <p className='text-xs text-muted -mt-2 mb-4'>{t('debtorsOnlyHint')}</p>}
+      {debtorsOnly && (
+        <p className='text-xs text-muted -mt-2 mb-4'>
+          {loadingPeriodOwed ? t('loading') : debtPeriod ? t('debtorsPeriodHint', { period: monthLabel(debtPeriod) }) : t('debtorsOnlyHint')}
+        </p>
+      )}
 
       <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden overflow-x-auto shadow-sm'>
         <table className='w-full text-sm'>

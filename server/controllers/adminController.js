@@ -32,7 +32,7 @@ import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCal
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
 import { startOfLocalDay, endOfLocalDay, isEditableToday } from "../services/businessTime.service.js"
 import { ensureDefaultCategories, ensureCategoryExists, SALARY_CATEGORY, PREPAYMENT_CATEGORY, REFUND_CATEGORY } from "../services/expenseCategories.service.js"
-import { computeStudentStatements, computeReconciliation, computeGroupRevenue } from "../services/studentLedger.service.js"
+import { computeStudentStatements, computeReconciliation, computeGroupRevenue, computeOwedByPeriod } from "../services/studentLedger.service.js"
 import { earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
 import { computeEffectiveLessonStatuses, computeEffectiveLessonStatus } from "../services/lessonStatus.service.js"
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
@@ -537,6 +537,29 @@ export const listStudents = async (req, res) => {
         }
 
         res.json({ students })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// backs the Students page's "debtors for a specific month" filter (as opposed to the plain debtors
+// toggle, which uses each student's real CURRENT balance, see listStudents above) - periodFrom/
+// periodTo are a single calendar month's bounds ('YYYY-MM-DD'), matched against each debt entry's own
+// periodStart/periodEnd. Returns a flat studentId->owed map rather than folding this into listStudents
+// itself, since the FIFO walk this requires is meaningfully heavier and most page loads never touch
+// the period filter at all.
+export const getStudentsDebtorsByPeriod = async (req, res) => {
+    try {
+        const { periodFrom, periodTo } = req.query
+        if (!periodFrom || !periodTo) return res.status(400).json({ error: 'period_required' })
+        const students = await User.find({ role: 'student', branchId: req.auth.branchId }).select('_id').lean()
+        const owedMap = await computeOwedByPeriod(
+            students.map(s => s._id),
+            new Date(`${periodFrom}T00:00:00.000Z`),
+            new Date(`${periodTo}T23:59:59.999Z`),
+        )
+        res.json({ owedByStudentId: Object.fromEntries(owedMap) })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

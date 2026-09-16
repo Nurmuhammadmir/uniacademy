@@ -133,23 +133,35 @@ export const ManagerProvider = ({ children }: { children: ReactNode }) => {
   // foreground — browser geolocation requires an explicit permission prompt
   // and shows a persistent OS indicator, and cannot run once the app/tab is
   // closed (there's no covert background variant of this).
+  // Uses watchPosition (not repeated one-shot getCurrentPosition calls) so the
+  // device's GPS stays "warm" and keeps refining, the same way a native map
+  // app does — a fresh getCurrentPosition call every couple minutes tends to
+  // return a stale/low-accuracy network-based fix instead of a real GPS lock.
+  // Sends to the backend are still throttled so a fast stream of watch
+  // callbacks doesn't turn into a request per second.
   useEffect(() => {
     if (!token) return
     if (!window.isSecureContext || !navigator.geolocation) return
 
-    const pingLocation = () => {
-      navigator.geolocation.getCurrentPosition(
-        (p) => {
-          axios.post(`${backendUrl}/api/lamus/manager/location`, { lat: p.coords.latitude, lng: p.coords.longitude }).catch(() => {})
-        },
-        () => {},
-        { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
-      )
-    }
+    let lastSentAt = 0
+    const MIN_INTERVAL_MS = 60000
 
-    pingLocation()
-    const interval = setInterval(pingLocation, 120000)
-    return () => clearInterval(interval)
+    const watchId = navigator.geolocation.watchPosition(
+      (p) => {
+        const now = Date.now()
+        if (now - lastSentAt < MIN_INTERVAL_MS) return
+        lastSentAt = now
+        axios.post(`${backendUrl}/api/lamus/manager/location`, {
+          lat: p.coords.latitude,
+          lng: p.coords.longitude,
+          accuracy: p.coords.accuracy,
+        }).catch(() => {})
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+    )
+
+    return () => navigator.geolocation.clearWatch(watchId)
   }, [token])
 
   const addClient = async (data: Omit<Client, '_id' | 'managerId' | 'bottlesHeld' | 'balance' | 'createdAt'>) => {

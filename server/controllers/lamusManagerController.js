@@ -33,11 +33,11 @@ export const getProfile = async (req, res) => {
 // reported by the manager's own device while the app is open in the foreground
 export const updateLocation = async (req, res) => {
   try {
-    const { lat, lng } = req.body
+    const { lat, lng, accuracy } = req.body
     if (typeof lat !== 'number' || typeof lng !== 'number') return res.json({ success: false, message: 'Invalid coordinates' })
     const location = await managerLocationModel.findOneAndUpdate(
       { managerId: req.userId },
-      { lat, lng },
+      { lat, lng, accuracy: typeof accuracy === 'number' ? accuracy : undefined },
       { new: true, upsert: true }
     )
     res.json({ success: true, location })

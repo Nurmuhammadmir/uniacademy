@@ -325,7 +325,7 @@ const en: Dict = {
   'toast.transactionAdded': 'Transaction recorded',
 
   'map.lastSeen': 'Last seen {time}',
-  'location.sharedNote': 'Your location is shared with admins while the app is open',
+  'map.accuracy': 'Accuracy: ± {meters} m',
 
   'nav.settings': 'Settings',
   'settings.subtitle': 'Bottle pricing and warehouse stock',
@@ -687,7 +687,7 @@ const ru: Dict = {
   'toast.transactionAdded': 'Операция записана',
 
   'map.lastSeen': 'Был(а) в сети: {time}',
-  'location.sharedNote': 'Ваше местоположение видно админам, пока приложение открыто',
+  'map.accuracy': 'Точность: ± {meters} м',
 
   'nav.settings': 'Настройки',
   'settings.subtitle': 'Цена бутыли и склад',
@@ -1049,7 +1049,7 @@ const uz: Dict = {
   'toast.transactionAdded': 'Operatsiya qayd etildi',
 
   'map.lastSeen': "Oxirgi ko'rilgan: {time}",
-  'location.sharedNote': "",
+  'map.accuracy': "Aniqlik: ± {meters} m",
 
   'nav.settings': 'Sozlamalar',
   'settings.subtitle': 'Butilka narxi va ombor',

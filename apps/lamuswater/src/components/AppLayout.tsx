@@ -8,7 +8,7 @@ import InstallAppButton from './InstallAppButton'
 import PullToRefresh from './PullToRefresh'
 import {
   Droplets, LayoutDashboard, Users, MapPin, ClipboardList,
-  Package, LogOut, Menu, ChevronRight, Activity, UserCog, Wallet, Navigation, Settings
+  Package, LogOut, Menu, ChevronRight, Activity, UserCog, Wallet, Settings
 } from 'lucide-react'
 
 const AppLayout = () => {
@@ -104,12 +104,6 @@ const AppLayout = () => {
             <div className="text-[11px] text-gray-400 truncate">{user?.email}</div>
           </div>
         </div>
-        {user?.role === 'manager' && (
-          <div className="flex items-center gap-2 px-3 py-2 mb-1 text-[11px] text-gray-400">
-            <Navigation size={12} className="flex-shrink-0" />
-            <span>{t('location.sharedNote')}</span>
-          </div>
-        )}
         <InstallAppButton />
         <button
           onClick={handleLogout}

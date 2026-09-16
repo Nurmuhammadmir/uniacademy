@@ -77,6 +77,20 @@ const AdminContextProvider = (props) => {
         }
     }
 
+    // per-month debtors figure for the Students page's period filter - NOT merged into the shared
+    // `students` state (that stays each student's real, all-time balance for every other screen/flow
+    // that reads it, e.g. the payment modal's default amount) - the caller keeps this map locally and
+    // only consults it while a specific month is selected.
+    const getStudentsDebtorsByPeriod = async (periodFrom, periodTo) => {
+        try {
+            const { data } = await axios.get(backendUrl + `/api/admin/students/debtors-by-period?periodFrom=${periodFrom}&periodTo=${periodTo}`, authHeader)
+            return data.owedByStudentId
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadStudents'))
+            return null
+        }
+    }
+
     const createStudent = async (payload) => {
         try {
             const { data } = await axios.post(backendUrl + '/api/admin/students', payload, authHeader)
@@ -1268,7 +1282,7 @@ const AdminContextProvider = (props) => {
 
     const value = {
         token, login, logout, initialLoading,
-        students, getStudents, createStudent, updateStudent, deleteStudent, unarchiveStudent, getStudentProfile, linkParent,
+        students, getStudents, getStudentsDebtorsByPeriod, createStudent, updateStudent, deleteStudent, unarchiveStudent, getStudentProfile, linkParent,
         applyDiscount, deleteDiscount, getDiscountHistory, setStudentFreeze, pricingList, getPricingList,
         createPayment, refundPayment, updatePayment, getFinanceOverview, getPaymentDetail,
         getStudentStatement, getReconciliation, deletePayment, getBusinessLedger,

@@ -216,6 +216,7 @@ export const TRANSLATIONS = {
     alreadyPaidLabel: 'Already paid', remainingToPayLabel: 'Remaining',
     prepayModeLabel: 'Amount', prepayModeAmount: 'Exact amount', prepayModePercent: '% of calculated', prepayPercentOfLabel: '% of {amount}',
     debtorsFilterBtn: 'Debtors', debtorsOnlyHint: 'Showing only students who currently owe money',
+    debtorsPeriodAllTime: 'All time', debtorsPeriodHint: 'Showing debtors for {period}',
     groupEndedHint: "This group's course period has ended - you can archive it, or just change its dates to keep running it.",
     salaryHistoryTitle: 'Financial history', noSalaryHistoryYet: 'No salary history yet', salaryAccruedBadge: 'Accrued', salaryPaidOutBadge: 'Paid out',
 
@@ -526,6 +527,7 @@ export const TRANSLATIONS = {
     alreadyPaidLabel: 'Уже выплачено', remainingToPayLabel: 'Осталось',
     prepayModeLabel: 'Сумма', prepayModeAmount: 'Точная сумма', prepayModePercent: '% от расчёта', prepayPercentOfLabel: '% от {amount}',
     debtorsFilterBtn: 'Должники', debtorsOnlyHint: 'Показаны только ученики с текущим долгом',
+    debtorsPeriodAllTime: 'Весь период', debtorsPeriodHint: 'Показаны должники за {period}',
     groupEndedHint: 'Курс этой группы завершился - можете архивировать её или просто изменить даты, чтобы продолжить.',
     salaryHistoryTitle: 'Финансовая история', noSalaryHistoryYet: 'Истории зарплаты пока нет', salaryAccruedBadge: 'Начислено', salaryPaidOutBadge: 'Выплачено',
 
@@ -833,6 +835,7 @@ export const TRANSLATIONS = {
     alreadyPaidLabel: "To'langan", remainingToPayLabel: 'Qoldiq',
     prepayModeLabel: 'Summa', prepayModeAmount: 'Aniq summa', prepayModePercent: 'Hisoblangandan %', prepayPercentOfLabel: '{amount} dan %',
     debtorsFilterBtn: 'Qarzdorlar', debtorsOnlyHint: "Faqat hozir qarzi bor talabalar ko'rsatilmoqda",
+    debtorsPeriodAllTime: "Butun davr", debtorsPeriodHint: "{period} uchun qarzdorlar ko'rsatilmoqda",
     groupEndedHint: "Bu guruhning kurs davri tugadi - uni arxivlashingiz yoki sanalarini o'zgartirib davom ettirishingiz mumkin.",
     salaryHistoryTitle: 'Moliyaviy tarix', noSalaryHistoryYet: "Hali ish haqi tarixi yo'q", salaryAccruedBadge: 'Hisoblandi', salaryPaidOutBadge: "To'landi",
 
@@ -1140,6 +1143,7 @@ export const TRANSLATIONS = {
     alreadyPaidLabel: "Tólendi", remainingToPayLabel: 'Qaldıq',
     prepayModeLabel: 'Summa', prepayModeAmount: 'Anıq summa', prepayModePercent: 'Esaplanǵannan %', prepayPercentOfLabel: '{amount} dan %',
     debtorsFilterBtn: 'Qarızdarlar', debtorsOnlyHint: "Tek házir qarızı bar studentler kórsetilmekte",
+    debtorsPeriodAllTime: "Pútkil dáwir", debtorsPeriodHint: "{period} ushın qarızdarlar kórsetilmekte",
     groupEndedHint: "Bul gruppanıń kurs dáwiri tamamlandı - onı arxivlewińiz yamasa sánelerin ózgertip dawam ettiriwińiz múmkin.",
     salaryHistoryTitle: 'Financelik tariyx', noSalaryHistoryYet: "Ele aylıq tariyxı joq", salaryAccruedBadge: 'Esaplandı', salaryPaidOutBadge: "Tólendi",
 

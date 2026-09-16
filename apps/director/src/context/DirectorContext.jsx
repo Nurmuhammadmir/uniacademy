@@ -95,6 +95,18 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // per-month debtors figure for the Students page's period filter - see AdminContext's identical
+    // function for why this is kept out of the shared allStudents state.
+    const getStudentsDebtorsByPeriod = async (periodFrom, periodTo) => {
+        try {
+            const { data } = await axios.get(backendUrl + `/api/director/students/debtors-by-period?periodFrom=${periodFrom}&periodTo=${periodTo}`, authHeader)
+            return data.owedByStudentId
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadStudents'))
+            return null
+        }
+    }
+
     const getStudentProfile = async (id) => {
         try {
             const { data } = await axios.get(backendUrl + '/api/director/students/' + id, authHeader)
@@ -1157,7 +1169,7 @@ const DirectorContextProvider = (props) => {
         token, login, logout,
         stats, getStats,
         mapData, getMapData,
-        allStudents, getAllStudents, getStudentProfile, adjustStudentBalance, permanentlyDeleteStudent,
+        allStudents, getAllStudents, getStudentsDebtorsByPeriod, getStudentProfile, adjustStudentBalance, permanentlyDeleteStudent,
         getBranchProfile,
         admins, getAdmins, createAdmin, updateAdmin, deleteAdminAccount, getAdminProfile,
         teachers, getTeachers, createTeacher, updateTeacher, deleteTeacherAccount, getTeacherProfile,

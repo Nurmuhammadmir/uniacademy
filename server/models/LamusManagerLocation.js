@@ -7,6 +7,7 @@ const managerLocationSchema = new mongoose.Schema({
   managerId: { type: mongoose.Schema.Types.ObjectId, ref: 'LamusUser', required: true, unique: true },
   lat: { type: Number, required: true },
   lng: { type: Number, required: true },
+  accuracy: { type: Number }, // meters, from the browser's GeolocationPosition.coords.accuracy
 }, { timestamps: true })
 
 const managerLocationModel = mongoose.models.LamusManagerLocation || mongoose.model('LamusManagerLocation', managerLocationSchema)

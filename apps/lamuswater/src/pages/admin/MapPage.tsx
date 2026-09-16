@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import Map, { Marker, Popup, type MapRef } from 'react-map-gl/mapbox'
+import Map, { Marker, Popup, Source, Layer, type MapRef } from 'react-map-gl/mapbox'
 import { useAdmin, type AdminClient, type ManagerLocation } from '../../context/AdminContext'
 import { useLanguage } from '../../context/LanguageContext'
 import { useMyLocation } from '../../hooks/useMyLocation'
@@ -12,6 +12,27 @@ import 'mapbox-gl/dist/mapbox-gl.css'
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string
 
 const MANAGER_PALETTE = ['#0066CC', '#0891b2', '#0f766e', '#7c3aed', '#b45309', '#db2777']
+
+// Renders a GPS accuracy radius as a real-world circle (meters), not a fixed
+// pixel dot — so it shrinks/grows correctly as the map is zoomed.
+const accuracyCircle = (lat: number, lng: number, radiusMeters: number) => {
+  const points = 64
+  const earthRadius = 6371000
+  const coords: [number, number][] = []
+  for (let i = 0; i <= points; i++) {
+    const angle = (i / points) * 2 * Math.PI
+    const dx = radiusMeters * Math.cos(angle)
+    const dy = radiusMeters * Math.sin(angle)
+    const dLat = (dy / earthRadius) * (180 / Math.PI)
+    const dLng = (dx / (earthRadius * Math.cos((lat * Math.PI) / 180))) * (180 / Math.PI)
+    coords.push([lng + dLng, lat + dLat])
+  }
+  return {
+    type: 'Feature' as const,
+    geometry: { type: 'Polygon' as const, coordinates: [coords] },
+    properties: {},
+  }
+}
 
 const AdminMapPage = () => {
   const { clients, managers, operations, managerLocations, transactions, financeSettings } = useAdmin()
@@ -132,6 +153,21 @@ const AdminMapPage = () => {
             </Marker>
           ))}
 
+          {filteredManagerLocations.filter(loc => loc.accuracy).map(loc => (
+            <Source key={`acc-src-${loc.managerId}`} id={`acc-src-${loc.managerId}`} type="geojson" data={accuracyCircle(loc.lat, loc.lng, loc.accuracy!)}>
+              <Layer
+                id={`acc-fill-${loc.managerId}`}
+                type="fill"
+                paint={{ 'fill-color': managerColors[loc.managerId] || '#666', 'fill-opacity': 0.15 }}
+              />
+              <Layer
+                id={`acc-line-${loc.managerId}`}
+                type="line"
+                paint={{ 'line-color': managerColors[loc.managerId] || '#666', 'line-width': 1, 'line-opacity': 0.5 }}
+              />
+            </Source>
+          ))}
+
           {filteredManagerLocations.map(loc => (
             <Marker
               key={loc.managerId}
@@ -209,6 +245,11 @@ const AdminMapPage = () => {
                 <div className="text-xs text-gray-400">
                   {t('map.lastSeen', { time: fmtDate(selectedManager.updatedAt, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })}
                 </div>
+                {selectedManager.accuracy != null && (
+                  <div className="text-xs text-gray-400 mt-0.5">
+                    {t('map.accuracy', { meters: Math.round(selectedManager.accuracy) })}
+                  </div>
+                )}
               </div>
             </Popup>
           )}

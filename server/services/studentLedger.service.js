@@ -175,6 +175,49 @@ export const computeReconciliation = async (studentIds, dateFrom, dateTo) => {
     return { rows, totals, dateFrom, dateTo }
 }
 
+// "how much does each student still owe FOR A SPECIFIC BILLING PERIOD" (e.g. "who owes for
+// September") - as opposed to computeReconciliation's/listStudents' `owed`, which is always a
+// student's CURRENT overall unpaid amount regardless of which month it was originally billed for.
+// Still just one filter over the SAME account-wide FIFO allocation every other owed figure in this
+// file uses (a payment is never earmarked for one course OR one month - oldest debt gets paid down
+// first, across the student's whole history) - a debt entry is attributed to a period via its own
+// periodStart/periodEnd (recognizeNextPeriod always stamps these; a debt entry can't span two
+// different calendar months by construction, see recognizeNextPeriod's day-proration). Batched like
+// computeReconciliation/computeCoveredDebtPeriodsBatch - one bulk query regardless of student count.
+export const computeOwedByPeriod = async (studentIds, periodStart, periodEnd) => {
+    const result = new Map(studentIds.map(id => [String(id), 0]))
+    if (studentIds.length === 0) return result
+
+    const accounts = await Account.find({ ownerType: 'student', ownerId: { $in: studentIds } }).select('ownerId').lean()
+    if (accounts.length === 0) return result
+
+    const studentIdByAccount = new Map(accounts.map(a => [String(a._id), String(a.ownerId)]))
+    const entries = await LedgerEntry.find({
+        accountId: { $in: accounts.map(a => a._id) }, kind: { $in: DISPLAY_KINDS },
+    }).sort({ date: 1, _id: 1 })
+
+    const entriesByAccount = new Map()
+    for (const e of entries) {
+        const key = String(e.accountId)
+        if (!entriesByAccount.has(key)) entriesByAccount.set(key, [])
+        entriesByAccount.get(key).push(e)
+    }
+
+    for (const [accountId, studentId] of studentIdByAccount) {
+        const allocations = foldReversalsAndAllocate(entriesByAccount.get(accountId) || [])
+        let owed = 0
+        for (const a of allocations) {
+            if (a.entry.kind !== 'debt') continue
+            const start = a.entry.periodStart || a.entry.date
+            const end = a.entry.periodEnd || a.entry.date
+            if (start > periodEnd || end < periodStart) continue
+            owed += a.entry.amount - a.covered
+        }
+        result.set(studentId, Math.max(0, owed))
+    }
+    return result
+}
+
 // group-level view of "where did this money come from" - Credits are every debt period actually PAID
 // (cash-basis, same as salaryCalculation.service.js's percent_of_revenue - see
 // computeCoveredDebtPeriodsBatch's own comment for why), attributed to whichever teacher/group was

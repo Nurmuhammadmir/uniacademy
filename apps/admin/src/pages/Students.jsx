@@ -13,7 +13,21 @@ import DatePicker from '../components/DatePicker.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
 import MoneyInput from '../components/MoneyInput.jsx'
 import { formatMoney, groupLabel } from '../lib/format.js'
-import { todayISO, formatDateTime } from '../lib/date.js'
+import { todayISO, formatDateTime, lastDayOfMonthISO } from '../lib/date.js'
+
+// last 12 calendar months (this one first), as 'YYYY-MM' strings - backs the debtors period filter's
+// dropdown. Same UTC-anchored construction Attendance.jsx's own monthOptions() uses, so "this month"
+// always means the same calendar month here as it does everywhere else in the app.
+const debtorsMonthOptions = () => {
+  const months = []
+  const now = new Date()
+  for (let i = 0; i <= 11; i++) {
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))
+    months.push(d.toISOString().slice(0, 7))
+  }
+  return months
+}
+const monthLabel = (m) => new Date(m + '-01').toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
 
 // mapbox-gl alone is well over a megabyte - pulling it in as a normal top-level import would bloat
 // THIS page's chunk even though the map only ever renders inside the add/edit-student modals. Lazy
@@ -169,7 +183,7 @@ const SwipeableStudentCard = ({ student, statusTab, owed, courseTags, selecting,
 }
 
 const Students = () => {
-  const { students, createStudent, updateStudent, deleteStudent, unarchiveStudent, createPayment, applyDiscount, deleteDiscount, getDiscountHistory, languages, settings, groups } = useContext(AdminContext)
+  const { students, createStudent, updateStudent, deleteStudent, unarchiveStudent, createPayment, applyDiscount, deleteDiscount, getDiscountHistory, languages, settings, groups, getStudentsDebtorsByPeriod } = useContext(AdminContext)
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -178,6 +192,29 @@ const Students = () => {
   // linked from the Finance page's "Debtors" summary card (/?debtors=1) - reads once on landing so
   // that link actually pre-filters instead of just navigating to a plain, unfiltered list
   const [debtorsOnly, setDebtorsOnly] = useState(() => searchParams.get('debtors') === '1')
+  // '' = all time (default - the real, current Account.balance every other screen also uses).
+  // A specific 'YYYY-MM' switches the debtors filter/count to that month's own billed-and-still-unpaid
+  // amount instead (see computeOwedByPeriod on the server) - fetched into periodOwedMap on demand,
+  // kept OUT of the shared `students` list so nothing else on this page (the balance column, the
+  // payment modal's default amount) is affected by which month happens to be selected here.
+  const [debtPeriod, setDebtPeriod] = useState('')
+  const [periodOwedMap, setPeriodOwedMap] = useState(null)
+  const [loadingPeriodOwed, setLoadingPeriodOwed] = useState(false)
+
+  useEffect(() => {
+    if (!debtPeriod) { setPeriodOwedMap(null); return }
+    let cancelled = false
+    setLoadingPeriodOwed(true)
+    getStudentsDebtorsByPeriod(`${debtPeriod}-01`, lastDayOfMonthISO(debtPeriod)).then(map => {
+      if (!cancelled) { setPeriodOwedMap(map); setLoadingPeriodOwed(false) }
+    })
+    return () => { cancelled = true }
+  }, [debtPeriod])
+
+  // the debtors filter/count use this instead of the raw s.owed whenever a specific month is picked -
+  // every OTHER read of a student's balance on this page (the table/card amount, the payment modal)
+  // stays s.owed, the real current total, on purpose (see debtPeriod's own comment above)
+  const debtForFilter = (s) => periodOwedMap ? (periodOwedMap[s._id] || 0) : (s.owed || 0)
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [payingStudent, setPayingStudent] = useState(null)
@@ -354,12 +391,12 @@ const Students = () => {
 
   const filteredStudents = students.filter(s => {
     if ((s.status || 'active') !== statusTab) return false
-    if (debtorsOnly && !((s.owed || 0) > 0)) return false
+    if (debtorsOnly && !(debtForFilter(s) > 0)) return false
     const q = search.trim().toLowerCase()
     if (!q) return true
     return s.name.toLowerCase().includes(q) || s.phone.toLowerCase().includes(q)
   })
-  const debtorsCount = students.filter(s => (s.status || 'active') === statusTab && (s.owed || 0) > 0).length
+  const debtorsCount = students.filter(s => (s.status || 'active') === statusTab && debtForFilter(s) > 0).length
   // checkboxes/row-select only make sense when targeting specific students - a 'course'-scoped
   // discount applies to everyone enrolled automatically, nothing to hand-pick from the list
   const selectingStudents = discountMode && discountScope === 'students'
@@ -397,8 +434,16 @@ const Students = () => {
               className={`px-3 py-2.5 rounded-xl text-sm font-medium flex items-center gap-1.5 transition-colors ${debtorsOnly ? 'bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20' : 'bg-bg-elevated border border-hairline text-muted'}`}>
               {t('debtorsFilterBtn')} {debtorsCount > 0 && <span className='text-xs opacity-70'>({debtorsCount})</span>}
             </button>
+            {debtorsOnly && (
+              <Select className='w-44' value={debtPeriod} onChange={setDebtPeriod}
+                options={[{ value: '', label: t('debtorsPeriodAllTime') }, ...debtorsMonthOptions().map(m => ({ value: m, label: monthLabel(m) }))]} />
+            )}
           </div>
-          {debtorsOnly && <p className='text-xs text-muted mt-2'>{t('debtorsOnlyHint')}</p>}
+          {debtorsOnly && (
+            <p className='text-xs text-muted mt-2'>
+              {loadingPeriodOwed ? t('loading') : debtPeriod ? t('debtorsPeriodHint', { period: monthLabel(debtPeriod) }) : t('debtorsOnlyHint')}
+            </p>
+          )}
         </div>
 
         {/* ---------- mobile ---------- */}
@@ -436,7 +481,15 @@ const Students = () => {
               <p className='text-sm font-semibold leading-tight mt-1 text-ink'>{t('exportBtn')}</p>
             </button>
           </div>
-          {debtorsOnly && <p className='text-xs text-muted mb-3'>{t('debtorsOnlyHint')}</p>}
+          {debtorsOnly && (
+            <div className='mb-3'>
+              <Select className='w-full' value={debtPeriod} onChange={setDebtPeriod}
+                options={[{ value: '', label: t('debtorsPeriodAllTime') }, ...debtorsMonthOptions().map(m => ({ value: m, label: monthLabel(m) }))]} />
+              <p className='text-xs text-muted mt-1.5'>
+                {loadingPeriodOwed ? t('loading') : debtPeriod ? t('debtorsPeriodHint', { period: monthLabel(debtPeriod) }) : t('debtorsOnlyHint')}
+              </p>
+            </div>
+          )}
 
           {/* iOS-style segmented control */}
           <div className='relative flex bg-slate-100 dark:bg-white/[0.06] rounded-xl p-1 mb-3'>
