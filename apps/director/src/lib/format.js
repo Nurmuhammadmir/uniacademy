@@ -16,6 +16,7 @@ export const paymentMethodLabelKey = (method) => ({
     bank_transfer: 'paymentMethodBankTransfer',
     card: 'paymentMethodCard',
     click: 'paymentMethodClick',
+    payme: 'paymentMethodPayme',
 }[method] || 'paymentMethodUnrecorded')
 
 // a group's display label - its admin-given name if one was set, otherwise the language·level

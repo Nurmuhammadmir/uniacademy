@@ -17,6 +17,13 @@ const courseSchema = new mongoose.Schema({
     // (see adminController.addStudentToGroup) - a student can exist with a course entry and no group
     // yet, exactly like today's "taking English, not placed yet" state.
     groupId: { type: mongoose.Schema.Types.ObjectId, ref: 'Group', default: null },
+    // the real-world date this student started THIS group (may be backdated by an admin at
+    // enrollment time - see adminController.addStudentToGroup/createStudent). Purely a display/
+    // editable-by-director convenience field mirroring what was actually used to bill the first
+    // period - the FIRST 'debt' LedgerEntry for this course is always the real source of truth for
+    // what got charged. Existing courses enrolled before this field existed are left null on
+    // purpose (never backfilled - confirmed with the user) rather than guessed from ledger history.
+    enrolledAt: { type: Date, default: null },
     // replaces the old `isActive` boolean - 'inactive' from the moment a group is assigned (debt is
     // recorded immediately, before any payment) until every recognized period for this course is
     // fully paid off, at which point billingCycle.service.js flips it to 'active'. Direct analog of

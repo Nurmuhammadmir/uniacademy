@@ -6,6 +6,8 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { confirm } from '../lib/confirm.js'
 import Modal from '../components/Modal.jsx'
 import MoneyInput from '../components/MoneyInput.jsx'
+import DatePicker from '../components/DatePicker.jsx'
+import { useSafeBack } from '../lib/useSafeBack.js'
 
 // director sees everything admin sees, PLUS address/geo - only the director is allowed to see
 // where a student lives. Read-only except for one deliberate override: adjustStudentBalance below,
@@ -81,12 +83,51 @@ const AdjustBalanceModal = ({ studentId, currentBalance, onClose, onAdjusted }) 
   )
 }
 
+// see directorController.updateCourseEnrollmentDate's own comment for the exact mechanics -
+// deliberately restricted to a correction within the SAME calendar month as whatever's already
+// been billed for this course (a real month-level mistake needs freeze/re-add instead), so the
+// date picker itself is clamped to that one month rather than letting someone pick a date the
+// backend will just reject anyway.
+const EditEnrollmentDateModal = ({ studentId, course, onClose, onSaved }) => {
+  const { updateCourseEnrollmentDate } = useContext(DirectorContext)
+  const { t } = useLanguage()
+  const [value, setValue] = useState(course.enrolledAt ? course.enrolledAt.slice(0, 10) : '')
+  const [submitting, setSubmitting] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!value || submitting) return
+    setSubmitting(true)
+    const result = await updateCourseEnrollmentDate(studentId, course.languageId._id, value)
+    setSubmitting(false)
+    if (result) onSaved()
+  }
+
+  return (
+    <Modal title={t('editEnrollmentDateBtn')} onClose={onClose}>
+      <form onSubmit={submit} className='flex flex-col gap-3'>
+        <p className='text-ink text-sm font-medium'>{course.languageId?.name} · {course.levelId?.name}</p>
+        <div>
+          <p className='text-xs text-muted mb-1'>{t('enrolledAtLabel')}</p>
+          <DatePicker value={value} onChange={setValue} />
+        </div>
+        <p className='text-muted text-xs bg-bg border border-hairline rounded-xl p-3'>{t('enrollmentDateHint')}</p>
+        <button type='submit' disabled={submitting || !value} className='py-2.5 rounded-xl bg-accent text-white text-sm font-medium transition-colors disabled:opacity-50'>
+          {t('saveChanges')}
+        </button>
+      </form>
+    </Modal>
+  )
+}
+
 const StudentProfile = () => {
   const { id: studentId } = useParams()
   const navigate = useNavigate()
+  const goBack = useSafeBack('/students')
   const { getStudentProfile, permanentlyDeleteStudent } = useContext(DirectorContext)
   const [data, setData] = useState(false)
   const [showAdjustBalance, setShowAdjustBalance] = useState(false)
+  const [editingEnrollmentCourse, setEditingEnrollmentCourse] = useState(null)
   const { t } = useLanguage()
 
   const load = () => getStudentProfile(studentId).then(setData)
@@ -101,7 +142,7 @@ const StudentProfile = () => {
   return (
     <div>
       <div className='flex justify-between items-center mb-4'>
-        <button onClick={() => navigate('/students')} className='text-muted text-sm'>‹ {t('back')}</button>
+        <button onClick={goBack} className='text-muted text-sm'>‹ {t('back')}</button>
         <button onClick={handlePermanentDelete} className='text-red-500 text-xs font-medium'>{t('deletePermanentlyBtn')}</button>
       </div>
 
@@ -139,6 +180,12 @@ const StudentProfile = () => {
                   {t('priceBalanceLine', { price: c.price !== null ? formatMoney(c.price) : '—' })} ·{' '}
                   <span className={c.owed > 0 ? 'text-rose-600 font-medium' : ''}>{t('courseBalanceLine', { balance: c.owed > 0 ? `-${formatMoney(c.owed)}` : formatMoney(0) })}</span>
                 </p>
+                {c.groupId && (
+                  <div className='flex items-center justify-between mt-2 pt-2 border-t border-hairline'>
+                    <span className='text-muted text-xs'>{t('enrolledAtLabel')}: {c.enrolledAt ? new Date(c.enrolledAt).toLocaleDateString('en-GB') : t('enrollmentDateNotSet')}</span>
+                    <button onClick={() => setEditingEnrollmentCourse(c)} className='text-accent text-xs font-medium'>{t('edit')}</button>
+                  </div>
+                )}
               </div>
             ))}
             {data.courses.length === 0 && <p className='text-muted text-sm col-span-2'>{t('noCoursesYetPlain')}</p>}
@@ -212,6 +259,15 @@ const StudentProfile = () => {
           currentBalance={data.accountBalance}
           onClose={() => setShowAdjustBalance(false)}
           onAdjusted={() => { setShowAdjustBalance(false); load() }}
+        />
+      )}
+
+      {editingEnrollmentCourse && (
+        <EditEnrollmentDateModal
+          studentId={studentId}
+          course={editingEnrollmentCourse}
+          onClose={() => setEditingEnrollmentCourse(null)}
+          onSaved={() => { setEditingEnrollmentCourse(null); load() }}
         />
       )}
     </div>

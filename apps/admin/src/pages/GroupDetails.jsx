@@ -12,6 +12,7 @@ import DatePicker from '../components/DatePicker.jsx'
 import TimePicker from '../components/TimePicker.jsx'
 import { formatMoney, scheduleDaysLabel } from '../lib/format.js'
 import { currentMonthISO } from '../lib/date.js'
+import { useSafeBack } from '../lib/useSafeBack.js'
 
 // small pastel square per lesson, not a loud solid-filled circle - dense enough to read as a
 // GitHub-commit-style grid at a glance, but every cell (including "not marked yet") still shows
@@ -74,6 +75,7 @@ const StudentRowMenu = ({ onRemove, t }) => (
 const GroupDetails = () => {
   const { id: groupId } = useParams()
   const navigate = useNavigate()
+  const goBack = useSafeBack('/groups')
   const {
     getGroupDetails, updateGroup, deleteGroup, permanentlyDeleteGroup, addStudentToGroup, removeStudentFromGroup,
     getGroupAttendanceGrid,
@@ -226,7 +228,7 @@ const GroupDetails = () => {
 
   return (
     <div>
-      <button onClick={() => navigate('/groups')} className='plain text-muted text-sm mb-4 hover:text-slate-700 dark:hover:text-slate-300 transition-colors'>‹ {t('back')}</button>
+      <button onClick={goBack} className='plain text-muted text-sm mb-4 hover:text-slate-700 dark:hover:text-slate-300 transition-colors'>‹ {t('back')}</button>
 
       <p className='text-xl font-bold text-slate-800 dark:text-white tracking-tight mb-2'>
         {group.languageId?.name} · {group.levelId?.name} · {group.teacherId?.name}

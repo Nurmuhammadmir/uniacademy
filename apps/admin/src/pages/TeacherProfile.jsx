@@ -6,6 +6,7 @@ import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Select from '../components/Select.jsx'
 import { formatMoney } from '../lib/format.js'
+import { useSafeBack } from '../lib/useSafeBack.js'
 
 const SALARY_KIND_STYLE = {
   salary_accrual: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400',
@@ -131,6 +132,7 @@ const LessonDetailModal = ({ lessonId, onClose, onStatusChanged, t }) => {
 const TeacherProfile = () => {
   const { id: teacherId } = useParams()
   const navigate = useNavigate()
+  const goBack = useSafeBack('/teachers')
   const { getTeacherProfile, getTeacherAttendanceGrid } = useContext(AdminContext)
   const { t } = useLanguage()
 
@@ -153,7 +155,7 @@ const TeacherProfile = () => {
 
   return (
     <div>
-      <button onClick={() => navigate('/teachers')} className='text-muted text-sm mb-4'>‹ {t('back')}</button>
+      <button onClick={goBack} className='text-muted text-sm mb-4'>‹ {t('back')}</button>
 
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6'>
         {/* left column - personal card */}

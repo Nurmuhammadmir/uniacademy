@@ -8,6 +8,7 @@ import { formatDateTime as fullDate, todayISO } from '../lib/date.js'
 import Select from '../components/Select.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
 import MoneyInput from '../components/MoneyInput.jsx'
+import { useSafeBack } from '../lib/useSafeBack.js'
 
 const PAY_METHODS = ['cash', 'bank_transfer', 'card', 'click', 'payme']
 
@@ -23,6 +24,7 @@ const Row = ({ label, value }) => (
 const TransactionDetail = ({ type }) => {
   const { id } = useParams()
   const navigate = useNavigate()
+  const goBack = useSafeBack(`/finance/${type === 'payment' ? 'payments' : 'expenses'}`)
   const { getPaymentDetail, getExpenseDetail, updatePayment } = useContext(AdminContext)
   const { t } = useLanguage()
   const [record, setRecord] = useState(false)
@@ -58,7 +60,7 @@ const TransactionDetail = ({ type }) => {
 
   return (
     <div>
-      <button onClick={() => navigate(`/finance/${isPayment ? 'payments' : 'expenses'}`)} className='text-muted text-sm mb-4'>‹ {t('backToFinance')}</button>
+      <button onClick={goBack} className='text-muted text-sm mb-4'>‹ {t('backToFinance')}</button>
 
       <div className='flex items-center justify-between mb-6'>
         <div>

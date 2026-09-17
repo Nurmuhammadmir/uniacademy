@@ -183,11 +183,13 @@ const SwipeableStudentCard = ({ student, statusTab, owed, courseTags, selecting,
 }
 
 const Students = () => {
-  const { students, createStudent, updateStudent, deleteStudent, unarchiveStudent, createPayment, applyDiscount, deleteDiscount, getDiscountHistory, languages, settings, groups, getStudentsDebtorsByPeriod } = useContext(AdminContext)
+  const { students, createStudent, updateStudent, deleteStudent, unarchiveStudent, createPayment, applyDiscount, deleteDiscount, getDiscountHistory, languages, levels, getLevels, settings, groups, getStudentsDebtorsByPeriod } = useContext(AdminContext)
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState('')
+  const [languageFilter, setLanguageFilter] = useState('')
+  const [levelFilter, setLevelFilter] = useState('')
   const [statusTab, setStatusTab] = useState('active')
   // linked from the Finance page's "Debtors" summary card (/?debtors=1) - reads once on landing so
   // that link actually pre-filters instead of just navigating to a plain, unfiltered list
@@ -392,6 +394,8 @@ const Students = () => {
   const filteredStudents = students.filter(s => {
     if ((s.status || 'active') !== statusTab) return false
     if (debtorsOnly && !(debtForFilter(s) > 0)) return false
+    if (languageFilter && !currentCourses(s).some(c => c.languageId?._id === languageFilter)) return false
+    if (levelFilter && !currentCourses(s).some(c => c.levelId?._id === levelFilter)) return false
     const q = search.trim().toLowerCase()
     if (!q) return true
     return s.name.toLowerCase().includes(q) || s.phone.toLowerCase().includes(q)
@@ -437,6 +441,13 @@ const Students = () => {
             {debtorsOnly && (
               <Select className='w-44' value={debtPeriod} onChange={setDebtPeriod}
                 options={[{ value: '', label: t('debtorsPeriodAllTime') }, ...debtorsMonthOptions().map(m => ({ value: m, label: monthLabel(m) }))]} />
+            )}
+            <Select className='w-44' value={languageFilter} onChange={(v) => { setLanguageFilter(v); if (v) getLevels(v) }} placeholder={t('anyLanguage')}
+              options={[{ value: '', label: t('anyLanguage') }, ...languages.map(l => ({ value: l._id, label: l.name }))]} />
+            <Select className='w-44' value={levelFilter} onChange={setLevelFilter} placeholder={t('anyLevel')}
+              options={[{ value: '', label: t('anyLevel') }, ...levels.map(l => ({ value: l._id, label: l.name }))]} />
+            {(search || languageFilter || levelFilter || debtorsOnly) && (
+              <button onClick={() => { setSearch(''); setLanguageFilter(''); setLevelFilter(''); setDebtorsOnly(false); setDebtPeriod('') }} className='text-muted hover:text-ink text-sm transition-colors'>{t('clearFilters')}</button>
             )}
           </div>
           {debtorsOnly && (
@@ -499,7 +510,7 @@ const Students = () => {
           </div>
 
           {/* iOS-style search field */}
-          <div className='relative'>
+          <div className='relative mb-2.5'>
             <Search size={16} strokeWidth={2} className='absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none' />
             <input
               value={search}
@@ -507,6 +518,15 @@ const Students = () => {
               placeholder={t('searchByNameOrPhone')}
               className='w-full pl-10 pr-4 py-2.5 rounded-lg bg-gray-100 dark:bg-zinc-800 border-none text-sm placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-accent/40'
             />
+          </div>
+          <div className='flex gap-2 items-center flex-wrap'>
+            <Select className='flex-1 min-w-[8rem]' value={languageFilter} onChange={(v) => { setLanguageFilter(v); if (v) getLevels(v) }} placeholder={t('anyLanguage')}
+              options={[{ value: '', label: t('anyLanguage') }, ...languages.map(l => ({ value: l._id, label: l.name }))]} />
+            <Select className='flex-1 min-w-[8rem]' value={levelFilter} onChange={setLevelFilter} placeholder={t('anyLevel')}
+              options={[{ value: '', label: t('anyLevel') }, ...levels.map(l => ({ value: l._id, label: l.name }))]} />
+            {(languageFilter || levelFilter) && (
+              <button onClick={() => { setLanguageFilter(''); setLevelFilter('') }} className='text-muted hover:text-ink text-sm transition-colors'>{t('clearFilters')}</button>
+            )}
           </div>
         </div>
 

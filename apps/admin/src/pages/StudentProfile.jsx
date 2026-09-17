@@ -13,6 +13,7 @@ import Modal from '../components/Modal.jsx'
 import Spinner from '../components/Spinner.jsx'
 import ReceiptModal from '../components/ReceiptModal.jsx'
 import MoneyInput from '../components/MoneyInput.jsx'
+import { useSafeBack } from '../lib/useSafeBack.js'
 
 const PAY_METHODS = ['cash', 'bank_transfer', 'card', 'click', 'payme']
 
@@ -26,6 +27,7 @@ const EMPTY = 'flex flex-col items-center text-center py-6 text-slate-400 text-x
 const StudentProfile = () => {
   const { id: studentId } = useParams()
   const navigate = useNavigate()
+  const goBack = useSafeBack('/')
   const {
     getStudentProfile,
     refundPayment, updatePayment, updateStudent, deleteStudent,
@@ -242,7 +244,7 @@ const StudentProfile = () => {
 
   return (
     <div>
-      <button onClick={() => navigate('/')} className='plain flex items-center gap-1 text-muted text-sm mb-4 hover:text-slate-700 dark:hover:text-slate-300 transition-colors'>
+      <button onClick={goBack} className='plain flex items-center gap-1 text-muted text-sm mb-4 hover:text-slate-700 dark:hover:text-slate-300 transition-colors'>
         <ArrowLeft size={15} strokeWidth={1.5} /> {t('back')}
       </button>
 

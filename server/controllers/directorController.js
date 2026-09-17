@@ -7,7 +7,7 @@ import Branch from "../models/Branch.js"
 import Payment from "../models/Payment.js"
 import Group from "../models/Group.js"
 import Pricing from "../models/Pricing.js"
-import { getOrCreateAccount, postEntry, deleteEntries, formatAmount } from "../services/ledger.service.js"
+import { getOrCreateAccount, postEntry, postTransfer, deleteEntries, formatAmount, dateOnlyUTC, computePeriodCost } from "../services/ledger.service.js"
 import Account from "../models/Account.js"
 import { computeCourseOwed, recomputeEnrollmentStatus } from "../services/billingCycle.service.js"
 import { computeOwedByPeriod } from "../services/studentLedger.service.js"
@@ -257,6 +257,105 @@ export const getStudentProfile = async (req, res) => {
             groups,
             examAttempts,
         })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// director/sub_director tool for correcting a mistyped/wrong group-join date - confirmed spec: an
+// admin's mistake (entered the 7th when the student actually started the 1st) means the FIRST
+// billing period was wrongly prorated (or wrongly charged the full month). Deliberately restricted
+// to a correction WITHIN THE SAME CALENDAR MONTH as whatever's already been recognized for this
+// course - a real month-boundary mistake (not just the wrong day) would require re-deriving every
+// period recognized since (recognizedThrough only ever remembers the PREVIOUS period's own end, see
+// billingCycle.service.js's own comment on this), which this tool intentionally does not attempt;
+// confirmed acceptable with the user, who can use freeze/remove-and-re-add for that rarer case.
+// The corrected debt is the FIRST one this account has ever recognized for this course (by
+// periodStart) - reversed in full and reposted with the new date, the same "cancel one already-
+// posted debt" shape reverseUnusedPeriod already uses, just for the whole amount instead of a tail.
+export const updateCourseEnrollmentDate = async (req, res) => {
+    try {
+        const { languageId, enrolledAt } = req.body
+        if (!languageId || !enrolledAt) return res.status(400).json({ error: 'language_and_date_required' })
+
+        const student = await User.findOne({ _id: req.params.id, role: 'student', ...branchOnlyFilter(req) })
+        if (!student) return res.status(404).json({ error: 'not_found' })
+
+        const course = student.courses.find(c => String(c.languageId) === String(languageId))
+        if (!course || !course.groupId) return res.status(404).json({ error: 'course_not_found' })
+
+        const group = await Group.findById(course.groupId)
+        if (!group) return res.status(404).json({ error: 'course_not_found' })
+
+        const parsedDate = new Date(enrolledAt)
+        if (isNaN(parsedDate)) return res.status(400).json({ error: 'invalid_enrollment_date' })
+        const newDate = dateOnlyUTC(parsedDate)
+        if (newDate > dateOnlyUTC(new Date())) return res.status(400).json({ error: 'enrollment_date_in_future' })
+        if (group.startDate && newDate < dateOnlyUTC(group.startDate)) return res.status(400).json({ error: 'enrollment_date_before_group_start' })
+
+        const account = await getOrCreateAccount('student', student._id)
+        const firstDebt = await LedgerEntry.findOne({ accountId: account._id, languageId, kind: 'debt' }).sort({ periodStart: 1, _id: 1 })
+
+        if (!firstDebt) {
+            // nothing on the ledger to correct (e.g. a first period whose cost rounded to 0) - just
+            // record the real date for display, nothing to reverse/repost
+            course.enrolledAt = newDate
+            await student.save()
+            return res.json({ course })
+        }
+
+        const oldStart = dateOnlyUTC(firstDebt.periodStart)
+        if (newDate.getUTCFullYear() !== oldStart.getUTCFullYear() || newDate.getUTCMonth() !== oldStart.getUTCMonth()) {
+            return res.status(400).json({ error: 'enrollment_date_different_month' })
+        }
+
+        const alreadyReversed = await LedgerEntry.exists({ accountId: account._id, kind: 'debt_reversal', sourceId: firstDebt._id })
+        if (alreadyReversed) return res.status(409).json({ error: 'period_already_adjusted' })
+
+        const { rawCost: newCost, windowEnd: newWindowEnd, isFullMonth } = computePeriodCost(group, newDate)
+        // the whole point of restricting this to a same-month correction: the corrected period's own
+        // end must land on exactly the same day the period this account already recognized ends on -
+        // otherwise recognizedThrough (left untouched below) would silently disagree with what this
+        // course's own billing history says happened. Guards the rare case where the group's endDate
+        // changed AFTER this period was first posted.
+        if (newWindowEnd.getTime() !== dateOnlyUTC(firstDebt.periodEnd).getTime()) {
+            return res.status(409).json({ error: 'group_schedule_changed_since' })
+        }
+
+        if (firstDebt.amount > 0) {
+            await postEntry({
+                accountId: account._id, direction: 'decrease', amount: firstDebt.amount, kind: 'debt_reversal',
+                meta: {
+                    studentId: student._id, groupId: group._id, languageId, levelId: course.levelId,
+                    teacherId: group.teacherId, periodStart: firstDebt.periodStart, periodEnd: firstDebt.periodEnd,
+                    sourceType: 'ledgerEntry', sourceId: firstDebt._id,
+                },
+                description: `Enrollment date corrected - original ${formatAmount(firstDebt.amount)} charge reversed`,
+                createdBy: req.auth.userId, date: new Date(),
+            })
+        }
+
+        if (newCost > 0) {
+            const dayLabel = isFullMonth
+                ? `${newDate.toISOString().slice(0, 10)} – ${newWindowEnd.toISOString().slice(0, 10)}`
+                : `${newDate.toISOString().slice(0, 10)} – ${newWindowEnd.toISOString().slice(0, 10)} (partial month)`
+            await postEntry({
+                accountId: account._id, direction: 'increase', amount: newCost, kind: 'debt',
+                meta: {
+                    studentId: student._id, groupId: group._id, languageId, levelId: course.levelId,
+                    teacherId: group.teacherId, periodStart: newDate, periodEnd: newWindowEnd,
+                },
+                description: `${dayLabel} · ${formatAmount(group.price)}/mo = ${formatAmount(newCost)} (enrollment date corrected)`,
+                createdBy: req.auth.userId, date: newDate,
+            })
+        }
+
+        course.enrolledAt = newDate
+        await recomputeEnrollmentStatus(student)
+        await student.save()
+
+        res.json({ course })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -1395,6 +1494,88 @@ export const getPaymentDetail = async (req, res) => {
         if (!payment) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && String(payment.branchId) !== String(req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
         res.json({ payment })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+const PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'click', 'payme']
+
+// director/sub_director counterpart of adminController.updatePayment - deliberately NOT gated by
+// isEditableToday, same reasoning as updateExpenseDirector's own comment (confirmed with the user:
+// full authority to correct any payment regardless of age, not just today's). Same branch-scoping as
+// getPaymentDetail above: a real director can touch any branch's payment, a sub_director only their
+// own. Mechanically identical to adminController.updatePayment otherwise (same delta-correction
+// ledger transfer, same refunded-payment guard).
+export const updatePaymentDirector = async (req, res) => {
+    try {
+        const { amount, method, comment } = req.body
+        const payment = await Payment.findById(req.params.id)
+        if (!payment) return res.status(404).json({ error: 'not_found' })
+        const paymentBranchId = payment.branchId || (await User.findById(payment.studentId).select('branchId').lean())?.branchId
+        if (isSubDirector(req) && String(paymentBranchId) !== String(req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
+        if (payment.refundedAmount > 0) return res.status(400).json({ error: 'already_refunded' })
+        if (amount !== undefined && !(Number(amount) > 0)) return res.status(400).json({ error: 'invalid_amount' })
+
+        if (amount !== undefined && Number(amount) !== payment.amount) {
+            const delta = Number(amount) - payment.amount
+            const studentAccount = await getOrCreateAccount('student', payment.studentId)
+            const branchAccount = await getOrCreateAccount('branch', paymentBranchId)
+            if (delta > 0) {
+                await postTransfer({
+                    fromAccountId: studentAccount._id, toAccountId: branchAccount._id,
+                    amount: delta, kind: 'payment', method: payment.method,
+                    meta: { studentId: payment.studentId, groupId: payment.groupId, languageId: payment.languageId, levelId: payment.levelId, teacherId: payment.teacherId, sourceType: 'payment', sourceId: payment._id },
+                    description: `Correction to payment ${payment._id} - increased by ${formatAmount(delta)}`,
+                    createdBy: req.auth.userId, date: new Date(),
+                })
+            } else {
+                await postTransfer({
+                    fromAccountId: branchAccount._id, toAccountId: studentAccount._id,
+                    fromDirection: 'decrease', toDirection: 'increase',
+                    amount: -delta, kind: 'payment', method: payment.method,
+                    meta: { studentId: payment.studentId, groupId: payment.groupId, languageId: payment.languageId, levelId: payment.levelId, teacherId: payment.teacherId, sourceType: 'payment', sourceId: payment._id },
+                    description: `Correction to payment ${payment._id} - decreased by ${formatAmount(-delta)}`,
+                    createdBy: req.auth.userId, date: new Date(),
+                })
+            }
+            payment.amount = Number(amount)
+            const student = await User.findOne({ _id: payment.studentId })
+            if (student) { await recomputeEnrollmentStatus(student); await student.save() }
+        }
+        if (method !== undefined && method !== payment.method) {
+            if (!PAYMENT_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_payment_method' })
+            await LedgerEntry.updateMany({ sourceType: 'payment', sourceId: payment._id }, { method })
+            payment.method = method
+        }
+        if (comment !== undefined) payment.comment = String(comment).trim().slice(0, 2000)
+        await payment.save({ validateModifiedOnly: true })
+
+        res.json({ payment })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// director/sub_director counterpart of adminController.deletePayment - same "any age, any branch
+// (sub_director: own branch only)" authority as updatePaymentDirector above.
+export const deletePaymentDirector = async (req, res) => {
+    try {
+        const payment = await Payment.findById(req.params.id)
+        if (!payment) return res.status(404).json({ error: 'not_found' })
+        const paymentBranchId = payment.branchId || (await User.findById(payment.studentId).select('branchId').lean())?.branchId
+        if (isSubDirector(req) && String(paymentBranchId) !== String(req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
+
+        await deleteEntries({ sourceType: 'payment', sourceId: payment._id })
+        await Expense.deleteMany({ refundOfPaymentId: payment._id })
+
+        const student = await User.findById(payment.studentId)
+        if (student) { await recomputeEnrollmentStatus(student); await student.save() }
+
+        await payment.deleteOne()
+        res.json({ deleted: true })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

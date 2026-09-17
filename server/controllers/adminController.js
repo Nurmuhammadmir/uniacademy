@@ -484,7 +484,7 @@ export const createStudent = async (req, res) => {
 
         const salt = await bcrypt.genSalt(10)
         const passwordHash = await bcrypt.hash(password, salt)
-        const courses = group ? [{ languageId: group.languageId, levelId: group.levelId, groupId: group._id }] : []
+        const courses = group ? [{ languageId: group.languageId, levelId: group.levelId, groupId: group._id, enrolledAt: enrolledDate || new Date() }] : []
         const student = await User.create({
             name, phone, passwordHash, address,
             dateOfBirth: dateOfBirth || null,
@@ -1500,8 +1500,8 @@ export const addStudentToGroup = async (req, res) => {
         await enrollStudentMidCycle(studentId, group, level?.durationDays || 30)
 
         let course = student.courses.find(c => String(c.languageId) === String(group.languageId))
-        if (course) { course.groupId = group._id; course.levelId = group.levelId }
-        else { student.courses.push({ languageId: group.languageId, levelId: group.levelId, groupId: group._id }); course = student.courses[student.courses.length - 1] }
+        if (course) { course.groupId = group._id; course.levelId = group.levelId; course.enrolledAt = enrolledDate || new Date() }
+        else { student.courses.push({ languageId: group.languageId, levelId: group.levelId, groupId: group._id, enrolledAt: enrolledDate || new Date() }); course = student.courses[student.courses.length - 1] }
         // save now, not only as a side effect of recognizeEnrollmentDebt below - that call is a no-op
         // (returns without saving anything) whenever the group's billing window has already ended or
         // the student is frozen, which would otherwise silently drop this course assignment entirely:

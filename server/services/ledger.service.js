@@ -1,6 +1,7 @@
 import mongoose from "mongoose"
 import Account from "../models/Account.js"
 import LedgerEntry from "../models/LedgerEntry.js"
+import { countScheduledDaysInRange } from "./scheduleDays.service.js"
 
 // ---- date helpers -----------------------------------------------------------------------------
 // the ONE place billing-period math lives now - previously this exact formula was independently
@@ -32,17 +33,40 @@ export const monthKeyUTC = (date) => `${date.getUTCFullYear()}-${String(date.get
 export const formatAmount = (n) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 
 // windowStart = the first day of the billing chunk being charged (either the 1st of a month for a
-// full month, or some other day for a partial first/only month - a course can run as short as 15
-// days, so a chunk never assumes it reaches a full month). Returns the (rounded) raw cost for that
-// one chunk before any discount, plus the chunk's own end (always the last calendar day of that
-// month - billing chunks are always calendar-month-aligned, never rolling N-day windows).
-export const computePeriodCost = (price, windowStart) => {
+// full month, or some other day for a partial first/only/last month - a course can run as short as
+// 15 days, so a chunk never assumes it reaches a full month). Returns the (rounded) raw cost for
+// that one chunk before any discount, plus the chunk's own end.
+//
+// A partial chunk (joined mid-month, or the group's own endDate cuts this month short) is prorated
+// by ACTUAL SCHEDULED LESSONS, not calendar days - confirmed spec: a course priced 300,000/mo whose
+// group meets ~13 times that month is really "300,000 for 13 lessons", so a student who only catches
+// 5 of those lessons this month (joined the 20th, say) owes 5/13 of the price, not "however many
+// calendar days are left / days in month". The denominator is always the FULL calendar month's own
+// lesson count for THIS group's specific schedule (varies month to month - which weekdays the 1st
+// falls on shifts a Mon/Wed/Fri group between 12-14 lessons), never a fixed assumed number. A full,
+// uncut month is still always the flat group.price with zero lesson-count adjustment (a lesson
+// cancelled/rescheduled after the fact doesn't retroactively shrink that month's charge) - lesson
+// counting only ever decides how a PARTIAL month's price is split.
+export const computePeriodCost = (group, windowStart) => {
     const daysInMonth = daysInMonthUTC(windowStart)
-    const dayOfMonth = windowStart.getUTCDate()
-    const isFullMonth = dayOfMonth === 1
-    const daysRemaining = daysInMonth - dayOfMonth + 1
-    const rawCost = isFullMonth ? price : Math.round(price * daysRemaining / daysInMonth)
-    return { rawCost, isFullMonth, daysRemaining, daysInMonth, windowEnd: endOfMonthUTC(windowStart) }
+    const monthStart = new Date(Date.UTC(windowStart.getUTCFullYear(), windowStart.getUTCMonth(), 1))
+    const naturalMonthEnd = endOfMonthUTC(windowStart)
+    // the group's own end date can cut this chunk short too (its billing window ending mid-month) -
+    // same partial-chunk treatment as joining mid-month, see reverseUnusedPeriod's day-based version
+    // of this same idea for the "leaving early" side, which still prorates by days since it works off
+    // an already-charged, already-fixed amount rather than re-deriving a lesson ratio from scratch.
+    const windowEnd = (group.endDate && group.endDate < naturalMonthEnd) ? group.endDate : naturalMonthEnd
+    const isFullMonth = windowStart.getUTCDate() === 1 && windowEnd.getTime() === naturalMonthEnd.getTime()
+
+    let rawCost
+    if (isFullMonth) {
+        rawCost = group.price
+    } else {
+        const totalLessonsInMonth = countScheduledDaysInRange(group, monthStart, naturalMonthEnd)
+        const lessonsInWindow = countScheduledDaysInRange(group, windowStart, windowEnd)
+        rawCost = totalLessonsInMonth > 0 ? Math.round(group.price * lessonsInWindow / totalLessonsInMonth) : 0
+    }
+    return { rawCost, isFullMonth, daysInMonth, windowEnd }
 }
 
 // ---- account access -----------------------------------------------------------------------------

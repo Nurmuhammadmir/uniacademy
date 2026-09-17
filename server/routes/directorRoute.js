@@ -1,7 +1,7 @@
 import express from "express"
 import requireRole from "../middleware/auth.js"
 import {
-    getMe, getStats, getMapData, getAllStudents, getStudentsDebtorsByPeriod, getStudentProfile, adjustStudentBalance, permanentlyDeleteStudent, getBranchProfile,
+    getMe, getStats, getMapData, getAllStudents, getStudentsDebtorsByPeriod, getStudentProfile, adjustStudentBalance, updateCourseEnrollmentDate, permanentlyDeleteStudent, getBranchProfile,
     createAdmin, listAdmins, updateAdmin, deleteAdmin, getAdminProfile,
     createTeacher, listTeachers, updateTeacher, deleteTeacher, getTeacherProfile,
     upsertPricing, listPricing, deletePricing, getAttendanceOverview,
@@ -11,7 +11,7 @@ import {
     createLevel, updateLevel, deleteLevel, deleteLastLesson,
     updateSettings,
     listAllGroups, updateGroupLimits, getTodayTimetable,
-    getFinanceOverview, getPaymentDetail, listPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, prepaySalary, getBusinessLedger,
+    getFinanceOverview, getPaymentDetail, updatePaymentDirector, deletePaymentDirector, listPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, prepaySalary, getBusinessLedger,
     listExpenseCategoriesDirector, createExpenseCategoryDirector, updateExpenseCategoryDirector, deleteExpenseCategoryDirector,
     getExpensesOverviewDirector, getExpenseDetailDirector, createExpenseDirector, updateExpenseDirector, deleteExpenseDirector,
 } from "../controllers/directorController.js"
@@ -97,6 +97,8 @@ directorRouter.get('/timetable', getTodayTimetable)
 directorRouter.get('/finance', getFinanceOverview)
 directorRouter.get('/business-ledger', getBusinessLedger)
 directorRouter.get('/payments/:id', getPaymentDetail)
+directorRouter.put('/payments/:id', updatePaymentDirector)
+directorRouter.delete('/payments/:id', deletePaymentDirector)
 directorRouter.get('/pay-rates', listPayRates)
 directorRouter.post('/pay-rates', setPayRate)
 directorRouter.delete('/pay-rates/:id', deletePayRate)
@@ -121,6 +123,7 @@ directorRouter.get('/students', getAllStudents)
 directorRouter.get('/students/debtors-by-period', getStudentsDebtorsByPeriod)
 directorRouter.get('/students/:id', getStudentProfile)
 directorRouter.put('/students/:id/balance', adjustStudentBalance)
+directorRouter.put('/students/:id/enrollment-date', updateCourseEnrollmentDate)
 directorRouter.delete('/students/:id/permanent', permanentlyDeleteStudent)
 
 // Admins is sub_director-reachable (scoped to plain 'admin' accounts in their own branch only -

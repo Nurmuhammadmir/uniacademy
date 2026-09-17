@@ -130,6 +130,28 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // director/sub_director tool for correcting a mistyped group-join date - see
+    // directorController.updateCourseEnrollmentDate's own comment for the exact mechanics and the
+    // deliberate same-calendar-month restriction.
+    const updateCourseEnrollmentDate = async (id, languageId, enrolledAt) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/students/' + id + '/enrollment-date', { languageId, enrolledAt }, authHeader)
+            toast.success(t('enrollmentDateUpdated'))
+            return data.course
+        } catch (error) {
+            const code = error.response?.data?.error
+            const knownCodes = {
+                enrollment_date_different_month: t('enrollmentDateDifferentMonthError'),
+                period_already_adjusted: t('periodAlreadyAdjustedError'),
+                group_schedule_changed_since: t('groupScheduleChangedError'),
+                enrollment_date_before_group_start: t('enrollmentDateBeforeGroupStartError'),
+                enrollment_date_in_future: t('enrollmentDateInFutureError'),
+            }
+            toast.error(knownCodes[code] || code || t('couldNotUpdateEnrollmentDate'))
+            return null
+        }
+    }
+
     const permanentlyDeleteStudent = async (id) => {
         if (!(await confirm(t('confirmPermanentlyDeleteStudent')))) return false
         try {
@@ -329,6 +351,34 @@ const DirectorContextProvider = (props) => {
         } catch (error) {
             toast.error(error.response?.data?.error || t('couldNotLoadPayments'))
             return null
+        }
+    }
+
+    // director/sub_director full authority over any payment (any age, unlike admin's same-day lock -
+    // see directorController.updatePaymentDirector's own comment) - the counterpart to updateExpense/
+    // deleteExpense below, which director already had.
+    const updatePayment = async (id, payload) => {
+        try {
+            await axios.put(backendUrl + '/api/director/payments/' + id, payload, authHeader)
+            toast.success(t('paymentUpdated'))
+            return true
+        } catch (error) {
+            const code = error.response?.data?.error
+            if (code === 'invalid_amount') toast.error(t('invalidAmountError'))
+            else toast.error(code || t('couldNotUpdatePayment'))
+            return false
+        }
+    }
+
+    const deletePayment = async (id) => {
+        if (!(await confirm(t('confirmDeletePayment')))) return false
+        try {
+            await axios.delete(backendUrl + '/api/director/payments/' + id, authHeader)
+            toast.success(t('paymentDeleted'))
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeletePayment'))
+            return false
         }
     }
 
@@ -1181,7 +1231,7 @@ const DirectorContextProvider = (props) => {
         getAttendanceOverview,
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,
-        getFinanceOverview, getPaymentDetail, getBusinessLedger,
+        getFinanceOverview, getPaymentDetail, updatePayment, deletePayment, getBusinessLedger, updateCourseEnrollmentDate,
         expenseCategories, getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
         getExpensesOverview, createExpense, updateExpense, deleteExpense,
         payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, prepaySalary,
