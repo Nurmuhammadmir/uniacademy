@@ -3,6 +3,7 @@
 import bcrypt from "bcrypt"
 import crypto from "crypto"
 import User from "../models/User.js"
+import StudentComment from "../models/StudentComment.js"
 import Group from "../models/Group.js"
 import Payment from "../models/Payment.js"
 import Pricing from "../models/Pricing.js"
@@ -636,6 +637,64 @@ export const updateStudent = async (req, res) => {
         res.json({ student })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'phone_already_in_use' })
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// ==== Student comments ====
+// dated, multi-entry comments on a student - separate from the flat student.notes field, same
+// pattern as GroupComment (see groupDetailsController.js) but editable, per the explicit request:
+// a comment can be corrected after the fact, not just deleted and retyped from scratch.
+export const listStudentComments = async (req, res) => {
+    try {
+        const student = await User.findOne({ _id: req.params.id, branchId: req.auth.branchId, role: 'student' }).select('_id').lean()
+        if (!student) return res.status(404).json({ error: 'not_found' })
+        const comments = await StudentComment.find({ studentId: req.params.id }).sort({ createdAt: -1 }).populate('authorId', 'name').lean()
+        res.json({ comments })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const addStudentComment = async (req, res) => {
+    try {
+        const { text } = req.body
+        if (!text?.trim()) return res.status(400).json({ error: 'text_required' })
+        const student = await User.findOne({ _id: req.params.id, branchId: req.auth.branchId, role: 'student' }).select('_id').lean()
+        if (!student) return res.status(404).json({ error: 'not_found' })
+        const comment = await StudentComment.create({ studentId: req.params.id, authorId: req.auth.userId, text: text.trim() })
+        const populated = await comment.populate('authorId', 'name')
+        res.status(201).json({ comment: populated })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const updateStudentComment = async (req, res) => {
+    try {
+        const { text } = req.body
+        if (!text?.trim()) return res.status(400).json({ error: 'text_required' })
+        const comment = await StudentComment.findOneAndUpdate(
+            { _id: req.params.commentId, studentId: req.params.id },
+            { text: text.trim(), editedAt: new Date() },
+            { new: true }
+        ).populate('authorId', 'name')
+        if (!comment) return res.status(404).json({ error: 'not_found' })
+        res.json({ comment })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+export const deleteStudentComment = async (req, res) => {
+    try {
+        await StudentComment.findOneAndDelete({ _id: req.params.commentId, studentId: req.params.id })
+        res.json({ deleted: true })
+    } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
     }

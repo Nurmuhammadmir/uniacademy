@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Phone, Wallet, Pencil, Archive, Receipt, UsersRound, Plus, Printer, Snowflake, Lock } from 'lucide-react'
+import { ArrowLeft, Phone, Wallet, Pencil, Archive, Receipt, UsersRound, Plus, Printer, Snowflake, Lock, MessageSquare } from 'lucide-react'
 import { formatMoney, paymentMethodLabelKey, remainingAmount, groupLabel } from '../lib/format.js'
 import { todayISO, formatUTCDate, formatDateTime } from '../lib/date.js'
 import { AdminContext } from '../context/AdminContext.jsx'
@@ -19,6 +19,85 @@ const PAY_METHODS = ['cash', 'bank_transfer', 'card', 'click', 'payme']
 
 const CARD = 'bg-white rounded-2xl border border-slate-100 p-5 shadow-sm dark:bg-[#161F30] dark:border-slate-800/80 dark:shadow-black/40'
 const EMPTY = 'flex flex-col items-center text-center py-6 text-slate-400 text-xs gap-2 dark:text-slate-600'
+
+// dated, multi-entry comments on this student - opens as its own popup (unlike GroupDetails.jsx's
+// "Izohlar" tab, which is inline on the page) per explicit request, and unlike group comments this
+// one supports editing an existing entry, not just adding/deleting.
+const CommentsModal = ({ studentId, onClose }) => {
+  const { getStudentComments, addStudentComment, updateStudentComment, deleteStudentComment } = useContext(AdminContext)
+  const { t } = useLanguage()
+  const [comments, setComments] = useState(null)
+  const [text, setText] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
+
+  const load = () => getStudentComments(studentId).then(setComments)
+  useEffect(() => { load() }, [])
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!text.trim() || submitting) return
+    setSubmitting(true)
+    const ok = await addStudentComment(studentId, text)
+    setSubmitting(false)
+    if (ok) { setText(''); load() }
+  }
+
+  const startEdit = (c) => { setEditingId(c._id); setEditText(c.text) }
+
+  const saveEdit = async (e) => {
+    e.preventDefault()
+    if (!editText.trim()) return
+    const ok = await updateStudentComment(studentId, editingId, editText)
+    if (ok) { setEditingId(null); load() }
+  }
+
+  const remove = async (commentId) => {
+    await deleteStudentComment(studentId, commentId)
+    load()
+  }
+
+  return (
+    <Modal title={t('commentsTitle')} onClose={onClose}>
+      <form onSubmit={submit} className='flex gap-2 mb-4'>
+        <input placeholder={t('addCommentPlaceholder')} value={text} onChange={e => setText(e.target.value)}
+          className='flex-1 px-3 py-2 rounded-lg bg-[#f5f5f7] border-none text-sm dark:bg-[#1E293B] dark:text-slate-200' />
+        <button type='submit' disabled={submitting} className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium disabled:opacity-50 dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10'>
+          {t('sendBtn')}
+        </button>
+      </form>
+      <div className='flex flex-col gap-2 max-h-96 overflow-y-auto'>
+        {(comments || []).map(c => (
+          <div key={c._id} className='bg-[#f5f5f7] dark:bg-[#1E293B] rounded-xl px-3 py-2'>
+            {editingId === c._id ? (
+              <form onSubmit={saveEdit} className='flex gap-2'>
+                <input autoFocus value={editText} onChange={e => setEditText(e.target.value)}
+                  className='flex-1 px-2.5 py-1.5 rounded-lg bg-white border border-slate-200 text-sm dark:bg-[#0F172A] dark:border-slate-700 dark:text-slate-200' />
+                <button type='submit' className='px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-medium dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA]'>{t('save')}</button>
+                <button type='button' onClick={() => setEditingId(null)} className='px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-xs font-medium'>{t('cancel')}</button>
+              </form>
+            ) : (
+              <>
+                <div className='flex justify-between items-start gap-2'>
+                  <p className='text-slate-700 dark:text-slate-300 text-sm whitespace-pre-wrap break-words'>{c.text}</p>
+                  <div className='flex gap-2 flex-shrink-0'>
+                    <button onClick={() => startEdit(c)} className='text-muted text-xs'>{t('edit')}</button>
+                    <button onClick={() => remove(c._id)} className='text-muted text-xs'>{t('removeBtn')}</button>
+                  </div>
+                </div>
+                <p className='text-muted text-xs mt-1'>
+                  {c.authorId?.name} · {formatDateTime(c.createdAt)}{c.editedAt ? ` · ${t('editedLabel')}` : ''}
+                </p>
+              </>
+            )}
+          </div>
+        ))}
+        {comments && comments.length === 0 && <p className='text-muted text-sm'>{t('noCommentsYet')}</p>}
+      </div>
+    </Modal>
+  )
+}
 
 // full profile page - registration date, every course with price/balance, full payment history
 // (with inline refund), exam attempt history, every group ever been in (with add/remove tools),
@@ -56,6 +135,7 @@ const StudentProfile = () => {
   const [printingPaymentId, setPrintingPaymentId] = useState(null)
   const [showFreezeModal, setShowFreezeModal] = useState(false)
   const [freezeForm, setFreezeForm] = useState({ reason: '', frozenAt: todayISO() })
+  const [showComments, setShowComments] = useState(false)
 
   const reload = () => getStudentProfile(studentId).then(d => { if (d) { setData(d); setNotes(d.student.notes || '') } })
   useEffect(() => { reload() }, [studentId])
@@ -296,6 +376,12 @@ const StudentProfile = () => {
                 className='w-full px-3 py-2.5 rounded-lg bg-[#f5f5f7] border-none text-sm text-[#1D1D1F] focus:outline-none focus:ring-2 focus:ring-accent/30 dark:bg-[#1E293B] dark:text-slate-200' placeholder={t('notesPlaceholder')} />
               <button onClick={saveNotes} disabled={savingNotes} className='mt-2 px-4 py-2 rounded-lg bg-accent text-white text-xs font-medium disabled:opacity-50 dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10'>
                 {savingNotes ? t('saving') : t('save')}
+              </button>
+            </div>
+
+            <div className='border-t border-slate-100 pt-4 dark:border-slate-800/80'>
+              <button onClick={() => setShowComments(true)} className='w-full py-2.5 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-xs font-medium flex items-center justify-center gap-1.5 transition-colors dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200'>
+                <MessageSquare size={13} strokeWidth={1.5} /> {t('openCommentsBtn')}
               </button>
             </div>
 
@@ -602,6 +688,8 @@ const StudentProfile = () => {
       )}
 
       {printingPaymentId && <ReceiptModal paymentId={printingPaymentId} onClose={() => setPrintingPaymentId(null)} />}
+
+      {showComments && <CommentsModal studentId={studentId} onClose={() => setShowComments(false)} />}
     </div>
   )
 }

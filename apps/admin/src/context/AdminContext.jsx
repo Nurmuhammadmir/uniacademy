@@ -851,6 +851,49 @@ const AdminContextProvider = (props) => {
         }
     }
 
+    // dated, multi-entry comments on a STUDENT - separate from the flat student.notes field, same
+    // pattern as the group comments above but editable (updateStudentComment has no group-comment
+    // counterpart - confirmed spec: a comment can be corrected, not just deleted and retyped).
+    const getStudentComments = async (id) => {
+        try {
+            const { data } = await axios.get(backendUrl + `/api/admin/students/${id}/comments`, authHeader)
+            return data.comments
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadComments'))
+            return []
+        }
+    }
+
+    const addStudentComment = async (id, text) => {
+        try {
+            await axios.post(backendUrl + `/api/admin/students/${id}/comments`, { text }, authHeader)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotAddComment'))
+            return false
+        }
+    }
+
+    const updateStudentComment = async (id, commentId, text) => {
+        try {
+            await axios.put(backendUrl + `/api/admin/students/${id}/comments/${commentId}`, { text }, authHeader)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotUpdateComment'))
+            return false
+        }
+    }
+
+    const deleteStudentComment = async (id, commentId) => {
+        try {
+            await axios.delete(backendUrl + `/api/admin/students/${id}/comments/${commentId}`, authHeader)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotDeleteComment'))
+            return false
+        }
+    }
+
     // private personal scratchpad - never shared with other admins/director
     const getMyNotes = async () => {
         try {
@@ -1299,6 +1342,7 @@ const AdminContextProvider = (props) => {
         getGroupDetails, getGroupAttendanceGrid,
         getGroupMaterials, addGroupMaterial, deleteGroupMaterial,
         getGroupComments, addGroupComment, deleteGroupComment,
+        getStudentComments, addStudentComment, updateStudentComment, deleteStudentComment,
         getExtraLessons, createExtraLesson, deleteExtraLesson,
         getMyNotes, createMyNote, deleteMyNote,
         getGroupExamsTab, getTimetable,

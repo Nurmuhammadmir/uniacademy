@@ -2,6 +2,7 @@ import express from "express"
 import requireRole from "../middleware/auth.js"
 import {
     createStudent, listStudents, getStudentsDebtorsByPeriod, updateStudent, deleteStudent, unarchiveStudent, getStudentProfile, linkParent,
+    listStudentComments, addStudentComment, updateStudentComment, deleteStudentComment,
     createPayment, refundPayment, deletePayment, updatePayment, getFinanceOverview, getPaymentDetail,
     createGroup, listGroups, getGroupProfile, updateGroup, deleteGroup, permanentlyDeleteGroup, unarchiveGroup, suggestGroup, addStudentToGroup, removeStudentFromGroup,
     retakeExam, listBranchTeachers, createTeacher, updateTeacher, getTeacherProfile, getTeacherAttendanceGrid, getStudentAttendanceGrid, getLessonDetail, setLessonTeacherStatus,
@@ -65,6 +66,10 @@ adminRouter.delete('/students/:id', deleteStudent)
 adminRouter.post('/students/:id/unarchive', unarchiveStudent)
 adminRouter.post('/students/:id/parent', linkParent)
 adminRouter.put('/students/:id/freeze', setStudentFreeze)
+adminRouter.get('/students/:id/comments', listStudentComments)
+adminRouter.post('/students/:id/comments', addStudentComment)
+adminRouter.put('/students/:id/comments/:commentId', updateStudentComment)
+adminRouter.delete('/students/:id/comments/:commentId', deleteStudentComment)
 adminRouter.post('/discounts', applyDiscount)
 adminRouter.get('/discounts', listDiscounts)
 adminRouter.delete('/discounts/:id', deleteDiscount)

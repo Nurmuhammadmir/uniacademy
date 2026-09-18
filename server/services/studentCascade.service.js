@@ -14,6 +14,7 @@ import GroupMembership from "../models/GroupMembership.js"
 import LessonAttendance from "../models/LessonAttendance.js"
 import Payment from "../models/Payment.js"
 import StudentProgress from "../models/StudentProgress.js"
+import StudentComment from "../models/StudentComment.js"
 import { deleteEntries } from "./ledger.service.js"
 
 export const hardDeleteStudent = async (studentId) => {
@@ -39,6 +40,7 @@ export const hardDeleteStudent = async (studentId) => {
         GroupMembership.deleteMany({ studentId }),
         LessonAttendance.deleteMany({ studentId }),
         Payment.deleteMany({ studentId }),
+        StudentComment.deleteMany({ studentId }),
         ExtraLesson.updateMany({ studentIds: studentId }, { $pull: { studentIds: studentId } }),
         Group.updateMany({ studentIds: studentId }, { $pull: { studentIds: studentId } }),
         // a parent may have this student linked as a child - drop the link rather than leaving a
