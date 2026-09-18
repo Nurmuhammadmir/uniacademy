@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { lazy, Suspense, useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { formatMoney, paymentMethodLabelKey } from '../lib/format.js'
@@ -7,7 +7,17 @@ import { confirm } from '../lib/confirm.js'
 import Modal from '../components/Modal.jsx'
 import MoneyInput from '../components/MoneyInput.jsx'
 import DatePicker from '../components/DatePicker.jsx'
+import PasswordInput from '../components/PasswordInput.jsx'
+import Spinner from '../components/Spinner.jsx'
 import { useSafeBack } from '../lib/useSafeBack.js'
+
+// mapbox-gl alone is well over a megabyte - lazy so it only loads once the Edit modal actually opens
+const MapPicker = lazy(() => import('../components/MapPicker.jsx'))
+const MapFallback = () => (
+  <div className='h-56 rounded-xl bg-bg border border-hairline flex items-center justify-center'>
+    <Spinner size={20} className='text-accent' />
+  </div>
+)
 
 // director sees everything admin sees, PLUS address/geo - only the director is allowed to see
 // where a student lives. Read-only except for one deliberate override: adjustStudentBalance below,
@@ -83,6 +93,56 @@ const AdjustBalanceModal = ({ studentId, currentBalance, onClose, onAdjusted }) 
   )
 }
 
+// director/sub_director counterpart of admin's edit-student form - director's app previously had no
+// way at all to edit a student's own details, only view them (see directorController.
+// updateStudentDirector's own comment). Same fields/shape as admin's Students.jsx edit modal.
+const EditStudentModal = ({ student, onClose, onSaved }) => {
+  const { updateStudent } = useContext(DirectorContext)
+  const { t } = useLanguage()
+  const [form, setForm] = useState({
+    name: student.name, phone: student.phone, password: '',
+    address: student.address || '', dateOfBirth: student.dateOfBirth ? student.dateOfBirth.slice(0, 10) : '',
+    geo: student.geo || { lat: null, lng: null }, passportInfo: student.passportInfo || '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (submitting) return
+    setSubmitting(true)
+    const result = await updateStudent(student._id, form)
+    setSubmitting(false)
+    if (result) onSaved()
+  }
+
+  return (
+    <Modal title={t('editStudentModalTitle', { name: student.name })} onClose={onClose}>
+      <form onSubmit={submit} className='flex flex-col gap-3'>
+        <input placeholder={t('fullName')} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+          className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
+        <input placeholder={t('phoneNumber')} value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })}
+          className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
+        <PasswordInput placeholder={t('newPasswordOptional')} value={form.password} onChange={e => setForm({ ...form, password: e.target.value })}
+          className='px-4 py-3 rounded-xl bg-bg border border-hairline' />
+        <div>
+          <label className='text-xs text-muted mb-1 block'>{t('dateOfBirthLabel')}</label>
+          <DatePicker withYearSelect value={form.dateOfBirth} onChange={(v) => setForm({ ...form, dateOfBirth: v })} />
+        </div>
+        <input placeholder={t('passportIdInfo')} value={form.passportInfo} onChange={e => setForm({ ...form, passportInfo: e.target.value })}
+          className='px-4 py-3 rounded-xl bg-bg border border-hairline' />
+        <p className='text-xs text-muted -mb-1'>{t('locationRequiredHint')}</p>
+        <Suspense fallback={<MapFallback />}>
+          <MapPicker address={form.address} lat={form.geo?.lat} lng={form.geo?.lng}
+            onChange={({ lat, lng, address }) => setForm({ ...form, address, geo: { lat, lng } })} />
+        </Suspense>
+        <button type='submit' disabled={submitting} className='py-2.5 rounded-xl bg-accent text-white text-sm font-medium transition-colors disabled:opacity-50'>
+          {t('saveChanges')}
+        </button>
+      </form>
+    </Modal>
+  )
+}
+
 // see directorController.updateCourseEnrollmentDate's own comment for the exact mechanics -
 // deliberately restricted to a correction within the SAME calendar month as whatever's already
 // been billed for this course (a real month-level mistake needs freeze/re-add instead), so the
@@ -127,6 +187,7 @@ const StudentProfile = () => {
   const { getStudentProfile, permanentlyDeleteStudent } = useContext(DirectorContext)
   const [data, setData] = useState(false)
   const [showAdjustBalance, setShowAdjustBalance] = useState(false)
+  const [showEditStudent, setShowEditStudent] = useState(false)
   const [editingEnrollmentCourse, setEditingEnrollmentCourse] = useState(null)
   const { t } = useLanguage()
 
@@ -143,7 +204,10 @@ const StudentProfile = () => {
     <div>
       <div className='flex justify-between items-center mb-4'>
         <button onClick={goBack} className='text-muted text-sm'>‹ {t('back')}</button>
-        <button onClick={handlePermanentDelete} className='text-red-500 text-xs font-medium'>{t('deletePermanentlyBtn')}</button>
+        <div className='flex items-center gap-3'>
+          <button onClick={() => setShowEditStudent(true)} className='text-accent text-xs font-medium'>{t('editStudentBtn')}</button>
+          <button onClick={handlePermanentDelete} className='text-red-500 text-xs font-medium'>{t('deletePermanentlyBtn')}</button>
+        </div>
       </div>
 
       <div className='flex flex-col gap-5'>
@@ -259,6 +323,14 @@ const StudentProfile = () => {
           currentBalance={data.accountBalance}
           onClose={() => setShowAdjustBalance(false)}
           onAdjusted={() => { setShowAdjustBalance(false); load() }}
+        />
+      )}
+
+      {showEditStudent && (
+        <EditStudentModal
+          student={data.student}
+          onClose={() => setShowEditStudent(false)}
+          onSaved={() => { setShowEditStudent(false); load() }}
         />
       )}
 

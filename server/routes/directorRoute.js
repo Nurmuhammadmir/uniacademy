@@ -1,7 +1,7 @@
 import express from "express"
 import requireRole from "../middleware/auth.js"
 import {
-    getMe, getStats, getMapData, getAllStudents, getStudentsDebtorsByPeriod, getStudentProfile, adjustStudentBalance, updateCourseEnrollmentDate, permanentlyDeleteStudent, getBranchProfile,
+    getMe, getStats, getMapData, getAllStudents, getStudentsDebtorsByPeriod, getStudentProfile, updateStudentDirector, adjustStudentBalance, updateCourseEnrollmentDate, permanentlyDeleteStudent, getBranchProfile,
     createAdmin, listAdmins, updateAdmin, deleteAdmin, getAdminProfile,
     createTeacher, listTeachers, updateTeacher, deleteTeacher, getTeacherProfile,
     upsertPricing, listPricing, deletePricing, getAttendanceOverview,
@@ -122,6 +122,7 @@ directorRouter.get('/map-data', directorOnly, getMapData)
 directorRouter.get('/students', getAllStudents)
 directorRouter.get('/students/debtors-by-period', getStudentsDebtorsByPeriod)
 directorRouter.get('/students/:id', getStudentProfile)
+directorRouter.put('/students/:id', updateStudentDirector)
 directorRouter.put('/students/:id/balance', adjustStudentBalance)
 directorRouter.put('/students/:id/enrollment-date', updateCourseEnrollmentDate)
 directorRouter.delete('/students/:id/permanent', permanentlyDeleteStudent)

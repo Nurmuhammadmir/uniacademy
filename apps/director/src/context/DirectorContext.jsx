@@ -48,7 +48,12 @@ const DirectorContextProvider = (props) => {
     const login = async (phone, password) => {
         try {
             const { data } = await axios.post(backendUrl + '/api/auth/login', { phone, password })
-            if (data.user.role !== 'director') {
+            // the entire backend (directorRoute.js's requireRole, every isSubDirector/branchOnlyFilter
+            // check throughout directorController.js) was already built assuming a sub_director logs
+            // into THIS SAME app - this was the one place that never got updated to match, so a real
+            // sub_director account (created via the Admins page, see createAdmin) could never actually
+            // get past login at all, no matter how much of the app already correctly supported them.
+            if (data.user.role !== 'director' && data.user.role !== 'sub_director') {
                 toast.error(t('accountNotDirector'))
                 return false
             }
@@ -113,6 +118,21 @@ const DirectorContextProvider = (props) => {
             return data
         } catch (error) {
             toast.error(error.response?.data?.error || t('couldNotLoadStudentProfile'))
+            return null
+        }
+    }
+
+    // director/sub_director counterpart of admin's updateStudent - director's app previously had no
+    // way at all to edit a student's own details, only admin did (confirmed gap, same shape as the
+    // payment/expense authority gaps already fixed).
+    const updateStudent = async (id, payload) => {
+        try {
+            const { data } = await axios.put(backendUrl + '/api/director/students/' + id, payload, authHeader)
+            toast.success(t('studentUpdated'))
+            return data.student
+        } catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'phone_already_in_use' ? t('phoneAlreadyInUseError') : (code || t('couldNotUpdateStudent')))
             return null
         }
     }
@@ -1219,7 +1239,7 @@ const DirectorContextProvider = (props) => {
         token, login, logout,
         stats, getStats,
         mapData, getMapData,
-        allStudents, getAllStudents, getStudentsDebtorsByPeriod, getStudentProfile, adjustStudentBalance, permanentlyDeleteStudent,
+        allStudents, getAllStudents, getStudentsDebtorsByPeriod, getStudentProfile, updateStudent, adjustStudentBalance, permanentlyDeleteStudent,
         getBranchProfile,
         admins, getAdmins, createAdmin, updateAdmin, deleteAdminAccount, getAdminProfile,
         teachers, getTeachers, createTeacher, updateTeacher, deleteTeacherAccount, getTeacherProfile,

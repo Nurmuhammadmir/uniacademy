@@ -362,6 +362,36 @@ export const updateCourseEnrollmentDate = async (req, res) => {
     }
 }
 
+// director/sub_director counterpart of adminController.updateStudent - previously director's app had
+// NO way to edit a student's own details at all (name/phone/address/passport/dob), only admin did;
+// confirmed gap, fixed the same way expenses/payments were: same fields, same behavior, just scoped
+// by branchOnlyFilter instead of admin's single hard-coded req.auth.branchId (a real director can
+// edit any branch's student, a sub_director only their own).
+export const updateStudentDirector = async (req, res) => {
+    try {
+        const { name, phone, password, address, dateOfBirth, geo, passportInfo, notes } = req.body
+        const update = { name, phone, address, geo }
+        if (dateOfBirth !== undefined) update.dateOfBirth = dateOfBirth || null
+        if (passportInfo !== undefined) update.passportInfo = passportInfo
+        if (notes !== undefined) update.notes = notes
+        if (password) {
+            const salt = await bcrypt.genSalt(10)
+            update.passwordHash = await bcrypt.hash(password, salt)
+        }
+        const student = await User.findOneAndUpdate(
+            { _id: req.params.id, role: 'student', ...branchOnlyFilter(req) },
+            update,
+            { new: true, runValidators: true }
+        ).select('-passwordHash')
+        if (!student) return res.status(404).json({ error: 'not_found' })
+        res.json({ student })
+    } catch (error) {
+        if (error.code === 11000) return res.status(409).json({ error: 'phone_already_in_use' })
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 // director-only manual override: retype a student's balance to whatever real-world number is
 // actually correct (this platform is new - a lot of students arrived with history it never saw).
 // This is the exact same reconciliation technique used by hand all through the migration (see
