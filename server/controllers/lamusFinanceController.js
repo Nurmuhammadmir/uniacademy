@@ -51,6 +51,11 @@ export const addTransaction = async (req, res) => {
       if (!clientId) return res.json({ success: false, message: 'Client is required for income' })
       const client = await clientModel.findById(clientId)
       if (!client) return res.json({ success: false, message: 'Client not found' })
+      // a manager logging income can only ever attribute it to their own client - otherwise they
+      // could silently move another manager's client balance around
+      if (req.userRole !== 'admin' && client.managerId.toString() !== req.userId) {
+        return res.json({ success: false, message: 'Not authorized' })
+      }
       await clientModel.findByIdAndUpdate(clientId, { $inc: { balance: -amt } })
     }
 
@@ -68,12 +73,17 @@ export const addTransaction = async (req, res) => {
 
 // Manual entries only — a 'payment' transaction is generated automatically from an order and must
 // stay in sync with it, so it can't be edited or deleted here independently of the order that
-// created it.
+// created it. A manager can edit (but never delete - see the route-level lamusAuthAdmin gate on
+// deleteTransaction) only the entries they themselves created - confirmed spec: managers manage
+// their own finance entries, they don't get to touch what someone else logged.
 export const updateTransaction = async (req, res) => {
   try {
     const existing = await financialTransactionModel.findById(req.params.id)
     if (!existing) return res.json({ success: false, message: 'Transaction not found' })
     if (existing.type === 'payment') return res.json({ success: false, message: 'Order payments can\'t be edited here' })
+    if (req.userRole !== 'admin' && existing.createdBy.toString() !== req.userId) {
+      return res.json({ success: false, message: 'Not authorized' })
+    }
 
     const { type, amount, category, notes, clientId, paymentMethod, date } = req.body
     if (!['income', 'expense', 'adjustment'].includes(type)) return res.json({ success: false, message: 'Invalid transaction' })
@@ -88,6 +98,9 @@ export const updateTransaction = async (req, res) => {
     if (type === 'income') {
       const client = await clientModel.findById(clientId)
       if (!client) return res.json({ success: false, message: 'Client not found' })
+      if (req.userRole !== 'admin' && client.managerId.toString() !== req.userId) {
+        return res.json({ success: false, message: 'Not authorized' })
+      }
       await clientModel.findByIdAndUpdate(clientId, { $inc: { balance: -amt } })
     }
 
@@ -155,6 +168,46 @@ export const report = async (req, res) => {
 
     res.json({ success: true, transactions, summary: { collected, expenses, netProfit: collected - expenses, receivable, byMethod } })
   } catch (error) {
+    res.json({ success: false, message: error.message })
+  }
+}
+
+// manager's own scoped view of `report` above - a manager never sees the company-wide picture
+// (openingBalance, other managers' cash/clients), only what's actually theirs: their own clients'
+// receivable balance, their own orders' payments, and finance entries THEY logged. A 'payment'/
+// 'income' transaction is scoped by which CLIENT it's tied to (their client, regardless of who
+// happened to record it - e.g. an admin recording a delivery for this manager's client still counts
+// here), while 'expense'/'adjustment' have no client to scope by, so those are scoped by createdBy
+// instead (their own manually-entered ones only).
+export const reportMine = async (req, res) => {
+  try {
+    const myClients = await clientModel.find({ managerId: req.userId }).select('_id balance')
+    const myClientIds = myClients.map(c => c._id)
+    const myOrders = await orderModel.find({ managerId: req.userId })
+
+    const transactions = await financialTransactionModel.find({
+      $or: [
+        { type: { $in: ['income', 'payment'] }, clientId: { $in: myClientIds } },
+        { type: { $in: ['expense', 'adjustment'] }, createdBy: req.userId },
+      ],
+    }).populate('clientId', 'name').sort({ date: -1 }).limit(500)
+
+    const byMethod = { cash: 0, card: 0, transfer: 0 }
+    myOrders.forEach(o => {
+      if (o.paymentAmount > 0 && PAYMENT_METHODS.includes(o.paymentMethod)) byMethod[o.paymentMethod] += o.paymentAmount
+    })
+    const incomeTx = transactions.filter(t => t.type === 'income')
+    const expenseTx = transactions.filter(t => t.type === 'expense')
+    incomeTx.forEach(t => { if (PAYMENT_METHODS.includes(t.paymentMethod)) byMethod[t.paymentMethod] += t.amount })
+    expenseTx.forEach(t => { if (PAYMENT_METHODS.includes(t.paymentMethod)) byMethod[t.paymentMethod] -= t.amount })
+
+    const collected = myOrders.reduce((s, o) => s + o.paymentAmount, 0) + incomeTx.reduce((s, t) => s + t.amount, 0)
+    const expenses = expenseTx.reduce((s, t) => s + t.amount, 0)
+    const receivable = myClients.reduce((s, c) => s + Math.max(0, c.balance), 0)
+
+    res.json({ success: true, transactions, summary: { collected, expenses, netProfit: collected - expenses, receivable, byMethod } })
+  } catch (error) {
+    console.log(error)
     res.json({ success: false, message: error.message })
   }
 }

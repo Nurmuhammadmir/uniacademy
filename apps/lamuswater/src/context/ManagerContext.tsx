@@ -35,6 +35,43 @@ export interface Order {
   createdAt: string
 }
 
+// a manager's own scoped slice of finance - see server/controllers/lamusFinanceController.js's
+// reportMine for exactly what's included (their own clients' receivable + orders' payments +
+// finance entries they personally logged). Deliberately narrower than admin's FinanceSummary: no
+// openingBalance/other-managers'-cash, since that's a company-wide concept a manager never sees.
+export interface ManagerTransaction {
+  _id: string
+  type: 'income' | 'expense' | 'payment' | 'adjustment'
+  amount: number
+  paymentMethod: 'cash' | 'card' | 'transfer'
+  category: string
+  notes: string
+  clientId: string | null
+  clientName: string
+  orderId: string | null
+  date: string
+  createdBy: string
+  createdAt: string
+}
+
+export interface ManagerTransactionInput {
+  type: 'income' | 'expense' | 'adjustment'
+  amount: number
+  category: string
+  notes: string
+  paymentMethod: 'cash' | 'card' | 'transfer'
+  clientId?: string
+  date?: string
+}
+
+export interface ManagerFinanceSummary {
+  collected: number
+  expenses: number
+  netProfit: number
+  receivable: number
+  byMethod: { cash: number; card: number; transfer: number }
+}
+
 interface ManagerContextType {
   clients: Client[]
   orders: Order[]
@@ -42,11 +79,16 @@ interface ManagerContextType {
   bottlesOut: number
   bottlePrice: number
   currency: string
+  expenseCategories: string[]
+  transactions: ManagerTransaction[]
+  financeSummary: ManagerFinanceSummary
   addClient: (data: Omit<Client, '_id' | 'managerId' | 'bottlesHeld' | 'balance' | 'createdAt'>) => Promise<boolean>
   updateClient: (id: string, data: Partial<Client>) => Promise<boolean>
   deleteClient: (id: string) => Promise<boolean>
   recordOrder: (data: { clientId: string; bottlesGiven: number; bottlesReturned: number; notes: string; paymentAmount: number; paymentMethod: 'cash' | 'card' | 'transfer' | 'later' }) => Promise<boolean>
   getClientHistory: (clientId: string) => Promise<Order[]>
+  addTransaction: (data: ManagerTransactionInput) => Promise<boolean>
+  updateTransaction: (id: string, data: ManagerTransactionInput) => Promise<boolean>
   todayOrders: Order[]
 }
 
@@ -60,6 +102,9 @@ export const ManagerProvider = ({ children }: { children: ReactNode }) => {
   const [totalStock, setTotalStock] = useState(0)
   const [bottlePrice, setBottlePrice] = useState(0)
   const [currency, setCurrency] = useState('UZS')
+  const [expenseCategories, setExpenseCategories] = useState<string[]>([])
+  const [transactions, setTransactions] = useState<ManagerTransaction[]>([])
+  const [financeSummary, setFinanceSummary] = useState<ManagerFinanceSummary>({ collected: 0, expenses: 0, netProfit: 0, receivable: 0, byMethod: { cash: 0, card: 0, transfer: 0 } })
   const bottlesOut = clients.reduce((sum, c) => sum + c.bottlesHeld, 0)
 
   const today = new Date().toISOString().split('T')[0]
@@ -115,9 +160,59 @@ export const ManagerProvider = ({ children }: { children: ReactNode }) => {
       if (data.success) {
         setBottlePrice(data.settings.bottlePrice || 0)
         setCurrency(data.settings.currency || 'UZS')
+        setExpenseCategories(data.settings.expenseCategories || [])
       }
     } catch (error: any) {
       toast.error(tError(error, backendUrl))
+    }
+  }
+
+  const loadFinanceReport = async () => {
+    try {
+      const { data } = await axios.get(`${backendUrl}/api/lamus/finance/report/mine`)
+      if (data.success) {
+        setTransactions(data.transactions.map((t: any) => ({
+          ...t,
+          clientId: t.clientId?._id || t.clientId,
+          clientName: t.clientId?.name || '',
+          date: t.date || t.createdAt,
+        })))
+        setFinanceSummary(data.summary)
+      }
+    } catch (error: any) {
+      toast.error(tError(error, backendUrl))
+    }
+  }
+
+  const addTransaction = async (data: ManagerTransactionInput) => {
+    try {
+      const { data: res } = await axios.post(`${backendUrl}/api/lamus/finance/transactions`, data)
+      if (!res.success) {
+        toast.error(tServer(res.message))
+        return false
+      }
+      await Promise.all([loadFinanceReport(), loadClients()])
+      toast.success(t('toast.transactionAdded'))
+      return true
+    } catch (error: any) {
+      toast.error(tError(error, backendUrl))
+      return false
+    }
+  }
+
+  const updateTransaction = async (id: string, data: ManagerTransactionInput) => {
+    try {
+      const { data: res } = await axios.put(`${backendUrl}/api/lamus/finance/transactions/${id}`, data)
+      if (!res.success) {
+        toast.error(tServer(res.message))
+        return false
+      }
+      await Promise.all([loadFinanceReport(), loadClients()])
+      toast.success(t('toast.transactionUpdated'))
+      return true
+    } catch (error: any) {
+      toast.error(tError(error, backendUrl))
+      return false
     }
   }
 
@@ -127,6 +222,7 @@ export const ManagerProvider = ({ children }: { children: ReactNode }) => {
     loadOrders()
     loadStock()
     loadFinanceSettings()
+    loadFinanceReport()
   }, [token])
 
   // Shares this manager's location with admins while the app is open in the
@@ -221,8 +317,9 @@ export const ManagerProvider = ({ children }: { children: ReactNode }) => {
         toast.error(tServer(res.message))
         return false
       }
-      await Promise.all([loadOrders(), loadClients(), loadStock()])
+      await Promise.all([loadOrders(), loadClients(), loadStock(), loadFinanceReport()])
       toast.success(t('toast.deliveryRecorded'))
+      if (res.stockWarning) toast.error(t('server.stockWentToZero'))
       return true
     } catch (error: any) {
       toast.error(tError(error, backendUrl))
@@ -261,7 +358,7 @@ export const ManagerProvider = ({ children }: { children: ReactNode }) => {
   }
 
   return (
-    <ManagerContext.Provider value={{ clients, orders, totalStock, bottlesOut, bottlePrice, currency, addClient, updateClient, deleteClient, recordOrder, getClientHistory, todayOrders }}>
+    <ManagerContext.Provider value={{ clients, orders, totalStock, bottlesOut, bottlePrice, currency, expenseCategories, transactions, financeSummary, addClient, updateClient, deleteClient, recordOrder, getClientHistory, addTransaction, updateTransaction, todayOrders }}>
       {children}
     </ManagerContext.Provider>
   )

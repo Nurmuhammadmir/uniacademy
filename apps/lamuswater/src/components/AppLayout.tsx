@@ -24,6 +24,7 @@ const AppLayout = () => {
     { to: '/dashboard', icon: LayoutDashboard, label: t('nav.dashboard'), end: true },
     { to: '/dashboard/clients', icon: Users, label: t('nav.clients') },
     { to: '/dashboard/orders', icon: ClipboardList, label: t('nav.orders') },
+    { to: '/dashboard/finance', icon: Wallet, label: t('nav.finance') },
     { to: '/dashboard/map', icon: MapPin, label: t('nav.map') },
     { to: '/dashboard/stock', icon: Package, label: t('nav.stock') },
   ]

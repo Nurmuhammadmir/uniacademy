@@ -207,6 +207,7 @@ const en: Dict = {
   'orders.held': 'held',
   'orders.bottlesGiven': 'Bottles Given',
   'orders.returned': 'Returned',
+  'orders.returnsExceedHeld': 'Client only holds {count} bottles - can\'t return more than that',
   'orders.netChange': 'Net change',
   'orders.bottles': 'bottles',
   'orders.notesPlaceholder': 'Optional note…',
@@ -265,6 +266,13 @@ const en: Dict = {
   'server.notAuthorized': 'Not authorized',
   'server.adminAccessRequired': 'Admin access required',
   'server.cantRemoveSelf': "Can't remove yourself",
+  'server.invalidBottlesGiven': 'Bottles given must be a whole number, 0 or more',
+  'server.invalidBottlesReturned': 'Bottles returned must be a whole number, 0 or more',
+  'server.invalidPaymentAmount': 'Payment amount must be 0 or more',
+  'server.invalidPaymentMethod': 'Invalid payment method',
+  'server.returnedExceedsHeld': "Can't return more bottles than this client currently holds",
+  'server.nothingToRecord': 'Nothing to record - set bottles given/returned or a payment amount',
+  'server.stockWentToZero': 'Warehouse stock reached 0 - some of these bottles may not actually be in stock',
 
   'nav.finance': 'Finance',
 
@@ -289,6 +297,7 @@ const en: Dict = {
 
   'finance.title': 'Finance',
   'finance.subtitle': 'Pricing, stock, and financial operations',
+  'finance.managerSubtitle': 'Your own clients\' payments and finance entries',
   'finance.pricingTitle': 'Bottle Price',
   'finance.currentPrice': 'Current price per bottle',
   'finance.newPrice': 'New price',
@@ -569,6 +578,7 @@ const ru: Dict = {
   'orders.held': 'на руках',
   'orders.bottlesGiven': 'Выдано бутылок',
   'orders.returned': 'Возвращено',
+  'orders.returnsExceedHeld': 'У клиента на руках всего {count} бутылей - нельзя вернуть больше',
   'orders.netChange': 'Изменение',
   'orders.bottles': 'бутылок',
   'orders.notesPlaceholder': 'Необязательная заметка…',
@@ -627,6 +637,13 @@ const ru: Dict = {
   'server.notAuthorized': 'Нет доступа',
   'server.adminAccessRequired': 'Требуется доступ администратора',
   'server.cantRemoveSelf': 'Вы не можете удалить себя',
+  'server.invalidBottlesGiven': 'Количество выданных бутылей должно быть целым числом, 0 или больше',
+  'server.invalidBottlesReturned': 'Количество возвращённых бутылей должно быть целым числом, 0 или больше',
+  'server.invalidPaymentAmount': 'Сумма оплаты должна быть 0 или больше',
+  'server.invalidPaymentMethod': 'Неверный способ оплаты',
+  'server.returnedExceedsHeld': 'Нельзя вернуть больше бутылей, чем сейчас у клиента на руках',
+  'server.nothingToRecord': 'Нечего записывать - укажите выданные/возвращённые бутыли или сумму оплаты',
+  'server.stockWentToZero': 'Склад ушёл в 0 - часть этих бутылей может фактически отсутствовать на складе',
 
   'nav.finance': 'Финансы',
 
@@ -651,6 +668,7 @@ const ru: Dict = {
 
   'finance.title': 'Финансы',
   'finance.subtitle': 'Цены, склад и финансовые операции',
+  'finance.managerSubtitle': 'Платежи и финансовые операции по вашим клиентам',
   'finance.pricingTitle': 'Цена бутыли',
   'finance.currentPrice': 'Текущая цена за бутыль',
   'finance.newPrice': 'Новая цена',
@@ -931,6 +949,7 @@ const uz: Dict = {
   'orders.held': 'da bor',
   'orders.bottlesGiven': 'Berilgan butilkalar',
   'orders.returned': 'Qaytarildi',
+  'orders.returnsExceedHeld': "Mijozda hozir bor-yo'g'i {count} ta butilka - undan ko'p qaytarib bo'lmaydi",
   'orders.netChange': "O'zgarish",
   'orders.bottles': 'butilka',
   'orders.notesPlaceholder': 'Ixtiyoriy izoh…',
@@ -989,6 +1008,13 @@ const uz: Dict = {
   'server.notAuthorized': "Ruxsat yo'q",
   'server.adminAccessRequired': 'Administrator huquqi talab qilinadi',
   'server.cantRemoveSelf': "O'zingizni o'chira olmaysiz",
+  'server.invalidBottlesGiven': "Berilgan butilkalar soni butun son, 0 yoki undan ko'p bo'lishi kerak",
+  'server.invalidBottlesReturned': "Qaytarilgan butilkalar soni butun son, 0 yoki undan ko'p bo'lishi kerak",
+  'server.invalidPaymentAmount': "To'lov summasi 0 yoki undan ko'p bo'lishi kerak",
+  'server.invalidPaymentMethod': "Noto'g'ri to'lov usuli",
+  'server.returnedExceedsHeld': "Mijozda hozir mavjud bo'lganidan ko'p butilka qaytarib bo'lmaydi",
+  'server.nothingToRecord': "Yozadigan narsa yo'q - berilgan/qaytarilgan butilkalar yoki to'lov summasini kiriting",
+  'server.stockWentToZero': "Ombor 0 ga tushdi - bu butilkalarning bir qismi haqiqatda omborda bo'lmasligi mumkin",
 
   'nav.finance': 'Moliya',
 
@@ -1013,6 +1039,7 @@ const uz: Dict = {
 
   'finance.title': 'Moliya',
   'finance.subtitle': 'Narxlar, ombor va moliyaviy operatsiyalar',
+  'finance.managerSubtitle': "O'z mijozlaringizning to'lovlari va moliyaviy yozuvlari",
   'finance.pricingTitle': 'Butilka narxi',
   'finance.currentPrice': 'Bitta butilka uchun joriy narx',
   'finance.newPrice': 'Yangi narx',
@@ -1109,4 +1136,10 @@ export const SERVER_MESSAGE_KEYS: Record<string, string> = {
   'Not authorized': 'server.notAuthorized',
   'Admin access required': 'server.adminAccessRequired',
   "Can't remove yourself": 'server.cantRemoveSelf',
+  'Bottles given must be a whole number, 0 or more': 'server.invalidBottlesGiven',
+  'Bottles returned must be a whole number, 0 or more': 'server.invalidBottlesReturned',
+  'Payment amount must be a number, 0 or more': 'server.invalidPaymentAmount',
+  'Invalid payment method': 'server.invalidPaymentMethod',
+  "Can't return more bottles than the client currently holds": 'server.returnedExceedsHeld',
+  'Nothing to record - set bottles given/returned or a payment amount': 'server.nothingToRecord',
 }

@@ -12,7 +12,7 @@ import { loginManager, getProfile, updateLocation } from '../controllers/lamusMa
 import { addClient, getMyClients, updateClient, deleteClient } from '../controllers/lamusClientController.js'
 import { recordOrder, getMyOrders, getClientOrders } from '../controllers/lamusOrderController.js'
 import { getStock, addStock } from '../controllers/lamusStockController.js'
-import { settings, updateSettings, addTransaction, updateTransaction, deleteTransaction, report } from '../controllers/lamusFinanceController.js'
+import { settings, updateSettings, addTransaction, updateTransaction, deleteTransaction, report, reportMine } from '../controllers/lamusFinanceController.js'
 
 const lamusRouter = express.Router()
 
@@ -50,12 +50,15 @@ lamusRouter.get('/order/client/:clientId', lamusAuthManager, getClientOrders)
 lamusRouter.get('/stock', lamusAuthManager, getStock)
 lamusRouter.post('/stock/add', lamusAuthAdmin, addStock)
 
-// finance
+// finance - a manager can view/add/edit their own finance entries (see reportMine and the
+// ownership checks inside addTransaction/updateTransaction) but can never delete one, and never
+// sees the company-wide report (openingBalance, other managers' cash) - both stay admin-only.
 lamusRouter.get('/finance/settings', lamusAuthManager, settings)
 lamusRouter.put('/finance/settings', lamusAuthAdmin, updateSettings)
-lamusRouter.post('/finance/transactions', lamusAuthAdmin, addTransaction)
-lamusRouter.put('/finance/transactions/:id', lamusAuthAdmin, updateTransaction)
+lamusRouter.post('/finance/transactions', lamusAuthManager, addTransaction)
+lamusRouter.put('/finance/transactions/:id', lamusAuthManager, updateTransaction)
 lamusRouter.delete('/finance/transactions/:id', lamusAuthAdmin, deleteTransaction)
 lamusRouter.get('/finance/report', lamusAuthAdmin, report)
+lamusRouter.get('/finance/report/mine', lamusAuthManager, reportMine)
 
 export default lamusRouter

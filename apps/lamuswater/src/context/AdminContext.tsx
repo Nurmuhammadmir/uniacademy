@@ -343,6 +343,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       }
       await Promise.all([loadClients(), loadOperations(), loadStock(), loadFinanceReport()])
       toast.success(t('toast.deliveryRecorded'))
+      if (res.stockWarning) toast.error(t('server.stockWentToZero'))
       return true
     } catch (error: any) {
       toast.error(tError(error, backendUrl))

@@ -25,6 +25,7 @@ import ManagerDashboard from './pages/manager/Dashboard'
 import ManagerClients from './pages/manager/Clients'
 import AddClient from './pages/manager/AddClient'
 import ManagerOrders from './pages/manager/Orders'
+import ManagerFinance from './pages/manager/Finance'
 import ManagerMapPage from './pages/manager/MapPage'
 import ManagerStock from './pages/manager/Stock'
 
@@ -67,6 +68,7 @@ const RoleRoutes = () => {
           <Route path="clients/edit/:id" element={<AddClient />} />
           <Route path="orders" element={<ManagerOrders />} />
           <Route path="orders/new" element={<ManagerOrders />} />
+          <Route path="finance" element={<ManagerFinance />} />
           <Route path="map" element={<ManagerMapPage />} />
           <Route path="stock" element={<ManagerStock />} />
         </Route>

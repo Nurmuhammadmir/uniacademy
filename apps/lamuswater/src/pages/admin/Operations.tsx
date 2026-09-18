@@ -31,10 +31,13 @@ const NewDeliveryModal = ({ onClose }: { onClose: () => void }) => {
   const selectedClient = clients.find(c => c._id === clientId)
   const orderTotal = Math.max(0, given) * financeSettings.bottlePrice
   const newBalance = selectedClient ? selectedClient.balance + orderTotal - paymentAmount : 0
+  const returnsTooMany = !!selectedClient && returned > selectedClient.bottlesHeld
+  const nothingToRecord = given === 0 && returned === 0 && paymentAmount === 0
+  const canSubmit = !!clientId && !returnsTooMany && !nothingToRecord
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!clientId) return
+    if (!canSubmit) return
     setSaving(true)
     const ok = await recordOrder({ clientId, bottlesGiven: given, bottlesReturned: returned, notes, paymentAmount, paymentMethod })
     setSaving(false)
@@ -79,11 +82,14 @@ const NewDeliveryModal = ({ onClose }: { onClose: () => void }) => {
                 max={50}
                 value={returned}
                 onChange={e => setReturned(Number(e.target.value))}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-mono-data text-gray-900
-                  focus:outline-none focus:border-[#0066CC] focus:ring-2 focus:ring-[#0066CC]/10 transition-all"
+                className={`w-full border rounded-xl px-4 py-2.5 text-sm font-mono-data text-gray-900 focus:outline-none focus:ring-2 transition-all
+                  ${returnsTooMany ? 'border-red-300 focus:border-red-400 focus:ring-red-100' : 'border-gray-200 focus:border-[#0066CC] focus:ring-[#0066CC]/10'}`}
               />
             </div>
           </div>
+          {returnsTooMany && (
+            <p className="text-xs text-red-500 -mt-2">{t('orders.returnsExceedHeld', { count: selectedClient!.bottlesHeld })}</p>
+          )}
           {given > 0 || returned > 0 ? (
             <div className="flex items-center justify-between bg-gray-50 rounded-xl px-4 py-3 text-sm">
               <span className="text-gray-500">{t('orders.netChange')}</span>
@@ -146,7 +152,7 @@ const NewDeliveryModal = ({ onClose }: { onClose: () => void }) => {
               className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
               {t('common.cancel')}
             </button>
-            <button type="submit" disabled={saving || !clientId}
+            <button type="submit" disabled={saving || !canSubmit}
               className="flex-1 py-2.5 rounded-xl bg-[#0066CC] text-white text-sm font-medium hover:bg-[#0052A3] transition-colors disabled:opacity-60">
               {saving ? t('common.saving') : t('orders.record')}
             </button>
