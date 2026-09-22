@@ -151,8 +151,9 @@ const DirectorContextProvider = (props) => {
     }
 
     // director/sub_director tool for correcting a mistyped group-join date - see
-    // directorController.updateCourseEnrollmentDate's own comment for the exact mechanics and the
-    // deliberate same-calendar-month restriction.
+    // directorController.updateCourseEnrollmentDate's own comment for the exact mechanics: any date
+    // is allowed while only the first period has been billed, otherwise (a second period already
+    // recognized) the correction is restricted to landing on that period's own existing end date.
     const updateCourseEnrollmentDate = async (id, languageId, enrolledAt) => {
         try {
             const { data } = await axios.put(backendUrl + '/api/director/students/' + id + '/enrollment-date', { languageId, enrolledAt }, authHeader)
@@ -161,8 +162,6 @@ const DirectorContextProvider = (props) => {
         } catch (error) {
             const code = error.response?.data?.error
             const knownCodes = {
-                enrollment_date_different_month: t('enrollmentDateDifferentMonthError'),
-                period_already_adjusted: t('periodAlreadyAdjustedError'),
                 group_schedule_changed_since: t('groupScheduleChangedError'),
                 enrollment_date_before_group_start: t('enrollmentDateBeforeGroupStartError'),
                 enrollment_date_in_future: t('enrollmentDateInFutureError'),

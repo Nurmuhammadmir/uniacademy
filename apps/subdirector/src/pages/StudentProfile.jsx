@@ -77,7 +77,8 @@ const StudentProfile = () => {
           <p className='text-ink font-medium mb-2'>{t('paymentHistory')}</p>
           <div className='flex flex-col gap-3'>
             {data.payments.map(p => (
-              <div key={p._id} className={`flex flex-wrap justify-between items-center gap-2 text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2 ${p.refunded ? 'opacity-50' : ''}`}>
+              <div key={p._id} onClick={() => navigate('/finance/payments/' + p._id)}
+                className={`flex flex-wrap justify-between items-center gap-2 text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2 cursor-pointer hover:bg-bg transition-colors ${p.refunded ? 'opacity-50' : ''}`}>
                 <span className='text-muted'>{t('paymentLine', { date: new Date(p.date).toLocaleDateString('en-GB'), admin: p.adminId?.name })}</span>
                 <span className='flex flex-wrap items-center gap-2'>
                   <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t(paymentMethodLabelKey(p.method))}</span>

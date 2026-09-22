@@ -62,7 +62,9 @@ const AdjustBalanceModal = ({ studentId, currentBalance, onClose, onAdjusted }) 
       <form onSubmit={submit} className='flex flex-col gap-3'>
         <div className='bg-bg border border-hairline rounded-xl p-3'>
           <p className='text-muted text-xs mb-1'>{t('currentBalanceLabel')}</p>
-          <p className={`font-mono text-lg ${currentBalance > 0 ? 'text-rose-600' : 'text-ink'}`}>{formatMoney(currentBalance)}</p>
+          <p className={`font-mono text-lg ${currentBalance > 0 ? 'text-rose-600' : currentBalance < 0 ? 'text-emerald-600' : 'text-ink'}`}>
+            {currentBalance > 0 ? `-${formatMoney(currentBalance)}` : currentBalance < 0 ? `+${formatMoney(-currentBalance)}` : formatMoney(0)}
+          </p>
         </div>
         <div className='grid grid-cols-2 gap-2'>
           <button type='button' onClick={() => setMode('debt')}
@@ -219,7 +221,9 @@ const StudentProfile = () => {
           </div>
           <div className='bg-bg-elevated border border-hairline rounded-xl p-3.5 text-right'>
             <p className='text-muted text-xs mb-1'>{t('currentBalanceLabel')}</p>
-            <p className={`font-mono text-lg ${data.accountBalance > 0 ? 'text-rose-600' : 'text-ink'}`}>{formatMoney(data.accountBalance)}</p>
+            <p className={`font-mono text-lg ${data.accountBalance > 0 ? 'text-rose-600' : data.accountBalance < 0 ? 'text-emerald-600' : 'text-ink'}`}>
+              {data.accountBalance > 0 ? `-${formatMoney(data.accountBalance)}` : data.accountBalance < 0 ? `+${formatMoney(-data.accountBalance)}` : formatMoney(0)}
+            </p>
             <button onClick={() => setShowAdjustBalance(true)} className='text-accent text-xs font-medium mt-1'>{t('adjustBalanceBtn')}</button>
           </div>
         </div>
@@ -268,7 +272,8 @@ const StudentProfile = () => {
           <p className='text-ink font-medium mb-2'>{t('paymentHistory')}</p>
           <div className='flex flex-col gap-3'>
             {data.payments.map(p => (
-              <div key={p._id} className={`flex flex-wrap justify-between items-center gap-2 text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2 ${p.refunded ? 'opacity-50' : ''}`}>
+              <div key={p._id} onClick={() => navigate('/finance/payments/' + p._id)}
+                className={`flex flex-wrap justify-between items-center gap-2 text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2 cursor-pointer hover:bg-bg transition-colors ${p.refunded ? 'opacity-50' : ''}`}>
                 <span className='text-muted'>{t('paymentLine', { date: new Date(p.date).toLocaleDateString('en-GB'), admin: p.adminId?.name })}</span>
                 <span className='flex flex-wrap items-center gap-2'>
                   <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t(paymentMethodLabelKey(p.method))}</span>

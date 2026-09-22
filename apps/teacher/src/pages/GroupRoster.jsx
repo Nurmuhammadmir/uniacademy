@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { TeacherContext } from '../context/TeacherContext.jsx'
 import HomeworkPreviewModal from '../components/HomeworkPreviewModal.jsx'
+import { formatMoney } from '../lib/format.js'
 
 const SECTION_META = [
   { key: 'vocab', label: 'Vocab', icon: '🔤' },
@@ -67,9 +68,16 @@ const GroupRoster = () => {
         <div className='flex flex-col gap-3'>
           {students.map(s => (
             <button key={s.id} onClick={() => navigate(`/groups/${id}/students/${s.id}`)} className='text-left bg-bg-card border border-hairline rounded-xl p-4'>
-              <div className='flex justify-between items-center mb-2'>
+              <div className='flex justify-between items-center mb-2 gap-2'>
                 <p className='text-ink font-medium'>{s.name}</p>
-                <span className='font-mono text-sm text-accent'>{s.completionPercent}%</span>
+                <span className='flex items-center gap-2 flex-shrink-0'>
+                  {s.owed > 0 && (
+                    <span className='font-mono text-xs px-2 py-1 rounded-full bg-red-100 text-red-500 dark:bg-red-500/10 dark:text-rose-400'>
+                      owes {formatMoney(s.owed)}
+                    </span>
+                  )}
+                  <span className='font-mono text-sm text-accent'>{s.completionPercent}%</span>
+                </span>
               </div>
               <div className='h-1.5 rounded-full bg-hairline overflow-hidden'>
                 <div className='h-full bg-accent rounded-full' style={{ width: `${s.completionPercent}%` }} />

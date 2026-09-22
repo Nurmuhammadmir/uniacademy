@@ -3,6 +3,7 @@ import crypto from "crypto"
 import Group from "../models/Group.js"
 import Level from "../models/Level.js"
 import User from "../models/User.js"
+import Account from "../models/Account.js"
 import StudentProgress from "../models/StudentProgress.js"
 import ExamAttempt from "../models/ExamAttempt.js"
 import Attendance from "../models/Attendance.js"
@@ -109,6 +110,13 @@ export const getGroupStudents = async (req, res) => {
 
         const progressRows = await StudentProgress.find({ groupId: group._id }).lean()
 
+        // confirmed spec: a teacher should be able to see which of her own students are debtors too,
+        // not just admin/director - the student's real, whole-account balance (see Account.js's own
+        // sign convention: positive = owes, negative = credit), same figure listStudents shows admin,
+        // one bulk query regardless of roster size
+        const accounts = await Account.find({ ownerType: 'student', ownerId: { $in: group.studentIds.map(s => s._id) } }).select('ownerId balance').lean()
+        const balanceByStudentId = new Map(accounts.map(a => [String(a.ownerId), a.balance]))
+
         const students = group.studentIds.map(student => {
             const rows = progressRows.filter(p => String(p.studentId) === String(student._id))
             const done = rows.filter(r => r.status === 'done').length
@@ -118,6 +126,7 @@ export const getGroupStudents = async (req, res) => {
                 name: student.name,
                 phone: student.phone,
                 completionPercent: Math.round((done / total) * 100),
+                owed: balanceByStudentId.get(String(student._id)) || 0,
             }
         })
 

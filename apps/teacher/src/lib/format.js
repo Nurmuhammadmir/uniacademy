@@ -6,3 +6,12 @@ export const resolveImageUrl = (path, backendUrl) => {
     if (/^https?:\/\//.test(path)) return path
     return `${backendUrl}${path}`
 }
+
+// same comma-thousands formatting as the admin/director apps' own formatMoney (see
+// apps/director/src/lib/format.js) - kept as its own small copy here rather than a shared package
+// since this app has no cross-app import boundary today, and it's the one place a teacher-facing
+// page needs to render a money figure (a student's owed balance, see GroupRoster.jsx)
+export const formatMoney = (n) => {
+    if (n === null || n === undefined || Number.isNaN(n)) return '—'
+    return Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}

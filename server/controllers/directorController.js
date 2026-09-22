@@ -9,7 +9,7 @@ import Group from "../models/Group.js"
 import Pricing from "../models/Pricing.js"
 import { getOrCreateAccount, postEntry, postTransfer, deleteEntries, formatAmount, dateOnlyUTC, computePeriodCost } from "../services/ledger.service.js"
 import Account from "../models/Account.js"
-import { computeCourseOwed, recomputeEnrollmentStatus } from "../services/billingCycle.service.js"
+import { computeCourseOwed, recomputeEnrollmentStatus, recognizeEnrollmentDebt } from "../services/billingCycle.service.js"
 import { computeOwedByPeriod } from "../services/studentLedger.service.js"
 import Language from "../models/Language.js"
 import CourseCategory from "../models/CourseCategory.js"
@@ -265,15 +265,30 @@ export const getStudentProfile = async (req, res) => {
 
 // director/sub_director tool for correcting a mistyped/wrong group-join date - confirmed spec: an
 // admin's mistake (entered the 7th when the student actually started the 1st) means the FIRST
-// billing period was wrongly prorated (or wrongly charged the full month). Deliberately restricted
-// to a correction WITHIN THE SAME CALENDAR MONTH as whatever's already been recognized for this
-// course - a real month-boundary mistake (not just the wrong day) would require re-deriving every
-// period recognized since (recognizedThrough only ever remembers the PREVIOUS period's own end, see
-// billingCycle.service.js's own comment on this), which this tool intentionally does not attempt;
-// confirmed acceptable with the user, who can use freeze/remove-and-re-add for that rarer case.
-// The corrected debt is the FIRST one this account has ever recognized for this course (by
-// periodStart) - reversed in full and reposted with the new date, the same "cancel one already-
-// posted debt" shape reverseUnusedPeriod already uses, just for the whole amount instead of a tail.
+// billing period was wrongly prorated (or wrongly charged the full month).
+//
+// The debt being corrected is always the CURRENTLY ACTIVE first period this account has recognized
+// for this course - the earliest 'debt' entry that hasn't already been cancelled out by a
+// debt_reversal - not necessarily the very first one ever posted. That's what lets this be run any
+// number of times: a previous correction already reversed-and-replaced the original entry once, so
+// re-running this must find the entry that replaced it, not the (now dead) original, or the
+// "already adjusted" guard would trip on every edit after the first.
+//
+// Once a SECOND period has already been recognized (course.recognizedThrough has moved past this
+// first period's own end - a real month has gone by since), rewriting the enrollment date across a
+// month boundary would mean retroactively adding/removing whole periods a teacher's salary may
+// already have been calculated - and paid - against (recognizedThrough only ever remembers the
+// PREVIOUS period's own end, see billingCycle.service.js's own comment on this) - that stays
+// deliberately out of scope for this tool; freeze + remove/re-add is the confirmed path for that
+// rarer case. In that situation the correction is only accepted if the corrected period's end still
+// lands on the exact same day the already-recognized second period expects it to (same swap-one-
+// period shape as before).
+//
+// While the course is still on its very FIRST period, though, there's nothing later to protect -
+// the old first debt is reversed in full and the whole course is re-recognized from scratch from the
+// new date (recognizedThrough reset to null, then recognizeEnrollmentDebt runs exactly the same
+// backdated-enrollment logic addStudentToGroup uses), so the new date can be ANY real day, in any
+// month, not just within whatever month was originally entered.
 export const updateCourseEnrollmentDate = async (req, res) => {
     try {
         const { languageId, enrolledAt } = req.body
@@ -295,63 +310,84 @@ export const updateCourseEnrollmentDate = async (req, res) => {
         if (group.startDate && newDate < dateOnlyUTC(group.startDate)) return res.status(400).json({ error: 'enrollment_date_before_group_start' })
 
         const account = await getOrCreateAccount('student', student._id)
-        const firstDebt = await LedgerEntry.findOne({ accountId: account._id, languageId, kind: 'debt' }).sort({ periodStart: 1, _id: 1 })
+        const debts = await LedgerEntry.find({ accountId: account._id, languageId, kind: 'debt' }).sort({ periodStart: 1, _id: 1 }).lean()
+        const reversals = debts.length
+            ? await LedgerEntry.find({ accountId: account._id, kind: 'debt_reversal', sourceType: 'ledgerEntry', sourceId: { $in: debts.map(d => d._id) } }).select('sourceId').lean()
+            : []
+        const reversedIds = new Set(reversals.map(r => String(r.sourceId)))
+        const firstDebt = debts.find(d => !reversedIds.has(String(d._id))) || null
 
         if (!firstDebt) {
-            // nothing on the ledger to correct (e.g. a first period whose cost rounded to 0) - just
-            // record the real date for display, nothing to reverse/repost
+            // nothing active on the ledger to correct (e.g. a first period whose cost rounded to 0) -
+            // just record the real date for display, nothing to reverse/repost
             course.enrolledAt = newDate
             await student.save()
             return res.json({ course })
         }
 
-        const oldStart = dateOnlyUTC(firstDebt.periodStart)
-        if (newDate.getUTCFullYear() !== oldStart.getUTCFullYear() || newDate.getUTCMonth() !== oldStart.getUTCMonth()) {
-            return res.status(400).json({ error: 'enrollment_date_different_month' })
+        const hasLaterPeriods = course.recognizedThrough && dateOnlyUTC(course.recognizedThrough).getTime() > dateOnlyUTC(firstDebt.periodEnd).getTime()
+
+        if (hasLaterPeriods) {
+            const { rawCost: newCost, windowEnd: newWindowEnd, isFullMonth } = computePeriodCost(group, newDate)
+            // the corrected period's own end must land on exactly the same day the already-recognized
+            // second period expects it to - otherwise recognizedThrough (left untouched below) would
+            // silently disagree with what this course's own billing history says happened
+            if (newWindowEnd.getTime() !== dateOnlyUTC(firstDebt.periodEnd).getTime()) {
+                return res.status(409).json({ error: 'group_schedule_changed_since' })
+            }
+
+            if (firstDebt.amount > 0) {
+                await postEntry({
+                    accountId: account._id, direction: 'decrease', amount: firstDebt.amount, kind: 'debt_reversal',
+                    meta: {
+                        studentId: student._id, groupId: group._id, languageId, levelId: course.levelId,
+                        teacherId: group.teacherId, periodStart: firstDebt.periodStart, periodEnd: firstDebt.periodEnd,
+                        sourceType: 'ledgerEntry', sourceId: firstDebt._id,
+                    },
+                    description: `Enrollment date corrected - original ${formatAmount(firstDebt.amount)} charge reversed`,
+                    createdBy: req.auth.userId, date: new Date(),
+                })
+            }
+
+            if (newCost > 0) {
+                const dayLabel = isFullMonth
+                    ? `${newDate.toISOString().slice(0, 10)} – ${newWindowEnd.toISOString().slice(0, 10)}`
+                    : `${newDate.toISOString().slice(0, 10)} – ${newWindowEnd.toISOString().slice(0, 10)} (partial month)`
+                await postEntry({
+                    accountId: account._id, direction: 'increase', amount: newCost, kind: 'debt',
+                    meta: {
+                        studentId: student._id, groupId: group._id, languageId, levelId: course.levelId,
+                        teacherId: group.teacherId, periodStart: newDate, periodEnd: newWindowEnd,
+                    },
+                    description: `${dayLabel} · ${formatAmount(group.price)}/mo = ${formatAmount(newCost)} (enrollment date corrected)`,
+                    createdBy: req.auth.userId, date: newDate,
+                })
+            }
+
+            course.enrolledAt = newDate
+        } else {
+            // nothing later recognized yet - free to move to any date. Reverse the old first period in
+            // full and re-derive the ENTIRE course history from the new date, exactly like a fresh
+            // (possibly backdated) enrollment: however many real months have elapsed since the
+            // corrected date get prorated/posted in one pass, not just a single swapped period.
+            if (firstDebt.amount > 0) {
+                await postEntry({
+                    accountId: account._id, direction: 'decrease', amount: firstDebt.amount, kind: 'debt_reversal',
+                    meta: {
+                        studentId: student._id, groupId: group._id, languageId, levelId: course.levelId,
+                        teacherId: group.teacherId, periodStart: firstDebt.periodStart, periodEnd: firstDebt.periodEnd,
+                        sourceType: 'ledgerEntry', sourceId: firstDebt._id,
+                    },
+                    description: `Enrollment date corrected - original ${formatAmount(firstDebt.amount)} charge reversed`,
+                    createdBy: req.auth.userId, date: new Date(),
+                })
+            }
+
+            course.enrolledAt = newDate
+            course.recognizedThrough = null
+            await recognizeEnrollmentDebt(student, course, req.auth.userId, newDate)
         }
 
-        const alreadyReversed = await LedgerEntry.exists({ accountId: account._id, kind: 'debt_reversal', sourceId: firstDebt._id })
-        if (alreadyReversed) return res.status(409).json({ error: 'period_already_adjusted' })
-
-        const { rawCost: newCost, windowEnd: newWindowEnd, isFullMonth } = computePeriodCost(group, newDate)
-        // the whole point of restricting this to a same-month correction: the corrected period's own
-        // end must land on exactly the same day the period this account already recognized ends on -
-        // otherwise recognizedThrough (left untouched below) would silently disagree with what this
-        // course's own billing history says happened. Guards the rare case where the group's endDate
-        // changed AFTER this period was first posted.
-        if (newWindowEnd.getTime() !== dateOnlyUTC(firstDebt.periodEnd).getTime()) {
-            return res.status(409).json({ error: 'group_schedule_changed_since' })
-        }
-
-        if (firstDebt.amount > 0) {
-            await postEntry({
-                accountId: account._id, direction: 'decrease', amount: firstDebt.amount, kind: 'debt_reversal',
-                meta: {
-                    studentId: student._id, groupId: group._id, languageId, levelId: course.levelId,
-                    teacherId: group.teacherId, periodStart: firstDebt.periodStart, periodEnd: firstDebt.periodEnd,
-                    sourceType: 'ledgerEntry', sourceId: firstDebt._id,
-                },
-                description: `Enrollment date corrected - original ${formatAmount(firstDebt.amount)} charge reversed`,
-                createdBy: req.auth.userId, date: new Date(),
-            })
-        }
-
-        if (newCost > 0) {
-            const dayLabel = isFullMonth
-                ? `${newDate.toISOString().slice(0, 10)} – ${newWindowEnd.toISOString().slice(0, 10)}`
-                : `${newDate.toISOString().slice(0, 10)} – ${newWindowEnd.toISOString().slice(0, 10)} (partial month)`
-            await postEntry({
-                accountId: account._id, direction: 'increase', amount: newCost, kind: 'debt',
-                meta: {
-                    studentId: student._id, groupId: group._id, languageId, levelId: course.levelId,
-                    teacherId: group.teacherId, periodStart: newDate, periodEnd: newWindowEnd,
-                },
-                description: `${dayLabel} · ${formatAmount(group.price)}/mo = ${formatAmount(newCost)} (enrollment date corrected)`,
-                createdBy: req.auth.userId, date: newDate,
-            })
-        }
-
-        course.enrolledAt = newDate
         await recomputeEnrollmentStatus(student)
         await student.save()
 
