@@ -22,7 +22,7 @@ const Sidebar = ({ open, onClose }) => {
         <NavLink to='/dashboard' onClick={onClose} className='plain mb-8 block'>
           <p className='font-logo text-4xl text-[#DC2626] tracking-tight leading-none'>Lamussa</p>
         </NavLink>
-        <nav className='flex flex-col gap-1.5 flex-1 overflow-y-auto'>
+        <nav className='flex flex-col gap-1.5 flex-1 overflow-y-auto overflow-x-hidden'>
           {links.map(link => {
             const Icon = link.icon
             return (
