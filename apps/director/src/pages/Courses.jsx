@@ -6,6 +6,7 @@ import Modal from '../components/Modal.jsx'
 import Select from '../components/Select.jsx'
 import MoneyInput from '../components/MoneyInput.jsx'
 import { X, Pencil, Check, Search, Plus } from 'lucide-react'
+import { usePersistedState } from '../lib/usePersistedState.js'
 
 const Courses = () => {
   const {
@@ -14,8 +15,8 @@ const Courses = () => {
     courseCategories, getCourseCategories, createCourseCategory, updateCourseCategory, deleteCourseCategory,
   } = useContext(DirectorContext)
   const { t } = useLanguage()
-  const [search, setSearch] = useState('')
-  const [tagFilter, setTagFilter] = useState('')
+  const [search, setSearch] = usePersistedState('director.courses.search', '')
+  const [tagFilter, setTagFilter] = usePersistedState('director.courses.tagFilter', '')
   const [showAddLanguage, setShowAddLanguage] = useState(false)
   const [editingLanguage, setEditingLanguage] = useState(null)
   const [languageForm, setLanguageForm] = useState({ code: '', name: '', categoryIds: [] })

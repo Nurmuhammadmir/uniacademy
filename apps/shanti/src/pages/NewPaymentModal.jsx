@@ -9,6 +9,7 @@ import NumberInput from '../components/NumberInput.jsx'
 import MethodPicker, { isMethodSplitValid } from '../components/MethodPicker.jsx'
 import { confirm } from '../lib/confirm.js'
 import { formatMoney } from '../lib/format.js'
+import Money from '../components/Money.jsx'
 import { todayISO } from '../lib/date.js'
 
 const breakdownFromPayment = (payment) => (payment?.methodBreakdown || []).map(r => ({ method: r.method, amount: String(r.amount) }))
@@ -76,7 +77,7 @@ const NewPaymentModal = ({ payment, onClose, onSaved }) => {
           debtForSelected > 0 ? (
             <div className='bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center justify-between'>
               <span className='text-amber-700 text-xs font-medium'>{t('currentDebtLabel')}</span>
-              <span className='text-amber-700 font-bold font-mono'>{formatMoney(debtForSelected)}</span>
+              <span className='text-amber-700 font-bold font-mono'><Money value={debtForSelected} /></span>
             </div>
           ) : (
             <p className='text-xs text-muted px-1'>{t('advancePaymentHint')}</p>

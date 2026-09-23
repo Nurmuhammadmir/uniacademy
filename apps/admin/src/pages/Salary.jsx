@@ -43,7 +43,9 @@ const Salary = () => {
 
   const openPay = (row, mode) => {
     setPayingRow(row); setPayMode(mode); setPayMethod('cash'); setAmountMode('amount')
-    setPayAmount(String(row.remaining)); setPayPercent('')
+    // remaining is 0 for a "Debt" prepay opened with nothing currently owed - nothing sensible to
+    // prefill (and no "remaining" for the % mode below to be a percent OF), so leave it blank
+    setPayAmount(row.remaining > 0 ? String(row.remaining) : ''); setPayPercent('')
   }
 
   const submitPay = async (e) => {
@@ -106,9 +108,7 @@ const Salary = () => {
                   )}
                 </td>
                 <td className='px-4 py-4'>
-                  {r.remaining <= 0 ? (
-                    <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]'>{t('paidBadge')}</span>
-                  ) : (
+                  {r.remaining > 0 ? (
                     <div className='flex flex-col gap-1.5 items-start'>
                       {r.paidAmount > 0 && (
                         <span className='text-xs text-amber-600 dark:text-amber-400'>{t('remainingToPayLabel')}: {formatMoney(r.remaining)}</span>
@@ -117,6 +117,16 @@ const Salary = () => {
                         <button onClick={() => openPay(r, 'pay')} className='px-3 py-1.5 rounded-lg bg-accent text-white dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-xs font-medium transition-colors'>{t('payBtn')}</button>
                         <button onClick={() => openPay(r, 'prepay')} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-ink text-xs font-medium'>{t('prepayBtn')}</button>
                       </div>
+                    </div>
+                  ) : (
+                    <div className='flex flex-col gap-1.5 items-start'>
+                      {/* total === 0 means nothing was calculated (eg. a percent_of_revenue teacher
+                      whose students paid nothing this period) - that's not the same as "Paid", so the
+                      badge only shows once something real was actually earned and settled */}
+                      {r.total > 0 && (
+                        <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]'>{t('paidBadge')}</span>
+                      )}
+                      <button onClick={() => openPay(r, 'prepay')} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-ink text-xs font-medium'>{t('debtBtn')}</button>
                     </div>
                   )}
                 </td>
@@ -162,15 +172,20 @@ const Salary = () => {
                 <p className='font-mono text-ink text-base'>{formatMoney(r.total)}</p>
                 {r.paidAmount > 0 && <p className='text-[11px] text-muted mt-0.5'>{t('alreadyPaidLabel')}: {formatMoney(r.paidAmount)}</p>}
               </div>
-              {r.remaining <= 0 ? (
-                <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]'>{t('paidBadge')}</span>
-              ) : (
+              {r.remaining > 0 ? (
                 <div className='flex flex-col gap-1.5 items-end'>
                   {r.paidAmount > 0 && <span className='text-xs text-amber-600 dark:text-amber-400'>{t('remainingToPayLabel')}: {formatMoney(r.remaining)}</span>}
                   <div className='flex gap-2'>
                     <button onClick={() => openPay(r, 'pay')} className='px-3 py-1.5 rounded-lg bg-accent text-white dark:bg-[#4F46E5] text-xs font-medium'>{t('payBtn')}</button>
                     <button onClick={() => openPay(r, 'prepay')} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-ink text-xs font-medium'>{t('prepayBtn')}</button>
                   </div>
+                </div>
+              ) : (
+                <div className='flex flex-col gap-1.5 items-end'>
+                  {r.total > 0 && (
+                    <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]'>{t('paidBadge')}</span>
+                  )}
+                  <button onClick={() => openPay(r, 'prepay')} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-ink text-xs font-medium'>{t('debtBtn')}</button>
                 </div>
               )}
             </div>
@@ -187,7 +202,7 @@ const Salary = () => {
       {payingRow && (
         <div className='fixed inset-0 z-50 bg-slate-900/20 backdrop-blur-md dark:bg-[#0B0F19]/60 dark:backdrop-blur-lg transition-all duration-300 flex items-center justify-center p-4' onClick={() => setPayingRow(null)}>
           <div className='bg-bg-elevated border border-hairline rounded-2xl p-6 max-w-sm w-full' onClick={e => e.stopPropagation()}>
-            <p className='font-display text-lg text-ink mb-1'>{t(payMode === 'prepay' ? 'prepayBtn' : 'payBtn')} — {payingRow.name}</p>
+            <p className='font-display text-lg text-ink mb-1'>{t(payMode === 'pay' ? 'payBtn' : (payingRow.remaining > 0 ? 'prepayBtn' : 'debtBtn'))} — {payingRow.name}</p>
             <p className='font-mono text-2xl text-ink mb-1'>{formatMoney(payingRow.remaining)}</p>
             <p className='text-xs text-muted mb-4'>
               {t('totalSalaryCol')}: {formatMoney(payingRow.total)}
@@ -195,7 +210,7 @@ const Salary = () => {
             </p>
 
             <form onSubmit={submitPay} className='flex flex-col gap-3'>
-              {payMode === 'prepay' && (
+              {payMode === 'prepay' && payingRow.remaining > 0 && (
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('prepayModeLabel')}</p>
                   <div className='flex gap-1 bg-slate-100 dark:bg-slate-800/40 rounded-lg p-1 mb-2'>
@@ -217,6 +232,13 @@ const Salary = () => {
                   )}
                 </div>
               )}
+              {payMode === 'prepay' && payingRow.remaining <= 0 && (
+                <div>
+                  <p className='text-xs text-muted mb-1'>{t('amountLabel')}</p>
+                  <MoneyInput value={payAmount} onChange={e => setPayAmount(e.target.value)}
+                    className='w-full px-3 py-2 rounded-lg bg-bg border border-hairline text-sm' required />
+                </div>
+              )}
               {payMode === 'pay' && (
                 <div>
                   <p className='text-xs text-muted mb-1'>{t('amountLabel')}</p>
@@ -230,7 +252,7 @@ const Salary = () => {
                   options={PAYOUT_METHODS.map(m => ({ value: m, label: t('expenseMethod_' + m) }))} />
               </div>
               <button type='submit' disabled={paying} className='py-2 rounded-lg bg-accent text-white dark:bg-[#4F46E5] dark:hover:bg-[#5D55FA] dark:shadow-lg dark:shadow-indigo-500/10 text-sm font-medium disabled:opacity-50 transition-colors flex items-center justify-center gap-2'>
-                {paying && <Spinner size={14} />} {paying ? t('payingBtn') : t(payMode === 'prepay' ? 'prepayBtn' : 'payBtn')}
+                {paying && <Spinner size={14} />} {paying ? t('payingBtn') : t(payMode === 'pay' ? 'payBtn' : (payingRow.remaining > 0 ? 'prepayBtn' : 'debtBtn'))}
               </button>
             </form>
           </div>

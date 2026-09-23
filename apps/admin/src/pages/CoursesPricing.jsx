@@ -4,6 +4,7 @@ import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
 import Select from '../components/Select.jsx'
+import { usePersistedState } from '../lib/usePersistedState.js'
 
 // a course has no icon/color of its own, so each card is assigned one from this small fixed
 // palette by position - purely decorative variety (Mac-widget look: a soft system-color disc
@@ -23,8 +24,8 @@ const ICON_PALETTE = [
 const CoursesPricing = () => {
   const { pricingList } = useContext(AdminContext)
   const { t } = useLanguage()
-  const [search, setSearch] = useState('')
-  const [tagFilter, setTagFilter] = useState('')
+  const [search, setSearch] = usePersistedState('admin.coursesPricing.search', '')
+  const [tagFilter, setTagFilter] = usePersistedState('admin.coursesPricing.tagFilter', '')
 
   const tagOptions = Object.values(
     pricingList.reduce((acc, p) => {

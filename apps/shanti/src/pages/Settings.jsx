@@ -7,7 +7,7 @@ import NumberInput from '../components/NumberInput.jsx'
 import MethodPicker, { isMethodSplitValid, methodDisplay } from '../components/MethodPicker.jsx'
 import Spinner from '../components/Spinner.jsx'
 import { confirm } from '../lib/confirm.js'
-import { formatMoney } from '../lib/format.js'
+import Money from '../components/Money.jsx'
 import { todayISO, formatDateTime } from '../lib/date.js'
 
 const TopUpBalanceSection = () => {
@@ -85,7 +85,7 @@ const TopUpBalanceSection = () => {
           return (
             <div key={a._id} className='flex items-center justify-between gap-2 py-2 border-b border-hairline last:border-0 text-sm'>
               <div className='min-w-0'>
-                <p className='text-ink font-mono font-semibold'>{formatMoney(a.amount)} <span className='text-muted font-sans font-normal' title={methodInfo.title}>· {methodInfo.label}</span></p>
+                <p className='text-ink font-mono font-semibold'><Money value={a.amount} /> <span className='text-muted font-sans font-normal' title={methodInfo.title}>· {methodInfo.label}</span></p>
                 <p className='text-[11px] text-slate-400 truncate'>{formatDateTime(a.date)}{a.comment ? ` · ${a.comment}` : ''}</p>
               </div>
               <button onClick={() => handleDelete(a._id)} className='plain text-muted hover:text-rose-500 text-xs flex-shrink-0'>{t('delete')}</button>

@@ -281,7 +281,15 @@ export const getPurchasesOverview = async (req, res) => {
         const match = await buildPurchaseMatch(req.query)
         const purchases = await ShantiPurchase.find(match).sort({ date: -1 }).populate('materialId', 'name category unit').populate('sellerId', 'name phone').populate('createdBy', 'name').lean()
         const totalAmount = purchases.reduce((sum, p) => sum + p.amount, 0)
-        res.json({ purchases, totalAmount })
+        // grouped by unit, not a single number - the filtered set can span materials with different
+        // units (kg, l, pcs...), which a bare sum would silently mix together
+        const quantityByUnit = {}
+        for (const p of purchases) {
+            const unit = p.materialId?.unit || ''
+            quantityByUnit[unit] = (quantityByUnit[unit] || 0) + p.quantity
+        }
+        const totalQuantity = Object.entries(quantityByUnit).map(([unit, quantity]) => ({ unit, quantity }))
+        res.json({ purchases, totalAmount, totalQuantity })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -310,10 +318,20 @@ export const getSellerDebts = async (req, res) => {
 export const getPurchaseDebts = async (req, res) => {
     try {
         const match = await buildPurchaseMatch(req.query)
-        match.$expr = { $gt: [{ $subtract: ['$amount', '$paidAmount'] }, 0] }
+        // 0.0001 tolerance, not a strict > 0 - amount/paidAmount are floats, and a "fully paid"
+        // purchase can otherwise leave a sub-cent rounding residue that's technically positive but
+        // displays as 0 $, making a purchase show up here with no visible debt
+        match.$expr = { $gt: [{ $subtract: ['$amount', '$paidAmount'] }, 0.0001] }
         const purchases = await ShantiPurchase.find(match).sort({ date: -1 }).populate('materialId', 'name category unit').populate('sellerId', 'name phone').populate('createdBy', 'name').lean()
         const totalDebt = purchases.reduce((sum, p) => sum + (p.amount - p.paidAmount), 0)
-        res.json({ purchases, totalDebt })
+        // grouped by unit, same reasoning as getPurchasesOverview's totalQuantity
+        const quantityByUnit = {}
+        for (const p of purchases) {
+            const unit = p.materialId?.unit || ''
+            quantityByUnit[unit] = (quantityByUnit[unit] || 0) + p.quantity
+        }
+        const totalQuantity = Object.entries(quantityByUnit).map(([unit, quantity]) => ({ unit, quantity }))
+        res.json({ purchases, totalDebt, totalQuantity })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

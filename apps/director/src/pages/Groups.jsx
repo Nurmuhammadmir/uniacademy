@@ -4,6 +4,7 @@ import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
 import TimePicker from '../components/TimePicker.jsx'
+import { usePersistedState } from '../lib/usePersistedState.js'
 
 const SCHEDULES = ['MON_WED_FRI', 'TUE_THU_SAT']
 const STATUS_DOT = { active: 'bg-emerald-500', archived: 'bg-rose-400' }
@@ -42,7 +43,7 @@ const EndingSoonBadge = ({ g, t }) => {
 const Groups = () => {
   const { allGroups, updateGroupLimits, teachers, branches } = useContext(DirectorContext)
   const { t } = useLanguage()
-  const [branchFilter, setBranchFilter] = useState('')
+  const [branchFilter, setBranchFilter] = usePersistedState('director.groups.branchFilter', '')
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({ teacherId: '', schedulePattern: '', time: '', capacity: 20 })
 

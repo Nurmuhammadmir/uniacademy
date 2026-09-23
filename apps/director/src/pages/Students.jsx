@@ -6,6 +6,8 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
 import { lastDayOfMonthISO } from '../lib/date.js'
 import Select from '../components/Select.jsx'
+import { usePersistedState } from '../lib/usePersistedState.js'
+import { useScrollRestore } from '../lib/useScrollRestore.js'
 
 // last 12 calendar months (this one first), as 'YYYY-MM' strings - backs the debtors period filter
 const debtorsMonthOptions = () => {
@@ -37,16 +39,19 @@ const Students = () => {
   const { allStudents, branches, languages, levels, getLevels, getStudentsDebtorsByPeriod } = useContext(DirectorContext)
   const { t } = useLanguage()
   const navigate = useNavigate()
-  const [search, setSearch] = useState('')
-  const [branchFilter, setBranchFilter] = useState('')
-  const [languageFilter, setLanguageFilter] = useState('')
-  const [levelFilter, setLevelFilter] = useState('')
-  const [debtorsOnly, setDebtorsOnly] = useState(false)
+  // sessionStorage-backed (see usePersistedState) so leaving for a student's profile (or any other
+  // page) and coming back doesn't silently reset whatever search/filter was set up - was a real
+  // reported annoyance, especially on this list.
+  const [search, setSearch] = usePersistedState('director.students.search', '')
+  const [branchFilter, setBranchFilter] = usePersistedState('director.students.branchFilter', '')
+  const [languageFilter, setLanguageFilter] = usePersistedState('director.students.languageFilter', '')
+  const [levelFilter, setLevelFilter] = usePersistedState('director.students.levelFilter', '')
+  const [debtorsOnly, setDebtorsOnly] = usePersistedState('director.students.debtorsOnly', false)
   // '' = all time (default, real current balance) - a specific 'YYYY-MM' switches the debtors
   // filter/count/total to that month's own billed-and-still-unpaid amount instead, see
   // adminController.getStudentsDebtorsByPeriod. Kept out of allStudents itself so the balance
   // column keeps showing each student's real total regardless of which month is selected here.
-  const [debtPeriod, setDebtPeriod] = useState('')
+  const [debtPeriod, setDebtPeriod] = usePersistedState('director.students.debtPeriod', '')
   const [periodOwedMap, setPeriodOwedMap] = useState(null)
   const [loadingPeriodOwed, setLoadingPeriodOwed] = useState(false)
 
@@ -59,6 +64,8 @@ const Students = () => {
     })
     return () => { cancelled = true }
   }, [debtPeriod])
+
+  useScrollRestore('director.studentsListScrollY', allStudents.length > 0)
 
   // a course a student has since left keeps its entry (groupId cleared) only so admin-side balance
   // history can still trace what was ever billed for it - not something they're "currently taking"

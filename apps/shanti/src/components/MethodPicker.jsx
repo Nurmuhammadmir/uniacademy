@@ -4,6 +4,7 @@ import Select from './Select.jsx'
 import NumberInput from './NumberInput.jsx'
 import { useLanguage, t } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
+import Money from './Money.jsx'
 
 export const SPLIT_METHODS = ['cash', 'card', 'bank_transfer']
 
@@ -63,7 +64,7 @@ const MethodPicker = ({ amount, method, setMethod, split, setSplit, breakdown, s
             <Plus size={14} strokeWidth={2} /> {t('addMethodRowBtn')}
           </button>
           <p className={`text-xs font-medium ${splitMatches ? 'text-emerald-600' : 'text-rose-600'}`}>
-            {t('splitTotalLabel')}: {formatMoney(splitTotal)} / {formatMoney(targetAmount)}
+            {t('splitTotalLabel')}: <Money value={splitTotal} /> / <Money value={targetAmount} />
           </p>
         </div>
       )}

@@ -4,6 +4,7 @@ import { Users, Truck, PackageCheck, ShoppingBag, Receipt } from 'lucide-react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { formatMoney } from '../lib/format.js'
+import Money from '../components/Money.jsx'
 
 const StatRow = ({ icon: Icon, label, value, sub, tone }) => (
   <div className='flex items-center gap-3 py-3 first:pt-0 last:pb-0 border-b border-slate-100 last:border-0'>
@@ -66,7 +67,7 @@ const Dashboard = () => {
           <div className='bg-white border border-slate-100 rounded-2xl p-5 shadow-sm flex items-center justify-between'>
             <p className='text-ink font-medium text-sm'>{t('netProfitLabel')}</p>
             <p className={`font-bold text-2xl tracking-tight font-mono ${series && series.netProfit < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-              {series ? formatMoney(series.netProfit) : '—'}
+              {series ? <Money value={series.netProfit} /> : '—'}
             </p>
           </div>
         </div>
@@ -74,15 +75,15 @@ const Dashboard = () => {
         <div className='bg-white border border-slate-100 rounded-2xl p-5 shadow-sm'>
           <p className='text-ink font-medium text-sm mb-1'>{t('statsTitle')}</p>
           <StatRow icon={Users} tone='bg-amber-50 text-amber-600'
-            label={t('debtorsCountLabel')} value={summary ? formatMoney(summary.debtors.total) : '—'} sub={summary?.debtors.count} />
+            label={t('debtorsCountLabel')} value={summary ? <Money value={summary.debtors.total} /> : '—'} sub={summary?.debtors.count} />
           <StatRow icon={Truck} tone='bg-rose-50 text-rose-600'
-            label={t('sellerDebtsCountLabel')} value={summary ? formatMoney(summary.sellerDebts.total) : '—'} sub={summary?.sellerDebts.count} />
+            label={t('sellerDebtsCountLabel')} value={summary ? <Money value={summary.sellerDebts.total} /> : '—'} sub={summary?.sellerDebts.count} />
           <StatRow icon={PackageCheck} tone='bg-emerald-50 text-emerald-600'
-            label={t('soldThisMonthLabel')} value={summary ? formatMoney(summary.thisMonth.salesSum) : '—'} sub={summary ? `${summary.thisMonth.soldQuantity} ${t('pcsShort')}` : undefined} />
+            label={t('soldThisMonthLabel')} value={summary ? <Money value={summary.thisMonth.salesSum} /> : '—'} sub={summary ? `${summary.thisMonth.soldQuantity} ${t('pcsShort')}` : undefined} />
           <StatRow icon={ShoppingBag} tone='bg-sky-50 text-sky-600'
-            label={t('purchasesThisMonthLabel')} value={summary ? formatMoney(summary.thisMonth.purchasesSum) : '—'} sub={summary?.thisMonth.purchasesCount} />
+            label={t('purchasesThisMonthLabel')} value={summary ? <Money value={summary.thisMonth.purchasesSum} /> : '—'} sub={summary?.thisMonth.purchasesCount} />
           <StatRow icon={Receipt} tone='bg-slate-100 text-slate-600'
-            label={t('expenseThisMonthLabel')} value={summary ? formatMoney(summary.thisMonth.expenseSum) : '—'} />
+            label={t('expenseThisMonthLabel')} value={summary ? <Money value={summary.thisMonth.expenseSum} /> : '—'} />
         </div>
       </div>
     </div>

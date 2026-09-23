@@ -5,6 +5,7 @@ import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Modal from '../components/Modal.jsx'
 import AdminProfileModal from '../components/AdminProfileModal.jsx'
 import PasswordInput from '../components/PasswordInput.jsx'
+import { usePersistedState } from '../lib/usePersistedState.js'
 
 const AVATAR_GRADIENTS = [
   'from-[#FF6B6B] to-[#FF3B30]', 'from-[#FF9F43] to-[#FF9500]', 'from-[#34C759] to-[#30B94D]',
@@ -21,7 +22,7 @@ const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.t
 const Admins = () => {
   const { admins, createAdmin, updateAdmin, deleteAdminAccount, branches, getAdminProfile } = useContext(DirectorContext)
   const { t } = useLanguage()
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = usePersistedState('director.admins.search', '')
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [viewingId, setViewingId] = useState(null)

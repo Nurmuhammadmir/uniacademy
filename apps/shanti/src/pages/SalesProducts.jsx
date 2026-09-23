@@ -7,7 +7,7 @@ import Modal from '../components/Modal.jsx'
 import Select from '../components/Select.jsx'
 import NumberInput from '../components/NumberInput.jsx'
 import Spinner from '../components/Spinner.jsx'
-import { formatMoney } from '../lib/format.js'
+import Money from '../components/Money.jsx'
 
 const RestockProductModal = ({ onClose }) => {
   const { products, restockProduct } = useContext(ShantiContext)
@@ -197,7 +197,7 @@ const ProductCard = ({ product, onOpen }) => (
     <Thumb url={product.imageUrl} size='w-12 h-12' />
     <span className='flex-1 min-w-0'>
       <p className='text-ink font-medium text-sm truncate'>{product.name}</p>
-      <p className='text-muted text-xs font-mono mt-0.5'>{formatMoney(product.price)} · {product.stock} {product.unit}</p>
+      <p className='text-muted text-xs font-mono mt-0.5'><Money value={product.price} /> · {product.stock} {product.unit}</p>
     </span>
   </button>
 )

@@ -3,7 +3,8 @@ import { SlidersHorizontal } from 'lucide-react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Select from '../components/Select.jsx'
-import { formatMoney } from '../lib/format.js'
+import Money from '../components/Money.jsx'
+import { formatQuantity } from '../lib/format.js'
 
 const DEFAULT_FILTERS = { clientId: '', category: '' }
 
@@ -11,14 +12,12 @@ const SalesDebtors = () => {
   const { clientCategories, clients, getSalesDebtors } = useContext(ShantiContext)
   const { t } = useLanguage()
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS)
   const [showFilters, setShowFilters] = useState(false)
   const [data, setData] = useState(null)
 
-  useEffect(() => { getSalesDebtors(appliedFilters).then(d => { if (d) setData(d) }) }, [appliedFilters])
+  useEffect(() => { getSalesDebtors(filters).then(d => { if (d) setData(d) }) }, [filters])
 
-  const applyFilters = (e) => { e.preventDefault(); setAppliedFilters(filters) }
-  const hasActiveFilters = appliedFilters.clientId || appliedFilters.category
+  const hasActiveFilters = filters.clientId || filters.category
 
   const totalDebt = (data?.debtors || []).reduce((sum, d) => sum + d.totalDebt, 0)
 
@@ -27,8 +26,16 @@ const SalesDebtors = () => {
       <div className='flex justify-between items-center mb-4 gap-3 flex-wrap'>
         <div className='bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 inline-block'>
           <p className='text-amber-700 text-[11px]'>{t('totalClientDebtLabel')}</p>
-          <p className='font-bold tracking-tight text-lg text-amber-700'>{data ? formatMoney(totalDebt) : '—'}</p>
+          <p className='font-bold tracking-tight text-lg text-amber-700'>{data ? <Money value={totalDebt} /> : '—'}</p>
         </div>
+        {data && data.totalQuantity?.length > 0 && (
+          <div className='bg-white border border-slate-100 rounded-2xl px-5 py-3 shadow-sm'>
+            <p className='text-muted text-[11px] leading-tight'>{t('totalQuantityLabel')}</p>
+            <p className='font-bold tracking-tight text-lg text-[#1D1D1F] leading-tight font-mono'>
+              {data.totalQuantity.map(q => `${formatQuantity(q.quantity)} ${q.unit}`).join(' · ')}
+            </p>
+          </div>
+        )}
         <button onClick={() => setShowFilters(v => !v)}
           className={`h-10 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors ${showFilters || hasActiveFilters ? 'bg-accent-soft text-accent' : 'bg-slate-100 text-slate-700'}`}>
           <SlidersHorizontal size={15} strokeWidth={1.75} /> {t('filterBtn')}
@@ -36,7 +43,7 @@ const SalesDebtors = () => {
       </div>
 
       {showFilters && (
-        <form onSubmit={applyFilters} className='flex flex-wrap gap-3 items-end mb-4 bg-white border border-slate-200/60 rounded-2xl p-4'>
+        <div className='flex flex-wrap gap-3 items-end mb-4 bg-white border border-slate-200/60 rounded-2xl p-4'>
           <div>
             <p className='text-xs text-muted mb-1'>{t('clientLabel')}</p>
             <Select forceSearch className='w-52' value={filters.clientId} onChange={(v) => setFilters({ ...filters, clientId: v })} placeholder={t('anyOption')}
@@ -47,13 +54,12 @@ const SalesDebtors = () => {
             <Select className='w-44' value={filters.category} onChange={(v) => setFilters({ ...filters, category: v })} placeholder={t('anyCategoryOption')}
               options={[{ value: '', label: t('anyCategoryOption') }, ...clientCategories.map(c => ({ value: c.name, label: c.name }))]} />
           </div>
-          <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium transition-colors'>{t('apply')}</button>
           {hasActiveFilters && (
-            <button type='button' onClick={() => { setFilters(DEFAULT_FILTERS); setAppliedFilters(DEFAULT_FILTERS) }} className='text-xs text-muted underline'>
+            <button type='button' onClick={() => setFilters(DEFAULT_FILTERS)} className='text-xs text-muted underline'>
               {t('clearFiltersBtn')}
             </button>
           )}
-        </form>
+        </div>
       )}
 
       <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
@@ -74,7 +80,7 @@ const SalesDebtors = () => {
                 <td className='px-4 py-3 text-muted'>{d.phone || '—'}</td>
                 <td className='px-4 py-3 text-muted'>{d.category}</td>
                 <td className='px-4 py-3 text-muted'>{d.saleCount}</td>
-                <td className='px-4 py-3 font-mono text-amber-700 font-semibold'>{formatMoney(d.totalDebt)}</td>
+                <td className='px-4 py-3 font-mono text-amber-700 font-semibold'><Money value={d.totalDebt} /></td>
               </tr>
             ))}
             {data && data.debtors.length === 0 && (
@@ -97,7 +103,7 @@ const SalesDebtors = () => {
                 <p className='font-semibold text-[#1D1D1F] text-sm truncate'>{d.name}</p>
                 <p className='text-xs text-slate-400 mt-1'>{d.category}{d.phone ? ` · ${d.phone}` : ''}</p>
               </div>
-              <p className='text-base font-bold text-amber-700 flex-shrink-0 ml-3'>{formatMoney(d.totalDebt)}</p>
+              <p className='text-base font-bold text-amber-700 flex-shrink-0 ml-3'><Money value={d.totalDebt} /></p>
             </div>
             <p className='text-xs text-muted mt-2'>{t('salesWithDebtLabel')}: {d.saleCount}</p>
           </div>

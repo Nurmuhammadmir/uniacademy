@@ -16,6 +16,7 @@ import SourceManagerModal from '../components/leads/SourceManagerModal.jsx'
 import AutoIntakeModal from '../components/leads/AutoIntakeModal.jsx'
 import FormModal from '../components/leads/FormModal.jsx'
 import ConvertLeadModal from '../components/leads/ConvertLeadModal.jsx'
+import { usePersistedState } from '../lib/usePersistedState.js'
 
 const GENERAL = 'general'
 // column-level action icons (lock, delete, add-form) stay near-invisible until hovered, Apple-style
@@ -350,8 +351,8 @@ const Leads = () => {
   const [subgroups, setSubgroups] = useState([])
   const [leads, setLeads] = useState([])
   const [loaded, setLoaded] = useState(false)
-  const [search, setSearch] = useState('')
-  const [sourceFilter, setSourceFilter] = useState('')
+  const [search, setSearch] = usePersistedState('admin.leads.search', '')
+  const [sourceFilter, setSourceFilter] = usePersistedState('admin.leads.sourceFilter', '')
   const [addingColumn, setAddingColumn] = useState(false)
   const [newColumnName, setNewColumnName] = useState('')
   const [showSourceManager, setShowSourceManager] = useState(false)

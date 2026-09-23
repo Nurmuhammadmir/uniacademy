@@ -2,6 +2,7 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import { LayoutDashboard, ShoppingCart, TrendingUp, Wallet2, Settings as SettingsIcon } from 'lucide-react'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
+import SidebarCalculator from './SidebarCalculator.jsx'
 
 const Sidebar = ({ open, onClose }) => {
   const { t, lang, setLang } = useLanguage()
@@ -34,6 +35,9 @@ const Sidebar = ({ open, onClose }) => {
               </NavLink>
             )
           })}
+          <div className='mt-2'>
+            <SidebarCalculator />
+          </div>
         </nav>
         <div className='pt-2 mt-2 border-t border-slate-100'>
           <NavLink to='/settings' onClick={onClose}

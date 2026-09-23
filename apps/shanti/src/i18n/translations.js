@@ -22,7 +22,7 @@ export const TRANSLATIONS = {
         methodClick: 'Click', methodPayme: 'Payme', methodApelsin: 'Apelsin',
 
         // navbar/balance
-        navDashboard: 'Дашборд', navPurchases: 'Покупки', navSales: 'Продажи', navFinance: 'Финансы', navSettings: 'Настройки',
+        navDashboard: 'Дашборд', navPurchases: 'Покупки', navSales: 'Продажи', navFinance: 'Финансы', navCalculator: 'Калькулятор', navSettings: 'Настройки',
         balanceCash: 'Наличные', balanceCard: 'Карта',
         balanceBankTransfer: 'На счету (от перечисления)', logoutBtn: 'Выйти',
 
@@ -62,7 +62,7 @@ export const TRANSLATIONS = {
         purchasesTotalLabel: 'Сумма покупок', filterBtn: 'Фильтр', newPurchaseBtn: 'Новая покупка', clearFiltersBtn: 'Сбросить фильтр',
         materialLabel: 'Сырьё', sellerLabel: 'Продавец', quantityShort: 'Кол-во',
         addCommentPlaceholder: '+ добавить', confirmDeletePurchase: 'Удалить эту покупку?',
-        noPurchasesYet: 'Покупок пока нет',
+        noPurchasesYet: 'Покупок пока нет', totalQuantityLabel: 'Общее количество',
         // SalesList
         salesTotalLabel: 'Сумма продаж', newSaleBtn: 'Новая продажа', clientLabel: 'Клиент', allPeriodLabel: 'За весь период',
         productLabel: 'Товар', itemsLabel: 'Товары', clientCategoryLabel: 'Категория клиента',
@@ -126,12 +126,13 @@ export const TRANSLATIONS = {
         confirmDeleteBalanceAdjustment: 'Удалить это пополнение?', confirmEditBalanceAdjustment: 'Изменить это пополнение?',
         chooseMaterialToRestockPlaceholder: 'Выберите сырьё', chooseProductPlaceholder: 'Выберите товар',
         quantityToAddLabel: 'Количество для добавления', settingsHint: 'Ручные корректировки для приведения платформы в соответствие с реальным бизнесом',
+        calcErrorLabel: 'Ошибка',
     },
     uz: {
         save: 'Saqlash', cancel: 'Bekor qilish', add: "Qo'shish", edit: "O'zgartirish", delete: "O'chirish",
         loading: 'Yuklanmoqda...', areYouSure: 'Ishonchingiz komilmi?', confirm: 'Tasdiqlash',
         dateCol: 'Sana', dateFromLabel: 'Sanadan', dateToLabel: 'Sanagacha',
-        categoryLabel: 'Kategoriya', amountLabel: "Miqdor", commentLabel: 'Izoh',
+        categoryLabel: 'Kategoriya', amountLabel: "Summa", commentLabel: 'Izoh',
         phoneLabel: 'Telefon', personNameLabel: 'Ism', itemNameLabel: 'Nomi', passwordLabel: 'Parol',
         otherCategory: 'Boshqa', anyOption: 'Har qanday', anyCategoryOption: 'Har qanday',
         chooseOption: 'Tanlang', notSpecified: "Ko'rsatilmagan", notFoundOption: 'Hech narsa topilmadi',
@@ -144,7 +145,7 @@ export const TRANSLATIONS = {
         methodCash: 'Naqd pul', methodCard: 'Karta', methodBankTransfer: "O'tkazma",
         methodClick: 'Click', methodPayme: 'Payme', methodApelsin: 'Apelsin',
 
-        navDashboard: 'Bosh sahifa', navPurchases: 'Xaridlar', navSales: 'Sotuvlar', navFinance: 'Moliya', navSettings: 'Sozlamalar',
+        navDashboard: 'Bosh sahifa', navPurchases: 'Xaridlar', navSales: 'Sotuvlar', navFinance: 'Moliya', navCalculator: 'Kalkulyator', navSettings: 'Sozlamalar',
         balanceCash: 'Naqd pul', balanceCard: 'Karta',
         balanceBankTransfer: "Hisobda (o'tkazmadan)", logoutBtn: 'Chiqish',
 
@@ -177,7 +178,7 @@ export const TRANSLATIONS = {
         salesTab: 'Sotuvlar', clientsTab: 'Mijozlar', productsTab: 'Mahsulotlar', debtorsTab: 'Qarzdorlar',
 
         purchasesTotalLabel: 'Xaridlar summasi', filterBtn: 'Filtr', newPurchaseBtn: 'Yangi xarid', clearFiltersBtn: 'Filtrni tozalash',
-        materialLabel: 'Xomashyo', sellerLabel: 'Sotuvchi', quantityShort: 'Miqdori',
+        materialLabel: 'Xomashyo', sellerLabel: 'Sotuvchi', quantityShort: 'Miqdori', totalQuantityLabel: 'Umumiy miqdor',
         addCommentPlaceholder: "+ qo'shish", confirmDeletePurchase: 'Bu xaridni o\'chirasizmi?',
         noPurchasesYet: "Hozircha xaridlar yo'q",
         salesTotalLabel: 'Sotuvlar summasi', newSaleBtn: 'Yangi sotuv', clientLabel: 'Mijoz', allPeriodLabel: "Butun davr uchun",
@@ -234,5 +235,6 @@ export const TRANSLATIONS = {
         confirmDeleteBalanceAdjustment: "Bu to'ldirishni o'chirasizmi?", confirmEditBalanceAdjustment: "Bu to'ldirishni o'zgartirasizmi?",
         chooseMaterialToRestockPlaceholder: "Xomashyoni tanlang", chooseProductPlaceholder: 'Mahsulotni tanlang',
         quantityToAddLabel: "Qo'shiladigan miqdor", settingsHint: 'Platformani haqiqiy biznes holatiga moslashtirish uchun qo\'lda tuzatishlar',
+        calcErrorLabel: 'Xato',
     },
 }

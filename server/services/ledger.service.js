@@ -52,9 +52,8 @@ export const computePeriodCost = (group, windowStart) => {
     const monthStart = new Date(Date.UTC(windowStart.getUTCFullYear(), windowStart.getUTCMonth(), 1))
     const naturalMonthEnd = endOfMonthUTC(windowStart)
     // the group's own end date can cut this chunk short too (its billing window ending mid-month) -
-    // same partial-chunk treatment as joining mid-month, see reverseUnusedPeriod's day-based version
-    // of this same idea for the "leaving early" side, which still prorates by days since it works off
-    // an already-charged, already-fixed amount rather than re-deriving a lesson ratio from scratch.
+    // same partial-chunk treatment as joining mid-month, see reverseUnusedPeriod for the "leaving
+    // early" side of this same idea, which now also prorates by lessons, not calendar days.
     const windowEnd = (group.endDate && group.endDate < naturalMonthEnd) ? group.endDate : naturalMonthEnd
     const isFullMonth = windowStart.getUTCDate() === 1 && windowEnd.getTime() === naturalMonthEnd.getTime()
 

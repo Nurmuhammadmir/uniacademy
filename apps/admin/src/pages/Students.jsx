@@ -14,6 +14,8 @@ import ReceiptModal from '../components/ReceiptModal.jsx'
 import MoneyInput from '../components/MoneyInput.jsx'
 import { formatMoney, groupLabel } from '../lib/format.js'
 import { todayISO, formatDateTime, lastDayOfMonthISO } from '../lib/date.js'
+import { usePersistedState } from '../lib/usePersistedState.js'
+import { useScrollRestore } from '../lib/useScrollRestore.js'
 
 // last 12 calendar months (this one first), as 'YYYY-MM' strings - backs the debtors period filter's
 // dropdown. Same UTC-anchored construction Attendance.jsx's own monthOptions() uses, so "this month"
@@ -187,19 +189,21 @@ const Students = () => {
   const { t } = useLanguage()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [search, setSearch] = useState('')
-  const [languageFilter, setLanguageFilter] = useState('')
-  const [levelFilter, setLevelFilter] = useState('')
-  const [statusTab, setStatusTab] = useState('active')
+  // sessionStorage-backed (see usePersistedState) so leaving for a student's profile (or any other
+  // page) and coming back doesn't silently reset whatever search/filter/tab was set up.
+  const [search, setSearch] = usePersistedState('admin.students.search', '')
+  const [languageFilter, setLanguageFilter] = usePersistedState('admin.students.languageFilter', '')
+  const [levelFilter, setLevelFilter] = usePersistedState('admin.students.levelFilter', '')
+  const [statusTab, setStatusTab] = usePersistedState('admin.students.statusTab', 'active')
   // linked from the Finance page's "Debtors" summary card (/?debtors=1) - reads once on landing so
   // that link actually pre-filters instead of just navigating to a plain, unfiltered list
-  const [debtorsOnly, setDebtorsOnly] = useState(() => searchParams.get('debtors') === '1')
+  const [debtorsOnly, setDebtorsOnly] = usePersistedState('admin.students.debtorsOnly', () => searchParams.get('debtors') === '1')
   // '' = all time (default - the real, current Account.balance every other screen also uses).
   // A specific 'YYYY-MM' switches the debtors filter/count to that month's own billed-and-still-unpaid
   // amount instead (see computeOwedByPeriod on the server) - fetched into periodOwedMap on demand,
   // kept OUT of the shared `students` list so nothing else on this page (the balance column, the
   // payment modal's default amount) is affected by which month happens to be selected here.
-  const [debtPeriod, setDebtPeriod] = useState('')
+  const [debtPeriod, setDebtPeriod] = usePersistedState('admin.students.debtPeriod', '')
   const [periodOwedMap, setPeriodOwedMap] = useState(null)
   const [loadingPeriodOwed, setLoadingPeriodOwed] = useState(false)
 
@@ -234,7 +238,6 @@ const Students = () => {
   const [showDiscountHistory, setShowDiscountHistory] = useState(false)
   const [discountHistory, setDiscountHistory] = useState(null)
   const [loadingDiscountHistory, setLoadingDiscountHistory] = useState(false)
-  const scrollRestoredRef = useRef(false)
 
   // "who got a discount, how much" summary inside the Discount section - fetched lazily the first
   // time it's opened, refetched after any delete so the total/list stay accurate
@@ -256,25 +259,7 @@ const Students = () => {
     if (ok) loadDiscountHistory()
   }
 
-  // confirmed real annoyance: with 100+ students, opening student #70's profile then going back
-  // used to always land back at the very top of the list, forcing a long re-scroll to find where
-  // you were. Continuously remembers scroll position while on this page (sessionStorage, so it only
-  // survives this tab/session, not forever) and restores it once the list has something to scroll
-  // to - after coming back from a profile, or after a fresh page load/refresh.
-  useEffect(() => {
-    const handleScroll = () => sessionStorage.setItem('studentsListScrollY', String(window.scrollY))
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  useEffect(() => {
-    if (scrollRestoredRef.current || students.length === 0) return
-    const saved = sessionStorage.getItem('studentsListScrollY')
-    if (saved) {
-      scrollRestoredRef.current = true
-      requestAnimationFrame(() => window.scrollTo(0, Number(saved)))
-    }
-  }, [students.length])
+  useScrollRestore('studentsListScrollY', students.length > 0)
 
   const submitCreate = async (e) => {
     e.preventDefault()

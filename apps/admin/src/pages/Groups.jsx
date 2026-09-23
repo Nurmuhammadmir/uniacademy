@@ -11,6 +11,8 @@ import Select from '../components/Select.jsx'
 import TimePicker from '../components/TimePicker.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import { groupLabel, scheduleDaysLabel, formatMoney } from '../lib/format.js'
+import { usePersistedState } from '../lib/usePersistedState.js'
+import { useScrollRestore } from '../lib/useScrollRestore.js'
 
 const SCHEDULES = ['MON_WED_FRI', 'TUE_THU_SAT']
 const WEEKDAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
@@ -104,13 +106,15 @@ const Groups = () => {
   const { t } = useLanguage()
   const navigate = useNavigate()
 
-  const [statusTab, setStatusTab] = useState('active')
-  const [nameSearch, setNameSearch] = useState('')
-  const [teacherFilter, setTeacherFilter] = useState('')
-  const [languageFilter, setLanguageFilter] = useState('')
-  const [daysFilter, setDaysFilter] = useState('')
-  const [dateFromFilter, setDateFromFilter] = useState('')
-  const [dateToFilter, setDateToFilter] = useState('')
+  // sessionStorage-backed (see usePersistedState) so leaving for a group's detail page (or any other
+  // page) and coming back doesn't silently reset whatever search/filter/tab was set up.
+  const [statusTab, setStatusTab] = usePersistedState('admin.groups.statusTab', 'active')
+  const [nameSearch, setNameSearch] = usePersistedState('admin.groups.nameSearch', '')
+  const [teacherFilter, setTeacherFilter] = usePersistedState('admin.groups.teacherFilter', '')
+  const [languageFilter, setLanguageFilter] = usePersistedState('admin.groups.languageFilter', '')
+  const [daysFilter, setDaysFilter] = usePersistedState('admin.groups.daysFilter', '')
+  const [dateFromFilter, setDateFromFilter] = usePersistedState('admin.groups.dateFromFilter', '')
+  const [dateToFilter, setDateToFilter] = usePersistedState('admin.groups.dateToFilter', '')
   const [showFilters, setShowFilters] = useState(true)
   const [visibleCols, setVisibleCols] = useState({ dates: true, room: true })
 
@@ -128,6 +132,7 @@ const Groups = () => {
   const [suggestion, setSuggestion] = useState(null)
 
   useEffect(() => { if (form.languageId) getLevels(form.languageId) }, [form.languageId])
+  useScrollRestore('admin.groupsListScrollY', groups.length > 0)
 
   // price is set per COURSE (per language), not per level - shown as a reference the moment a
   // language is picked, so the admin knows what this group's price will be before submitting (it's

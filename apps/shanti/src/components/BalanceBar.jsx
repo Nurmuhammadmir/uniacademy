@@ -2,7 +2,7 @@ import React, { useContext } from 'react'
 import { Wallet, CreditCard, Landmark } from 'lucide-react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
-import { formatMoney } from '../lib/format.js'
+import Money from './Money.jsx'
 
 // always-visible real cash position by payment method - a sale's paidAmount plus any debt-collection
 // payment is money in, a purchase's paidAmount is money out, regardless of the debt still outstanding
@@ -30,7 +30,7 @@ const BalanceBar = () => {
             <div className='min-w-0'>
               <p className='text-[11px] text-muted leading-tight truncate'>{label}</p>
               <p className={`text-lg font-bold font-mono leading-tight ${balance ? (value < 0 ? 'text-rose-600' : 'text-[#1D1D1F]') : 'text-muted'}`}>
-                {balance ? formatMoney(value) : '—'}
+                {balance ? <Money value={value} /> : '—'}
               </p>
             </div>
           </div>

@@ -9,6 +9,7 @@ import NumberInput from '../components/NumberInput.jsx'
 import { methodDisplay } from '../components/MethodPicker.jsx'
 import { confirm } from '../lib/confirm.js'
 import { formatMoney } from '../lib/format.js'
+import Money from '../components/Money.jsx'
 import { firstOfMonthISO, todayISO, formatDateTime } from '../lib/date.js'
 import NewPaymentModal from './NewPaymentModal.jsx'
 
@@ -19,7 +20,6 @@ const FinanceReceipts = () => {
   const { t } = useLanguage()
   const METHOD_LABEL = { cash: t('methodCash'), card: t('methodCard'), click: t('methodClick'), bank_transfer: t('methodBankTransfer'), payme: t('methodPayme'), apelsin: t('methodApelsin') }
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS)
   const [data, setData] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showNew, setShowNew] = useState(false)
@@ -27,11 +27,9 @@ const FinanceReceipts = () => {
   const [period, setPeriod] = useState('month')
   const [chart, setChart] = useState(null)
 
-  const load = () => getPaymentsOverview(appliedFilters).then(d => { if (d) setData(d) })
-  useEffect(() => { load() }, [appliedFilters])
+  const load = () => getPaymentsOverview(filters).then(d => { if (d) setData(d) })
+  useEffect(() => { load() }, [filters])
   useEffect(() => { getPaymentsChart(period).then(d => { if (d) setChart(d) }) }, [period])
-
-  const applyFilters = (e) => { e.preventDefault(); setAppliedFilters(filters) }
 
   const handleDelete = async (id) => {
     if (!(await confirm(t('confirmDeletePayment')))) return
@@ -43,8 +41,8 @@ const FinanceReceipts = () => {
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5'>
         <div className='bg-white border border-slate-100 rounded-2xl px-5 py-4 shadow-sm'>
           <p className='text-muted text-[11px] leading-tight'>{t('receiptsTotalLabel')}</p>
-          <p className='font-bold tracking-tight text-2xl text-emerald-600 leading-tight mt-1'>{data ? formatMoney(data.totalAmount) : '—'}</p>
-          <p className='text-[10px] text-slate-400 mt-1'>{appliedFilters.dateFrom} — {appliedFilters.dateTo}</p>
+          <p className='font-bold tracking-tight text-2xl text-emerald-600 leading-tight mt-1'>{data ? <Money value={data.totalAmount} /> : '—'}</p>
+          <p className='text-[10px] text-slate-400 mt-1'>{filters.dateFrom} — {filters.dateTo}</p>
         </div>
 
         <div className='lg:col-span-2 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm'>
@@ -85,7 +83,7 @@ const FinanceReceipts = () => {
       </div>
 
       {showFilters && (
-        <form onSubmit={applyFilters} className='flex flex-wrap gap-3 items-end mb-4 bg-white border border-slate-200/60 rounded-2xl p-4'>
+        <div className='flex flex-wrap gap-3 items-end mb-4 bg-white border border-slate-200/60 rounded-2xl p-4'>
           <div>
             <p className='text-xs text-muted mb-1'>{t('dateFromLabel')}</p>
             <DatePicker className='w-36' value={filters.dateFrom} onChange={(v) => setFilters({ ...filters, dateFrom: v })} />
@@ -112,8 +110,7 @@ const FinanceReceipts = () => {
               <NumberInput value={filters.amountMax} onChange={v => setFilters({ ...filters, amountMax: v })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
             </div>
           </div>
-          <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium transition-colors'>{t('apply')}</button>
-        </form>
+        </div>
       )}
 
       <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
@@ -133,7 +130,7 @@ const FinanceReceipts = () => {
               <tr key={p._id} className='border-b border-hairline last:border-0'>
                 <td className='px-4 py-3 text-muted whitespace-nowrap'>{formatDateTime(p.date)}</td>
                 <td className='px-4 py-3 text-ink'>{p.clientId?.name || '—'}</td>
-                <td className='px-4 py-3 font-mono text-emerald-600 font-semibold'>{formatMoney(p.amount)}</td>
+                <td className='px-4 py-3 font-mono text-emerald-600 font-semibold'><Money value={p.amount} /></td>
                 <td className='px-4 py-3 text-muted' title={methodDisplay(p, METHOD_LABEL).title}>{methodDisplay(p, METHOD_LABEL).label}</td>
                 <td className='px-4 py-3 text-muted max-w-[220px] truncate' title={p.comment}>{p.comment || '—'}</td>
                 <td className='px-4 py-3 text-right whitespace-nowrap'>
@@ -162,7 +159,7 @@ const FinanceReceipts = () => {
                 <p className='font-semibold text-[#1D1D1F] text-sm truncate'>{p.clientId?.name || '—'}</p>
                 <p className='text-xs text-slate-400 mt-1'>{formatDateTime(p.date)}</p>
               </div>
-              <p className='text-base font-bold text-emerald-600 flex-shrink-0 ml-3'>{formatMoney(p.amount)}</p>
+              <p className='text-base font-bold text-emerald-600 flex-shrink-0 ml-3'><Money value={p.amount} /></p>
             </div>
             <div className='flex gap-3 mt-2'>
               <button onClick={() => setEditingPayment(p)} className='text-xs text-accent font-medium'>{t('edit')}</button>

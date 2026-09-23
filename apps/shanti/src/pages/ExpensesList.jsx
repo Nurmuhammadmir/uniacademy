@@ -10,6 +10,7 @@ import NumberInput from '../components/NumberInput.jsx'
 import { methodDisplay } from '../components/MethodPicker.jsx'
 import { confirm } from '../lib/confirm.js'
 import { formatMoney } from '../lib/format.js'
+import Money from '../components/Money.jsx'
 import { firstOfMonthISO, todayISO, formatDateTime } from '../lib/date.js'
 import NewExpenseModal from './NewExpenseModal.jsx'
 
@@ -30,7 +31,6 @@ const ExpensesList = () => {
   const [editingCategory, setEditingCategory] = useState(null)
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS)
   const [data, setData] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showNew, setShowNew] = useState(false)
@@ -38,12 +38,10 @@ const ExpensesList = () => {
   const [period, setPeriod] = useState('month')
   const [chart, setChart] = useState(null)
 
-  const effectiveFilters = { ...appliedFilters, category: categoryFilter || appliedFilters.category }
+  const effectiveFilters = { ...filters, category: categoryFilter || filters.category }
   const load = () => getExpensesOverview(effectiveFilters).then(d => { if (d) setData(d) })
-  useEffect(() => { load() }, [appliedFilters, categoryFilter])
+  useEffect(() => { load() }, [filters, categoryFilter])
   useEffect(() => { getExpensesChart(period).then(d => { if (d) setChart(d) }) }, [period])
-
-  const applyFilters = (e) => { e.preventDefault(); setAppliedFilters(filters) }
 
   const submitNewCategory = async (e) => {
     e.preventDefault()
@@ -65,8 +63,8 @@ const ExpensesList = () => {
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5'>
         <div className='bg-white border border-slate-100 rounded-2xl px-5 py-4 shadow-sm'>
           <p className='text-muted text-[11px] leading-tight'>{t('expensesTotalLabel')}</p>
-          <p className='font-bold tracking-tight text-2xl text-rose-600 leading-tight mt-1'>{data ? formatMoney(data.totalAmount) : '—'}</p>
-          <p className='text-[10px] text-slate-400 mt-1'>{appliedFilters.dateFrom} — {appliedFilters.dateTo}</p>
+          <p className='font-bold tracking-tight text-2xl text-rose-600 leading-tight mt-1'>{data ? <Money value={data.totalAmount} /> : '—'}</p>
+          <p className='text-[10px] text-slate-400 mt-1'>{filters.dateFrom} — {filters.dateTo}</p>
         </div>
 
         <div className='lg:col-span-2 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm'>
@@ -121,7 +119,7 @@ const ExpensesList = () => {
       </div>
 
       {showFilters && (
-        <form onSubmit={applyFilters} className='flex flex-wrap gap-3 items-end mb-4 bg-white border border-slate-200/60 rounded-2xl p-4'>
+        <div className='flex flex-wrap gap-3 items-end mb-4 bg-white border border-slate-200/60 rounded-2xl p-4'>
           <div>
             <p className='text-xs text-muted mb-1'>{t('dateFromLabel')}</p>
             <DatePicker className='w-36' value={filters.dateFrom} onChange={(v) => setFilters({ ...filters, dateFrom: v })} />
@@ -138,8 +136,7 @@ const ExpensesList = () => {
               <NumberInput value={filters.amountMax} onChange={v => setFilters({ ...filters, amountMax: v })} className='px-3 py-2 rounded-lg bg-bg border border-hairline text-sm w-24' />
             </div>
           </div>
-          <button type='submit' className='px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium transition-colors'>{t('apply')}</button>
-        </form>
+        </div>
       )}
 
       <div className='hidden md:block bg-bg-elevated border border-hairline rounded-2xl overflow-hidden'>
@@ -161,7 +158,7 @@ const ExpensesList = () => {
                 <td className='px-4 py-3 text-muted whitespace-nowrap'>{formatDateTime(e.date)}</td>
                 <td className='px-4 py-3 text-ink'>{e.category}</td>
                 <td className='px-4 py-3 text-muted'>{e.sellerId?.name || '—'}</td>
-                <td className='px-4 py-3 font-mono text-rose-600 font-semibold'>{formatMoney(e.amount)}</td>
+                <td className='px-4 py-3 font-mono text-rose-600 font-semibold'><Money value={e.amount} /></td>
                 <td className='px-4 py-3 text-muted' title={methodDisplay(e, METHOD_LABEL).title}>{methodDisplay(e, METHOD_LABEL).label}</td>
                 <td className='px-4 py-3 text-muted max-w-[200px] truncate' title={e.comment}>{e.comment || '—'}</td>
                 <td className='px-4 py-3 text-right whitespace-nowrap'>
@@ -190,7 +187,7 @@ const ExpensesList = () => {
                 <p className='font-semibold text-[#1D1D1F] text-sm truncate'>{e.category}{e.sellerId ? ` · ${e.sellerId.name}` : ''}</p>
                 <p className='text-xs text-slate-400 mt-1'>{formatDateTime(e.date)}</p>
               </div>
-              <p className='text-base font-bold text-rose-600 flex-shrink-0 ml-3'>{formatMoney(e.amount)}</p>
+              <p className='text-base font-bold text-rose-600 flex-shrink-0 ml-3'><Money value={e.amount} /></p>
             </div>
             <div className='flex gap-3 mt-2'>
               <button onClick={() => setEditingExpense(e)} className='text-xs text-accent font-medium'>{t('edit')}</button>

@@ -7,6 +7,7 @@ import TeacherProfileModal from '../components/TeacherProfileModal.jsx'
 import PasswordInput from '../components/PasswordInput.jsx'
 import DatePicker from '../components/DatePicker.jsx'
 import { todayISO } from '../lib/date.js'
+import { usePersistedState } from '../lib/usePersistedState.js'
 
 const AVATAR_GRADIENTS = [
   'from-[#FF6B6B] to-[#FF3B30]', 'from-[#FF9F43] to-[#FF9500]', 'from-[#34C759] to-[#30B94D]',
@@ -23,9 +24,9 @@ const initials = (name) => name.trim().split(/\s+/).slice(0, 2).map(w => w[0]?.t
 const Teachers = () => {
   const { teachers, createTeacher, updateTeacher, deleteTeacherAccount, branches, getTeacherProfile } = useContext(DirectorContext)
   const { t } = useLanguage()
-  const [search, setSearch] = useState('')
-  const [branchFilter, setBranchFilter] = useState('')
-  const [sortBy, setSortBy] = useState('students') // students | recent | name
+  const [search, setSearch] = usePersistedState('director.teachers.search', '')
+  const [branchFilter, setBranchFilter] = usePersistedState('director.teachers.branchFilter', '')
+  const [sortBy, setSortBy] = usePersistedState('director.teachers.sortBy', 'students') // students | recent | name
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState(null)
   const [viewingId, setViewingId] = useState(null)

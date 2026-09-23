@@ -4,6 +4,7 @@ import Group from "../models/Group.js"
 import Account from "../models/Account.js"
 import LedgerEntry from "../models/LedgerEntry.js"
 import { getOrCreateAccount, postEntry, computePeriodCost, dateOnlyUTC, startOfNextMonthUTC, formatAmount } from "./ledger.service.js"
+import { countScheduledDaysInRange } from "./scheduleDays.service.js"
 
 // the kinds computeCoveredDebtPeriodsBatch (the ONLY teacher-revenue/salary-facing consumer of this
 // fold logic) is allowed to ever see - deliberately excludes 'opening_balance' (see LedgerEntry.js's
@@ -258,16 +259,27 @@ export const recognizeEnrollmentDebt = async (student, course, createdBy, enroll
 }
 
 // called when an admin removes a student from a group (see adminController's removeStudentFromGroup)
-// - confirmed spec: the unused days of whatever billing period is currently in progress for this
-// course get returned to the student's balance, not kept as if the full period had been taught.
+// - confirmed spec: the unused portion of whatever billing period is currently in progress for this
+// course gets returned to the student's balance, not kept as if the full period had been taught.
 // recognizeNextPeriod never posts a future period in advance (its own due-date guard), so at most
 // ONE debt entry can ever have periodStart <= today <= periodEnd for a course at any moment - that's
-// the one this reverses, prorated by the days strictly after today (today itself still counts as
-// attended). Safe to call unconditionally: no-ops if there's no currently-open period, or if today
-// is already the period's last day (nothing left to return).
+// the one this reverses. Safe to call unconditionally: no-ops if there's no currently-open period, or
+// if today is already the period's last day (nothing left to return).
+//
+// Prorated by ACTUAL SCHEDULED LESSONS strictly after today (today itself still counts as attended),
+// out of the total lessons the whole period was originally priced for - the same lesson-based
+// proration computePeriodCost uses on the "joining mid-month" side (see its own comment for the full
+// reasoning), NOT calendar days. Confirmed real bug, found live: this used to prorate by calendar
+// days instead, so two students removed on the same calendar date got refunded the same fraction of
+// their period even when one group's schedule had noticeably more lessons left in it than the
+// other's - e.g. a group meeting 14 times that month refunded the same % as one meeting only 13
+// times, even though a "day" is worth less of the group's actual teaching when there are more lessons
+// packed into it. Lesson-based proration is the one consistent rule everywhere now: a cancelled/
+// rescheduled lesson doesn't retroactively change anything (the schedule, not attendance, decides).
+//
 // asOf lets a freeze be backdated (confirmed spec: "freeze as of last Tuesday", not just "freeze
 // starting right now") - every date this function would otherwise call "today" (which period counts
-// as currently open, how many days are unused, what date the reversal itself is dated) uses asOf
+// as currently open, how many lessons are unused, what date the reversal itself is dated) uses asOf
 // instead when given. Defaults to the real today, so every other caller (removeStudentFromGroup,
 // a same-day freeze) is completely unaffected.
 export const reverseUnusedPeriod = async (student, course, group, createdBy = null, reason = 'Removed from group', asOf = null) => {
@@ -283,19 +295,21 @@ export const reverseUnusedPeriod = async (student, course, group, createdBy = nu
     // confirmed real bug, found live: freezing a student then also removing them from the group (or
     // any other double call to this function before a new debt gets recognized for the same period)
     // found this SAME still-open debt entry both times and reversed its unused tail twice, refunding
-    // the student for days they'd already been refunded for. The original debt entry is immutable so
-    // it can't record "already partially reversed" on itself - checking for an existing debt_reversal
-    // pointing back at it (sourceId, set below) is the only way to make this idempotent.
+    // the student for lessons they'd already been refunded for. The original debt entry is immutable
+    // so it can't record "already partially reversed" on itself - checking for an existing
+    // debt_reversal pointing back at it (sourceId, set below) is the only way to make this idempotent.
     const alreadyReversed = await LedgerEntry.exists({ accountId: studentAccount._id, kind: 'debt_reversal', sourceId: currentDebt._id })
     if (alreadyReversed) return null
 
     const periodStart = dateOnlyUTC(currentDebt.periodStart)
     const periodEnd = dateOnlyUTC(currentDebt.periodEnd)
-    const totalDays = Math.round((periodEnd - periodStart) / 86400000) + 1
-    const unusedDays = Math.round((periodEnd - today) / 86400000)
-    if (unusedDays <= 0) return null
+    const dayAfterToday = new Date(today); dayAfterToday.setUTCDate(dayAfterToday.getUTCDate() + 1)
 
-    const reversalAmount = Math.round(currentDebt.amount * unusedDays / totalDays)
+    const totalLessons = countScheduledDaysInRange(group, periodStart, periodEnd)
+    const unusedLessons = countScheduledDaysInRange(group, dayAfterToday, periodEnd)
+    if (totalLessons <= 0 || unusedLessons <= 0) return null
+
+    const reversalAmount = Math.round(currentDebt.amount * unusedLessons / totalLessons)
     if (reversalAmount <= 0) return null
 
     const entry = await postEntry({
@@ -308,7 +322,7 @@ export const reverseUnusedPeriod = async (student, course, group, createdBy = nu
             teacherId: group.teacherId, periodStart: currentDebt.periodStart, periodEnd: currentDebt.periodEnd,
             sourceType: 'ledgerEntry', sourceId: currentDebt._id,
         },
-        description: `${reason} ${today.toISOString().slice(0, 10)} - ${unusedDays}/${totalDays} unused days of ${formatAmount(currentDebt.amount)} returned = ${formatAmount(reversalAmount)}`,
+        description: `${reason} ${today.toISOString().slice(0, 10)} - ${unusedLessons}/${totalLessons} unused lessons of ${formatAmount(currentDebt.amount)} returned = ${formatAmount(reversalAmount)}`,
         createdBy,
         date: today,
     })

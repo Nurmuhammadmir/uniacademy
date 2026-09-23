@@ -13,6 +13,7 @@ import Logo from '../components/Logo.jsx'
 import SourceManagerModal from '../components/leads/SourceManagerModal.jsx'
 import AutoIntakeModal from '../components/leads/AutoIntakeModal.jsx'
 import FormModal from '../components/leads/FormModal.jsx'
+import { usePersistedState } from '../lib/usePersistedState.js'
 
 const GENERAL = 'general'
 const ICON_BTN = 'plain text-slate-500 dark:text-[#94A3B8] opacity-40 hover:opacity-100 transition-opacity'
@@ -290,8 +291,8 @@ const LeadsBoard = ({ branchId, t }) => {
   const [subgroups, setSubgroups] = useState([])
   const [leads, setLeads] = useState([])
   const [loaded, setLoaded] = useState(false)
-  const [search, setSearch] = useState('')
-  const [sourceFilter, setSourceFilter] = useState('')
+  const [search, setSearch] = usePersistedState('director.leads.search', '')
+  const [sourceFilter, setSourceFilter] = usePersistedState('director.leads.sourceFilter', '')
   const [addingColumn, setAddingColumn] = useState(false)
   const [newColumnName, setNewColumnName] = useState('')
   const [showSourceManager, setShowSourceManager] = useState(false)

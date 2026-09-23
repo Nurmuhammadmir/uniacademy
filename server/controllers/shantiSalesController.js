@@ -278,10 +278,24 @@ const buildSaleMatch = async ({ dateFrom, dateTo, category, clientId, productId,
 
 export const getSalesOverview = async (req, res) => {
     try {
+        const { productId } = req.query
         const match = await buildSaleMatch(req.query)
         const sales = await ShantiSale.find(match).sort({ date: -1 }).populate('clientId', 'name category').populate('items.productId', 'name unit').populate('createdBy', 'name').lean()
         const totalAmount = sales.reduce((sum, s) => sum + s.amount, 0)
-        res.json({ sales, totalAmount })
+        // grouped by unit, not a single number - a sale can carry several products with different
+        // units, and buildSaleMatch's productId filter only narrows WHICH sales come back (a sale
+        // with a matching item still brings its other items along), so quantity itself is summed
+        // here, per unit, counting only items that match productId when that filter is set
+        const quantityByUnit = {}
+        for (const s of sales) {
+            for (const item of s.items) {
+                if (productId && String(item.productId?._id) !== String(productId)) continue
+                const unit = item.productId?.unit || ''
+                quantityByUnit[unit] = (quantityByUnit[unit] || 0) + item.quantity
+            }
+        }
+        const totalQuantity = Object.entries(quantityByUnit).map(([unit, quantity]) => ({ unit, quantity }))
+        res.json({ sales, totalAmount, totalQuantity })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
@@ -301,7 +315,26 @@ export const getSalesDebtors = async (req, res) => {
             .map(c => ({ clientId: c._id, name: c.name, phone: c.phone, category: c.category, ...debtMap.get(String(c._id)) }))
             .map(d => ({ ...d, totalDebt: d.debt }))
             .sort((a, b) => b.totalDebt - a.totalDebt)
-        res.json({ debtors })
+
+        // quantity behind these debtors' unpaid sales, grouped by unit - the debt map above nets
+        // against payments (not tracked per item), so this sums every item on every still-unpaid
+        // sale (amount > paidAmount) belonging to one of the listed debtor clients, same "debt"
+        // definition PurchaseDebts already uses for purchases
+        const debtorIds = debtors.map(d => d.clientId)
+        // 0.0001 tolerance, not a strict $gt, so a fully-paid sale with sub-cent float residue
+        // doesn't get counted here either (same reasoning as PurchaseDebts' own $expr filter)
+        const unpaidSales = await ShantiSale.find({ clientId: { $in: debtorIds }, $expr: { $gt: [{ $subtract: ['$amount', '$paidAmount'] }, 0.0001] } })
+            .populate('items.productId', 'unit').lean()
+        const quantityByUnit = {}
+        for (const s of unpaidSales) {
+            for (const item of s.items) {
+                const unit = item.productId?.unit || ''
+                quantityByUnit[unit] = (quantityByUnit[unit] || 0) + item.quantity
+            }
+        }
+        const totalQuantity = Object.entries(quantityByUnit).map(([unit, quantity]) => ({ unit, quantity }))
+
+        res.json({ debtors, totalQuantity })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
