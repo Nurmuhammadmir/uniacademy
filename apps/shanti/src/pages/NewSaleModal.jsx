@@ -10,7 +10,7 @@ import Spinner from '../components/Spinner.jsx'
 import NumberInput from '../components/NumberInput.jsx'
 import MethodPicker, { isMethodSplitValid } from '../components/MethodPicker.jsx'
 import { confirm } from '../lib/confirm.js'
-import { formatMoney } from '../lib/format.js'
+import { formatMoney, formatPrice } from '../lib/format.js'
 import { todayISO } from '../lib/date.js'
 
 const emptyLine = () => ({ productId: '', quantity: '', price: '' })
@@ -154,7 +154,7 @@ const NewSaleModal = ({ sale, onClose, onCreated }) => {
                 <div className='flex gap-2 items-center'>
                   <NumberInput placeholder={t('quantityShort')} value={line.quantity} onChange={v => setBonusLine(idx, { quantity: v })} className='flex-1 sm:flex-none sm:w-24 min-w-0 px-2 py-2 rounded-lg bg-bg border border-hairline text-sm' />
                   <div title={t('bonusPriceReadonlyHint')} className={`flex-1 sm:flex-none sm:w-28 min-w-0 px-2 py-2 rounded-lg bg-amber-100/60 border border-amber-200 text-sm font-mono text-center select-none truncate ${line.productId && !bonusUnitPrice(line.productId) ? 'text-rose-600' : 'text-amber-800'}`}>
-                    {line.productId ? (bonusUnitPrice(line.productId) ? formatMoney(bonusUnitPrice(line.productId)) : '—') : t('priceLabel')}
+                    {line.productId ? (bonusUnitPrice(line.productId) ? formatPrice(bonusUnitPrice(line.productId)) : '—') : t('priceLabel')}
                   </div>
                   <button type='button' onClick={() => removeBonusLine(idx)} className='plain w-8 h-8 rounded-lg flex items-center justify-center text-muted hover:text-rose-500 hover:bg-rose-50 flex-shrink-0'>
                     <X size={15} strokeWidth={1.5} />
@@ -166,7 +166,7 @@ const NewSaleModal = ({ sale, onClose, onCreated }) => {
               <button type='button' onClick={addBonusLine} className='plain text-amber-600 text-sm font-medium flex items-center gap-1'>
                 <Plus size={14} strokeWidth={2} /> {t('addItemBtn')}
               </button>
-              {bonusCost > 0 && <p className='text-xs font-semibold text-amber-700'>{t('bonusCostTotal', { total: formatMoney(bonusCost) })}</p>}
+              {bonusCost > 0 && <p className='text-xs font-semibold text-amber-700'>{t('bonusCostTotal', { total: formatPrice(bonusCost) })}</p>}
             </div>
           </div>
         )}

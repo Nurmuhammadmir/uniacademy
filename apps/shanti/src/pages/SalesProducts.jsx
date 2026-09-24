@@ -195,7 +195,7 @@ const ProductCard = ({ product, onOpen }) => (
     <Thumb url={product.imageUrl} size='w-12 h-12' />
     <span className='flex-1 min-w-0'>
       <p className='text-ink font-medium text-sm truncate'>{product.name}</p>
-      <p className='text-muted text-xs font-mono mt-0.5'><Money value={product.price} /> · {product.stock} {product.unit}</p>
+      <p className='text-muted text-xs font-mono mt-0.5'><Money value={product.price} precise /> · {product.stock} {product.unit}</p>
     </span>
   </button>
 )

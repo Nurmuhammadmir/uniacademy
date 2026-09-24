@@ -8,6 +8,14 @@ export const formatMoney = (n) => {
     return `${sign}${digits}$`
 }
 
+// same "$" suffix as formatMoney but keeps cents (up to 2 decimals, trailing zeros trimmed). Use for
+// per-unit prices: those are routinely fractional dollars (e.g. 1.85$/kg), and formatMoney's whole-
+// dollar rounding would show that as "2$" - a price that doesn't match the product's real one.
+export const formatPrice = (n) => {
+    if (n === null || n === undefined || Number.isNaN(n)) return '—'
+    return `${formatQuantity(n)}$`
+}
+
 // caps to 2 decimal places (trimming trailing zeros) and comma-groups the integer part - summed
 // quantities otherwise carry raw floating-point noise (e.g. 203220.65000000005)
 export const formatQuantity = (n) => {

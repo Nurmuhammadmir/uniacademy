@@ -70,7 +70,9 @@ const SalesBonuses = () => {
 
   const hasActiveFilters = Object.values(filters).some(Boolean)
   const loading = !data
-  const cost = (v) => <span className='font-mono text-amber-700 font-semibold'><Money value={v} /></span>
+  // bonus amounts keep cents: unit prices are fractional dollars, so whole-dollar rounding would make
+  // the rows visibly disagree with price x quantity
+  const cost = (v) => <span className='font-mono text-amber-700 font-semibold'><Money value={v} precise /></span>
 
   return (
     <div>
@@ -78,7 +80,7 @@ const SalesBonuses = () => {
         <div className='flex gap-3 flex-wrap'>
           <div className='bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3'>
             <p className='text-amber-700 text-[11px] leading-tight'>{t('totalBonusCostLabel')}</p>
-            <p className='font-bold tracking-tight text-lg text-amber-700 leading-tight'>{data ? <Money value={data.totalCost} /> : '—'}</p>
+            <p className='font-bold tracking-tight text-lg text-amber-700 leading-tight'>{data ? <Money value={data.totalCost} precise /> : '—'}</p>
             <p className='text-[10px] text-amber-700/70 mt-0.5'>{filters.dateFrom || filters.dateTo ? `${filters.dateFrom} — ${filters.dateTo}` : t('allPeriodLabel')}</p>
           </div>
           {data && data.totalQuantity.length > 0 && (
@@ -150,7 +152,7 @@ const SalesBonuses = () => {
           { label: t('dateCol'), className: 'text-muted whitespace-nowrap', render: r => formatDateTime(r.date) },
           { label: t('productLabel'), render: r => r.productName },
           { label: t('quantityShort'), render: r => `${formatQuantity(r.quantity)} ${r.unit}` },
-          { label: t('pricePerUnitLabel'), className: 'text-muted font-mono', render: r => <Money value={r.price} /> },
+          { label: t('pricePerUnitLabel'), className: 'text-muted font-mono', render: r => <Money value={r.price} precise /> },
           { label: t('bonusCostLabel'), render: r => cost(r.cost) },
         ]} />
     </div>
