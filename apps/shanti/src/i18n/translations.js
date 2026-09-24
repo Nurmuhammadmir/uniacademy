@@ -114,7 +114,8 @@ export const TRANSLATIONS = {
         confirmEditPayment: 'Изменить этот платёж?', noPaymentsYet: 'Платежей пока нет', noDebtorsToPayLabel: 'Нет должников для оплаты',
         advancePaymentHint: 'У клиента нет долга — платёж будет учтён как аванс',
         advanceSupplierPaymentHint: 'У поставщика нет долга — расход будет учтён как аванс',
-        receiptsTab: 'Поступления', expensesTab: 'Расходы',
+        receiptsTab: 'Поступления', expensesTab: 'Расходы', typeLabel: 'Тип',
+        typeSale: 'Продажа', typePurchase: 'Покупка', typePayment: 'Оплата долга', typeExpense: 'Расход',
         // Expenses
         expensesTotalLabel: 'Сумма расходов', newExpenseBtn: 'Новый расход', newExpenseTitle: 'Новый расход',
         editExpenseTitle: 'Изменить расход', confirmDeleteExpense: 'Удалить этот расход?', confirmEditExpense: 'Изменить этот расход?',
@@ -223,7 +224,8 @@ export const TRANSLATIONS = {
         confirmEditPayment: "Bu to'lovni o'zgartirasizmi?", noPaymentsYet: "Hozircha to'lovlar yo'q", noDebtorsToPayLabel: "To'lov uchun qarzdorlar yo'q",
         advancePaymentHint: "Mijozda qarz yo'q — to'lov avans sifatida hisobga olinadi",
         advanceSupplierPaymentHint: "Sotuvchida qarz yo'q — xarajat avans sifatida hisobga olinadi",
-        receiptsTab: 'Tushumlar', expensesTab: 'Xarajatlar',
+        receiptsTab: 'Tushumlar', expensesTab: 'Xarajatlar', typeLabel: 'Turi',
+        typeSale: 'Sotuv', typePurchase: 'Xarid', typePayment: "Qarz to'lovi", typeExpense: 'Xarajat',
         // Expenses
         expensesTotalLabel: 'Xarajatlar summasi', newExpenseBtn: 'Yangi xarajat', newExpenseTitle: 'Yangi xarajat',
         editExpenseTitle: "Xarajatni o'zgartirish", confirmDeleteExpense: "Bu xarajatni o'chirasizmi?", confirmEditExpense: "Bu xarajatni o'zgartirasizmi?",

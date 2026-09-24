@@ -11,15 +11,23 @@ import { methodDisplay } from '../components/MethodPicker.jsx'
 import { confirm } from '../lib/confirm.js'
 import { formatMoney } from '../lib/format.js'
 import Money from '../components/Money.jsx'
-import { firstOfMonthISO, todayISO, formatDateTime } from '../lib/date.js'
+import { formatDateTime } from '../lib/date.js'
 import NewExpenseModal from './NewExpenseModal.jsx'
+import NewPurchaseModal from './NewPurchaseModal.jsx'
 
-const DEFAULT_FILTERS = { dateFrom: firstOfMonthISO(), dateTo: todayISO(), category: '', amountMin: '', amountMax: '' }
+const DEFAULT_FILTERS = { dateFrom: '', dateTo: '', category: '', amountMin: '', amountMax: '' }
 
+// a purchase's own paidAmount (money WE actually paid a supplier AT the point of purchase) belongs
+// here just as much as a general company Expense does - both are real cash going out. The two
+// collections are merged for DISPLAY only; each row is still edited/deleted through its own real
+// resource (a purchase row opens NewPurchaseModal and PUTs /purchases/:id, same modal and endpoint
+// the Purchases page itself uses - editing here IS editing the purchase, so Purchases/Xaridlar
+// shows the change too, not a separate copy of it). Purchases don't belong to any expense category,
+// so they only show up in the unfiltered "all categories" view.
 const ExpensesList = () => {
   const {
     expenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
-    getExpensesOverview, getExpensesChart, deleteExpense,
+    getExpensesOverview, getExpensesChart, deleteExpense, getPurchasesOverview,
   } = useContext(ShantiContext)
   const { t } = useLanguage()
   const METHOD_LABEL = { cash: t('methodCash'), card: t('methodCard'), click: t('methodClick'), bank_transfer: t('methodBankTransfer'), payme: t('methodPayme'), apelsin: t('methodApelsin') }
@@ -31,17 +39,36 @@ const ExpensesList = () => {
   const [editingCategory, setEditingCategory] = useState(null)
 
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [data, setData] = useState(null)
+  const [entries, setEntries] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [editingExpense, setEditingExpense] = useState(null)
+  const [editingPurchase, setEditingPurchase] = useState(null)
   const [period, setPeriod] = useState('month')
   const [chart, setChart] = useState(null)
 
-  const effectiveFilters = { ...filters, category: categoryFilter || filters.category }
-  const load = () => getExpensesOverview(effectiveFilters).then(d => { if (d) setData(d) })
+  const effectiveCategory = categoryFilter || filters.category
+
+  const load = async () => {
+    const { dateFrom, dateTo, amountMin, amountMax } = filters
+    const [expensesRes, purchasesRes] = await Promise.all([
+      getExpensesOverview({ dateFrom, dateTo, category: effectiveCategory }),
+      effectiveCategory ? Promise.resolve({ purchases: [] }) : getPurchasesOverview({ dateFrom, dateTo }),
+    ])
+    if (!expensesRes || !purchasesRes) return
+    let merged = [
+      ...expensesRes.expenses.map(e => ({ type: 'expense', _id: e._id, date: e.date, amount: e.amount, category: e.category, sellerName: e.sellerId?.name, method: e.method, methodBreakdown: e.methodBreakdown, comment: e.comment, raw: e })),
+      ...purchasesRes.purchases.filter(p => p.paidAmount > 0).map(p => ({ type: 'purchase', _id: p._id, date: p.date, amount: p.paidAmount, category: p.materialId?.category, sellerName: p.sellerId?.name, method: p.method, methodBreakdown: p.methodBreakdown, comment: p.comment, raw: p })),
+    ]
+    if (amountMin) merged = merged.filter(x => x.amount >= Number(amountMin))
+    if (amountMax) merged = merged.filter(x => x.amount <= Number(amountMax))
+    merged.sort((a, b) => new Date(b.date) - new Date(a.date))
+    setEntries(merged)
+  }
   useEffect(() => { load() }, [filters, categoryFilter])
   useEffect(() => { getExpensesChart(period).then(d => { if (d) setChart(d) }) }, [period])
+
+  const totalAmount = entries ? entries.reduce((sum, e) => sum + e.amount, 0) : 0
 
   const submitNewCategory = async (e) => {
     e.preventDefault()
@@ -57,14 +84,15 @@ const ExpensesList = () => {
     if (!(await confirm(t('confirmDeleteExpense')))) return
     if (await deleteExpense(id)) { load(); getExpensesChart(period).then(d => { if (d) setChart(d) }) }
   }
+  const handlePurchaseSaved = () => { load(); getExpensesChart(period).then(d => { if (d) setChart(d) }) }
 
   return (
     <div>
       <div className='grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5'>
         <div className='bg-white border border-slate-100 rounded-2xl px-5 py-4 shadow-sm'>
           <p className='text-muted text-[11px] leading-tight'>{t('expensesTotalLabel')}</p>
-          <p className='font-bold tracking-tight text-2xl text-rose-600 leading-tight mt-1'>{data ? <Money value={data.totalAmount} /> : '—'}</p>
-          <p className='text-[10px] text-slate-400 mt-1'>{filters.dateFrom} — {filters.dateTo}</p>
+          <p className='font-bold tracking-tight text-2xl text-rose-600 leading-tight mt-1'>{entries ? <Money value={totalAmount} /> : '—'}</p>
+          <p className='text-[10px] text-slate-400 mt-1'>{filters.dateFrom || filters.dateTo ? `${filters.dateFrom} — ${filters.dateTo}` : t('allPeriodLabel')}</p>
         </div>
 
         <div className='lg:col-span-2 bg-white border border-slate-100 rounded-2xl p-5 shadow-sm'>
@@ -144,6 +172,7 @@ const ExpensesList = () => {
           <thead>
             <tr className='text-left text-muted border-b border-hairline'>
               <th className='px-4 py-3 font-medium'>{t('dateCol')}</th>
+              <th className='px-4 py-3 font-medium'>{t('typeLabel')}</th>
               <th className='px-4 py-3 font-medium'>{t('categoryLabel')}</th>
               <th className='px-4 py-3 font-medium'>{t('paySupplierLabel')}</th>
               <th className='px-4 py-3 font-medium'>{t('amountLabel')}</th>
@@ -153,45 +182,58 @@ const ExpensesList = () => {
             </tr>
           </thead>
           <tbody>
-            {(data?.expenses || []).map(e => (
-              <tr key={e._id} className='border-b border-hairline last:border-0'>
+            {(entries || []).map(e => (
+              <tr key={e.type + e._id} className='border-b border-hairline last:border-0'>
                 <td className='px-4 py-3 text-muted whitespace-nowrap'>{formatDateTime(e.date)}</td>
-                <td className='px-4 py-3 text-ink'>{e.category}</td>
-                <td className='px-4 py-3 text-muted'>{e.sellerId?.name || '—'}</td>
+                <td className='px-4 py-3'>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${e.type === 'purchase' ? 'bg-accent-soft text-accent' : 'bg-rose-50 text-rose-700'}`}>
+                    {e.type === 'purchase' ? t('typePurchase') : t('typeExpense')}
+                  </span>
+                </td>
+                <td className='px-4 py-3 text-ink'>{e.category || '—'}</td>
+                <td className='px-4 py-3 text-muted'>{e.sellerName || '—'}</td>
                 <td className='px-4 py-3 font-mono text-rose-600 font-semibold'><Money value={e.amount} /></td>
                 <td className='px-4 py-3 text-muted' title={methodDisplay(e, METHOD_LABEL).title}>{methodDisplay(e, METHOD_LABEL).label}</td>
                 <td className='px-4 py-3 text-muted max-w-[200px] truncate' title={e.comment}>{e.comment || '—'}</td>
                 <td className='px-4 py-3 text-right whitespace-nowrap'>
-                  <button onClick={() => setEditingExpense(e)} className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-xs font-medium mr-2'>{t('edit')}</button>
-                  <button onClick={() => handleDelete(e._id)} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>{t('delete')}</button>
+                  <button onClick={() => e.type === 'purchase' ? setEditingPurchase(e.raw) : setEditingExpense(e.raw)}
+                    className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-xs font-medium mr-2'>{t('edit')}</button>
+                  {e.type === 'expense' && (
+                    <button onClick={() => handleDelete(e._id)} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>{t('delete')}</button>
+                  )}
                 </td>
               </tr>
             ))}
-            {data && data.expenses.length === 0 && (
-              <tr><td colSpan={7} className='px-4 py-8 text-center text-muted'>{t('noExpensesYet')}</td></tr>
+            {entries && entries.length === 0 && (
+              <tr><td colSpan={8} className='px-4 py-8 text-center text-muted'>{t('noExpensesYet')}</td></tr>
             )}
-            {!data && (
-              <tr><td colSpan={7} className='px-4 py-8 text-center text-muted'>{t('loading')}</td></tr>
+            {!entries && (
+              <tr><td colSpan={8} className='px-4 py-8 text-center text-muted'>{t('loading')}</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       <div className='block md:hidden flex flex-col gap-2.5'>
-        {!data && <p className='text-muted text-sm text-center py-8'>{t('loading')}</p>}
-        {data && data.expenses.length === 0 && <p className='text-muted text-sm text-center py-8'>{t('noExpensesYet')}</p>}
-        {(data?.expenses || []).map(e => (
-          <div key={e._id} className='bg-white rounded-xl border border-slate-100 p-4 shadow-sm'>
+        {!entries && <p className='text-muted text-sm text-center py-8'>{t('loading')}</p>}
+        {entries && entries.length === 0 && <p className='text-muted text-sm text-center py-8'>{t('noExpensesYet')}</p>}
+        {(entries || []).map(e => (
+          <div key={e.type + e._id} className='bg-white rounded-xl border border-slate-100 p-4 shadow-sm'>
             <div className='flex justify-between items-start'>
               <div className='min-w-0'>
-                <p className='font-semibold text-[#1D1D1F] text-sm truncate'>{e.category}{e.sellerId ? ` · ${e.sellerId.name}` : ''}</p>
+                <div className='flex items-center gap-1.5'>
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${e.type === 'purchase' ? 'bg-accent-soft text-accent' : 'bg-rose-50 text-rose-700'}`}>
+                    {e.type === 'purchase' ? t('typePurchase') : t('typeExpense')}
+                  </span>
+                  <p className='font-semibold text-[#1D1D1F] text-sm truncate'>{e.category}{e.sellerName ? ` · ${e.sellerName}` : ''}</p>
+                </div>
                 <p className='text-xs text-slate-400 mt-1'>{formatDateTime(e.date)}</p>
               </div>
               <p className='text-base font-bold text-rose-600 flex-shrink-0 ml-3'><Money value={e.amount} /></p>
             </div>
             <div className='flex gap-3 mt-2'>
-              <button onClick={() => setEditingExpense(e)} className='text-xs text-accent font-medium'>{t('edit')}</button>
-              <button onClick={() => handleDelete(e._id)} className='text-xs text-muted'>{t('delete')}</button>
+              <button onClick={() => e.type === 'purchase' ? setEditingPurchase(e.raw) : setEditingExpense(e.raw)} className='text-xs text-accent font-medium'>{t('edit')}</button>
+              {e.type === 'expense' && <button onClick={() => handleDelete(e._id)} className='text-xs text-muted'>{t('delete')}</button>}
             </div>
           </div>
         ))}
@@ -247,6 +289,7 @@ const ExpensesList = () => {
 
       {showNew && <NewExpenseModal onClose={() => setShowNew(false)} onSaved={load} />}
       {editingExpense && <NewExpenseModal expense={editingExpense} onClose={() => setEditingExpense(null)} onSaved={load} />}
+      {editingPurchase && <NewPurchaseModal purchase={editingPurchase} onClose={() => setEditingPurchase(null)} onCreated={handlePurchaseSaved} />}
     </div>
   )
 }

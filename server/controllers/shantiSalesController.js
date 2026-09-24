@@ -164,10 +164,11 @@ export const listProducts = async (req, res) => {
     }
 }
 
-// producing `quantity` units of a product consumes its recipe from the material warehouse, the same
-// way selling a unit does (see applyStockDelta below) - a negative quantity (a downward stock
-// correction) symmetrically gives materials back. Always applied against the recipe as it stands
-// AFTER whatever save just happened, matching applyStockDelta's own "never a snapshot" convention.
+// producing `quantity` units of a product consumes its recipe from the material warehouse - the
+// ONLY place a sale/product touches the material warehouse at all (see applyStockDelta below,
+// which deliberately does not). A negative quantity (a downward stock correction) symmetrically
+// gives materials back. Always applied against the recipe as it stands AFTER whatever save just
+// happened, never a stale snapshot.
 const applyMaterialsForProductionDelta = async (materialsUsed, quantity) => {
     if (!quantity) return
     for (const usage of materialsUsed || []) {
@@ -197,21 +198,21 @@ export const createProduct = async (req, res) => {
     }
 }
 
+// no `stock` field accepted here - stock only ever moves through sales, restocks, or production
+// (see restockProduct below and applyStockDelta), never a direct overwrite, by design (same
+// reasoning as updateMaterial in shantiPurchasesController.js).
 export const updateProduct = async (req, res) => {
     try {
-        const { name, unit, price, stock, materialsUsed } = req.body
+        const { name, unit, price, materialsUsed } = req.body
         const product = await ShantiProduct.findById(req.params.id)
         if (!product) return res.status(404).json({ error: 'not_found' })
         const cleanedMaterials = await resolveMaterialsUsed(materialsUsed)
         if (cleanedMaterials === null) return res.status(400).json({ error: 'invalid_materials_used' })
-        const stockDelta = stock !== undefined ? Number(stock) - product.stock : 0
         if (name !== undefined && name.trim()) product.name = name.trim()
         if (unit !== undefined && unit.trim()) product.unit = unit.trim()
         if (price !== undefined) product.price = price
-        if (stock !== undefined) product.stock = stock
         if (cleanedMaterials !== undefined) product.materialsUsed = cleanedMaterials
         await product.save()
-        await applyMaterialsForProductionDelta(product.materialsUsed, stockDelta)
         res.json({ product })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'product_already_exists' })
@@ -362,19 +363,15 @@ const validateItems = async (items) => {
     return null
 }
 
-// symmetric in both directions: selling (sign -1) decrements the product AND every material in its
-// recipe by quantity*perUnit; reversing a sale (sign +1, from an edit or delete) gives all of it
-// back. Reads each product's CURRENT recipe rather than a snapshot from when the sale was made -
-// same convention the product stock delta itself already follows (also read fresh, never
-// snapshotted) - so editing a recipe after the fact intentionally affects how older sales reverse,
-// consistent rather than silently disagreeing with the product's own stock math.
+// selling (sign -1) decrements the product's OWN stock; reversing a sale (sign +1, from an edit or
+// delete) gives it back. Deliberately does NOT touch materialsUsed/the material warehouse - a
+// recipe's materials are consumed once, at production time (restockProduct, "Mahsulotni
+// to'ldirish" - see applyMaterialsForProductionDelta below), the same way a factory draws raw
+// materials down when it manufactures a batch, not again every time a already-produced unit is
+// later sold off the shelf. Sales only ever move finished-goods stock.
 const applyStockDelta = async (items, sign) => {
     for (const item of items) {
         await ShantiProduct.updateOne({ _id: item.productId }, { $inc: { stock: sign * item.quantity } })
-        const product = await ShantiProduct.findById(item.productId).select('materialsUsed').lean()
-        for (const usage of product?.materialsUsed || []) {
-            await ShantiMaterial.updateOne({ _id: usage.materialId }, { $inc: { stock: sign * item.quantity * usage.quantity } })
-        }
     }
 }
 

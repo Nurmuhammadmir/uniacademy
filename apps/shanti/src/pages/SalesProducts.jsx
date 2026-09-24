@@ -75,12 +75,13 @@ const emptyRecipeLine = () => ({ materialId: '', quantity: '' })
 // fresh from the current `product` prop each time it mounts, so re-opening a card after a save (or
 // after another tab refetched the list) never shows stale edit-form values left over from a
 // previous open. Collapsing the card unmounts this and discards any unsaved edits, same as closing
-// any other unsaved form.
+// any other unsaved form. No stock field here: stock only ever moves through sales/restocks/
+// production, by design - same reasoning as MaterialEditPanel in PurchaseMaterials.jsx.
 const ProductEditPanel = ({ product, onClose }) => {
   const { materials, units, updateProduct, deleteProduct, uploadProductPhoto, deleteProductPhoto } = useContext(ShantiContext)
   const { t } = useLanguage()
   const fileInputRef = useRef(null)
-  const [form, setForm] = useState({ name: product.name, unit: product.unit, price: String(product.price), stock: String(product.stock) })
+  const [form, setForm] = useState({ name: product.name, unit: product.unit, price: String(product.price) })
   const [recipe, setRecipe] = useState((product.materialsUsed || []).map(m => ({ materialId: m.materialId, quantity: String(m.quantity) })))
   const [saving, setSaving] = useState(false)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
@@ -94,7 +95,7 @@ const ProductEditPanel = ({ product, onClose }) => {
     setSaving(true)
     const validRecipe = recipe.filter(r => r.materialId && Number(r.quantity) > 0)
     const ok = await updateProduct(product._id, {
-      name: form.name, unit: form.unit, price: Number(form.price) || 0, stock: Number(form.stock) || 0,
+      name: form.name, unit: form.unit, price: Number(form.price) || 0,
       materialsUsed: validRecipe.map(r => ({ materialId: r.materialId, quantity: Number(r.quantity) })),
     })
     setSaving(false)
@@ -132,6 +133,7 @@ const ProductEditPanel = ({ product, onClose }) => {
       </div>
 
       <form onSubmit={handleSave} className='flex flex-col gap-3'>
+        <p className='text-xs text-muted'>{t('stockLabel')}: <span className='font-mono font-semibold text-ink'>{product.stock} {product.unit}</span></p>
         <div className='grid grid-cols-2 gap-2.5'>
           <div className='col-span-2'>
             <p className='text-xs text-muted mb-1'>{t('itemNameLabel')}</p>
@@ -144,10 +146,6 @@ const ProductEditPanel = ({ product, onClose }) => {
           <div>
             <p className='text-xs text-muted mb-1'>{t('priceLabel')}</p>
             <NumberInput value={form.price} onChange={v => setForm({ ...form, price: v })} className='w-full px-2.5 py-2 rounded-lg bg-bg border border-hairline text-sm' />
-          </div>
-          <div className='col-span-2'>
-            <p className='text-xs text-muted mb-1'>{t('stockLabel')}</p>
-            <NumberInput value={form.stock} onChange={v => setForm({ ...form, stock: v })} className='w-full px-2.5 py-2 rounded-lg bg-bg border border-hairline text-sm' />
           </div>
         </div>
 

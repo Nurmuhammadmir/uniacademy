@@ -22,7 +22,7 @@ const StatRow = ({ icon: Icon, label, value, sub, tone }) => (
 const Dashboard = () => {
   const { getDashboardSummary, getDashboardSeries } = useContext(ShantiContext)
   const { t } = useLanguage()
-  const [period, setPeriod] = useState('month')
+  const [period, setPeriod] = useState('year')
   const [series, setSeries] = useState(null)
   const [summary, setSummary] = useState(null)
 

@@ -4,6 +4,7 @@
 import mongoose from "mongoose"
 import ShantiExpenseCategory from "../models/ShantiExpenseCategory.js"
 import ShantiExpense from "../models/ShantiExpense.js"
+import ShantiPurchase from "../models/ShantiPurchase.js"
 import ShantiSeller from "../models/ShantiSeller.js"
 import { SHANTI_METHODS } from "../models/shantiConstants.js"
 import { ensureOtherExpenseCategoryExists, OTHER_EXPENSE_CATEGORY } from "../services/shantiCatalog.service.js"
@@ -103,13 +104,19 @@ export const getExpensesOverview = async (req, res) => {
     }
 }
 
+// same two sources ExpensesList.jsx's own list merges (Expenses + Purchases' paidAmount) - kept
+// consistent so the chart underneath the list never disagrees with what the list itself totals.
 export const getExpensesChart = async (req, res) => {
     try {
         const period = ['week', 'month', 'year'].includes(req.query.period) ? req.query.period : 'month'
         const { start, end, keys, keyFn } = bucketConfig(period)
-        const expenses = await ShantiExpense.find({ date: { $gte: start, $lt: end } }).select('date amount').lean()
+        const [expenses, purchases] = await Promise.all([
+            ShantiExpense.find({ date: { $gte: start, $lt: end } }).select('date amount').lean(),
+            ShantiPurchase.find({ date: { $gte: start, $lt: end } }).select('date paidAmount').lean(),
+        ])
         const map = Object.fromEntries(keys.map(k => [k, 0]))
         for (const e of expenses) { const k = keyFn(new Date(e.date)); if (k in map) map[k] += e.amount }
+        for (const p of purchases) { const k = keyFn(new Date(p.date)); if (k in map) map[k] += p.paidAmount }
         const series = keys.map(k => ({ label: k, value: map[k] }))
         res.json({ period, series, total: series.reduce((s, r) => s + r.value, 0) })
     } catch (error) {

@@ -1,8 +1,12 @@
-// The "Финансы" panel - a plain log of debt-collection receipts against clients. See
-// shantiDebt.service.js for how a payment's effect on a client's debt is computed on read.
+// The "Финансы" panel - a plain log of debt-collection receipts against clients. A sale's own
+// paidAmount (money received AT the point of sale, never itself a Payment document) is merged in
+// only on the frontend (FinanceReceipts.jsx, alongside these Payments) since it's edited through
+// the Sales endpoints, not these - see shantiDebt.service.js for how a payment's effect on a
+// client's debt is computed on read.
 import mongoose from "mongoose"
 import ShantiClient from "../models/ShantiClient.js"
 import ShantiPayment from "../models/ShantiPayment.js"
+import ShantiSale from "../models/ShantiSale.js"
 import { SHANTI_METHODS } from "../models/shantiConstants.js"
 import { bucketConfig } from "../services/shantiChartBuckets.service.js"
 import { validateMethodBreakdown, normalizeMethodBreakdown } from "../services/shantiMethodBreakdown.service.js"
@@ -97,13 +101,19 @@ export const updatePayment = async (req, res) => {
     }
 }
 
+// same two sources FinanceReceipts.jsx's own list merges (Payments + Sales' paidAmount) - kept
+// consistent so the chart underneath the list never disagrees with what the list itself totals.
 export const getPaymentsChart = async (req, res) => {
     try {
         const period = ['week', 'month', 'year'].includes(req.query.period) ? req.query.period : 'month'
         const { start, end, keys, keyFn } = bucketConfig(period)
-        const payments = await ShantiPayment.find({ date: { $gte: start, $lt: end } }).select('date amount').lean()
+        const [payments, sales] = await Promise.all([
+            ShantiPayment.find({ date: { $gte: start, $lt: end } }).select('date amount').lean(),
+            ShantiSale.find({ date: { $gte: start, $lt: end } }).select('date paidAmount').lean(),
+        ])
         const map = Object.fromEntries(keys.map(k => [k, 0]))
         for (const p of payments) { const k = keyFn(new Date(p.date)); if (k in map) map[k] += p.amount }
+        for (const s of sales) { const k = keyFn(new Date(s.date)); if (k in map) map[k] += s.paidAmount }
         const series = keys.map(k => ({ label: k, value: map[k] }))
         res.json({ period, series, total: series.reduce((s, r) => s + r.value, 0) })
     } catch (error) {
