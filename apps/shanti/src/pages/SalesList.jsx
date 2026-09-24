@@ -48,6 +48,8 @@ const saleQuantityText = (items) => {
   return Object.entries(byUnit).map(([unit, qty]) => `${formatQuantity(qty)} ${unit}`).join(' · ')
 }
 
+const bonusText = (sale) => (sale.bonusItems || []).map(i => `${i.productId?.name} ×${i.quantity}`).join(', ')
+
 const SalesList = () => {
   const { clientCategories, clients, products, getSalesOverview, updateSale, deleteSale } = useContext(ShantiContext)
   const { t } = useLanguage()
@@ -160,8 +162,13 @@ const SalesList = () => {
                 <tr key={s._id} className='border-b border-hairline last:border-0'>
                   <td className='px-4 py-3 text-muted whitespace-nowrap'>{formatDateTime(s.date)}</td>
                   <td className='px-4 py-3 text-ink'>{s.clientId?.name || '—'}</td>
-                  <td className='px-4 py-3 text-muted max-w-[180px] truncate' title={s.items.map(i => `${i.productId?.name} ×${i.quantity}`).join(', ')}>
-                    {s.items.map(i => `${i.productId?.name} ×${i.quantity}`).join(', ')}
+                  <td className='px-4 py-3 text-muted max-w-[180px]'>
+                    <p className='truncate' title={s.items.map(i => `${i.productId?.name} ×${i.quantity}`).join(', ')}>
+                      {s.items.map(i => `${i.productId?.name} ×${i.quantity}`).join(', ')}
+                    </p>
+                    {s.bonusItems?.length > 0 && (
+                      <p className='truncate text-xs text-amber-600' title={bonusText(s)}>{t('bonusLabel')}: {bonusText(s)}</p>
+                    )}
                   </td>
                   <td className='px-4 py-3 text-muted whitespace-nowrap'>{saleQuantityText(s.items)}</td>
                   <td className='px-4 py-3 font-mono text-ink font-semibold'><Money value={s.amount} /></td>
@@ -207,6 +214,7 @@ const SalesList = () => {
                 <div className='min-w-0'>
                   <p className='font-semibold text-[#1D1D1F] text-sm truncate'>{s.clientId?.name || '—'}</p>
                   <p className='text-xs text-slate-400 mt-1'>{formatDateTime(s.date)} · {saleQuantityText(s.items)}</p>
+                  {s.bonusItems?.length > 0 && <p className='text-xs text-amber-600 mt-1'>{t('bonusLabel')}: {bonusText(s)}</p>}
                 </div>
                 <div className='flex items-center gap-1 flex-shrink-0 ml-3'>
                   <p className='text-base font-bold text-slate-900'><Money value={s.amount} /></p>

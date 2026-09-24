@@ -5,8 +5,9 @@ import SalesList from './SalesList.jsx'
 import SalesClients from './SalesClients.jsx'
 import SalesProducts from './SalesProducts.jsx'
 import SalesDebtors from './SalesDebtors.jsx'
+import SalesBonuses from './SalesBonuses.jsx'
 
-const TAB_VALUES = ['list', 'clients', 'products', 'debtors']
+const TAB_VALUES = ['list', 'clients', 'products', 'debtors', 'bonuses']
 
 const Sales = () => {
   const { t } = useLanguage()
@@ -18,6 +19,7 @@ const Sales = () => {
     ['clients', t('clientsTab')],
     ['products', t('productsTab')],
     ['debtors', t('debtorsTab')],
+    ['bonuses', t('bonusesTab')],
   ]
 
   if (!TAB_VALUES.includes(tab)) return <Navigate to='/sales/list' replace />
@@ -40,6 +42,7 @@ const Sales = () => {
       {tab === 'clients' && <SalesClients />}
       {tab === 'products' && <SalesProducts />}
       {tab === 'debtors' && <SalesDebtors />}
+      {tab === 'bonuses' && <SalesBonuses />}
     </div>
   )
 }

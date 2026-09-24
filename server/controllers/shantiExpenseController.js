@@ -159,6 +159,9 @@ export const updateExpense = async (req, res) => {
     try {
         const expense = await ShantiExpense.findById(req.params.id)
         if (!expense) return res.status(404).json({ error: 'not_found' })
+        // a bonus expense mirrors its sale's bonusItems, so editing it here would silently drift
+        // from the stock that actually left the warehouse - change the bonus on the sale instead
+        if (expense.saleId) return res.status(409).json({ error: 'expense_managed_by_sale' })
         const { category, amount, date, method, methodBreakdown, sellerId, comment } = req.body
         if (method !== undefined && !SHANTI_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
@@ -199,6 +202,7 @@ export const deleteExpense = async (req, res) => {
     try {
         const expense = await ShantiExpense.findById(req.params.id)
         if (!expense) return res.status(404).json({ error: 'not_found' })
+        if (expense.saleId) return res.status(409).json({ error: 'expense_managed_by_sale' })
         await expense.deleteOne()
         res.json({ deleted: true })
     } catch (error) {

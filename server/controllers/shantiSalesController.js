@@ -11,6 +11,7 @@ import { SHANTI_METHODS } from "../models/shantiConstants.js"
 import { ensureOtherClientCategoryExists, OTHER_CLIENT_CATEGORY } from "../services/shantiCatalog.service.js"
 import { getClientDebtMap } from "../services/shantiDebt.service.js"
 import { validateMethodBreakdown, normalizeMethodBreakdown } from "../services/shantiMethodBreakdown.service.js"
+import { resolveBonusItems, syncBonusExpense, removeBonusExpense } from "../services/shantiBonus.service.js"
 import { deleteProductPhotoFile } from "./shantiUploadController.js"
 
 // validates a product's recipe - each row needs a real ShantiMaterial and a positive quantity (how
@@ -242,7 +243,7 @@ export const deleteProduct = async (req, res) => {
     try {
         const product = await ShantiProduct.findById(req.params.id)
         if (!product) return res.status(404).json({ error: 'not_found' })
-        const inUse = await ShantiSale.countDocuments({ 'items.productId': product._id })
+        const inUse = await ShantiSale.countDocuments({ $or: [{ 'items.productId': product._id }, { 'bonusItems.productId': product._id }] })
         if (inUse > 0) return res.status(409).json({ error: 'product_in_use' })
         deleteProductPhotoFile(product._id) // never leave an orphaned photo file behind on disk
         await product.deleteOne()
@@ -281,7 +282,7 @@ export const getSalesOverview = async (req, res) => {
     try {
         const { productId } = req.query
         const match = await buildSaleMatch(req.query)
-        const sales = await ShantiSale.find(match).sort({ date: -1 }).populate('clientId', 'name category').populate('items.productId', 'name unit').populate('createdBy', 'name').lean()
+        const sales = await ShantiSale.find(match).sort({ date: -1 }).populate('clientId', 'name category').populate('items.productId', 'name unit').populate('bonusItems.productId', 'name unit').populate('createdBy', 'name').lean()
         const totalAmount = sales.reduce((sum, s) => sum + s.amount, 0)
         // grouped by unit, not a single number - a sale can carry several products with different
         // units, and buildSaleMatch's productId filter only narrows WHICH sales come back (a sale
@@ -342,9 +343,61 @@ export const getSalesDebtors = async (req, res) => {
     }
 }
 
+// every bonus line ever given, flattened one row per (sale, product), plus who-got-what rollups.
+// A bonus only exists inside a sale, so this reads sales that carry bonusItems; `cost` is what the
+// line cost us (quantity x the price snapshotted when it was saved), not revenue.
+export const getBonusesOverview = async (req, res) => {
+    try {
+        const { productId, ...filters } = req.query
+        const match = await buildSaleMatch({ dateFrom: filters.dateFrom, dateTo: filters.dateTo, category: filters.category, clientId: filters.clientId })
+        match['bonusItems.0'] = { $exists: true }
+        if (productId) match['bonusItems.productId'] = new mongoose.Types.ObjectId(productId)
+        const sales = await ShantiSale.find(match).sort({ date: -1 })
+            .populate('clientId', 'name category').populate('bonusItems.productId', 'name unit').lean()
+
+        const rows = []
+        for (const s of sales) {
+            for (const item of s.bonusItems) {
+                if (productId && String(item.productId?._id) !== String(productId)) continue
+                rows.push({
+                    saleId: s._id, date: s.date,
+                    clientId: s.clientId?._id, clientName: s.clientId?.name || '—', category: s.clientId?.category || '',
+                    productId: item.productId?._id, productName: item.productId?.name || '—', unit: item.productId?.unit || '',
+                    quantity: item.quantity, price: item.price, cost: item.quantity * item.price,
+                })
+            }
+        }
+
+        const byUnit = (list) => Object.entries(list.reduce((acc, r) => { acc[r.unit] = (acc[r.unit] || 0) + r.quantity; return acc }, {}))
+            .map(([unit, quantity]) => ({ unit, quantity }))
+        const groupBy = (keyOf, make) => {
+            const groups = new Map()
+            for (const r of rows) {
+                const key = String(keyOf(r))
+                if (!groups.has(key)) groups.set(key, [])
+                groups.get(key).push(r)
+            }
+            return [...groups.values()]
+                .map(list => ({ ...make(list[0]), saleCount: new Set(list.map(r => String(r.saleId))).size, quantity: byUnit(list), totalCost: list.reduce((s, r) => s + r.cost, 0) }))
+                .sort((a, b) => b.totalCost - a.totalCost)
+        }
+
+        res.json({
+            rows,
+            totalCost: rows.reduce((sum, r) => sum + r.cost, 0),
+            totalQuantity: byUnit(rows),
+            byClient: groupBy(r => r.clientId, r => ({ clientId: r.clientId, name: r.clientName, category: r.category })),
+            byProduct: groupBy(r => r.productId, r => ({ productId: r.productId, name: r.productName, unit: r.unit })),
+        })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 export const getSaleDetail = async (req, res) => {
     try {
-        const sale = await ShantiSale.findById(req.params.id).populate('clientId', 'name category phone').populate('items.productId', 'name unit').populate('createdBy', 'name').lean()
+        const sale = await ShantiSale.findById(req.params.id).populate('clientId', 'name category phone').populate('items.productId', 'name unit').populate('bonusItems.productId', 'name unit').populate('createdBy', 'name').lean()
         if (!sale) return res.status(404).json({ error: 'not_found' })
         res.json({ sale })
     } catch (error) {
@@ -368,7 +421,8 @@ const validateItems = async (items) => {
 // recipe's materials are consumed once, at production time (restockProduct, "Mahsulotni
 // to'ldirish" - see applyMaterialsForProductionDelta below), the same way a factory draws raw
 // materials down when it manufactures a batch, not again every time a already-produced unit is
-// later sold off the shelf. Sales only ever move finished-goods stock.
+// later sold off the shelf. Sales only ever move finished-goods stock. Callers pass a sale's
+// bonusItems along with its items - free goods leave the shelf just the same.
 const applyStockDelta = async (items, sign) => {
     for (const item of items) {
         await ShantiProduct.updateOne({ _id: item.productId }, { $inc: { stock: sign * item.quantity } })
@@ -377,13 +431,15 @@ const applyStockDelta = async (items, sign) => {
 
 export const createSale = async (req, res) => {
     try {
-        const { clientId, date, items, amount, paidAmount, method, methodBreakdown, comment } = req.body
+        const { clientId, date, items, bonusItems, amount, paidAmount, method, methodBreakdown, comment } = req.body
         if (!clientId) return res.status(400).json({ error: 'client_required' })
         const client = await ShantiClient.findById(clientId)
         if (!client) return res.status(404).json({ error: 'client_not_found' })
         const itemsError = await validateItems(items)
         if (itemsError) return res.status(400).json({ error: itemsError })
         if (method && !SHANTI_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
+        const bonus = await resolveBonusItems(bonusItems || [], items)
+        if (bonus.error) return res.status(400).json({ error: bonus.error })
 
         const computedTotal = items.reduce((sum, i) => sum + i.quantity * i.price, 0)
         const resolvedAmount = amount !== undefined ? Number(amount) : computedTotal
@@ -397,12 +453,14 @@ export const createSale = async (req, res) => {
         const sale = await ShantiSale.create({
             clientId, date: date ? new Date(date) : new Date(),
             items: items.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price })),
+            bonusItems: bonus.items,
             amount: resolvedAmount, paidAmount: resolvedPaid,
             method: normalizedBreakdown.length ? normalizedBreakdown[0].method : (method || 'cash'),
             methodBreakdown: normalizedBreakdown, comment: comment || '',
             createdBy: req.auth.userId,
         })
-        await applyStockDelta(sale.items, -1)
+        await applyStockDelta([...sale.items, ...sale.bonusItems], -1)
+        await syncBonusExpense(sale, client.name, req.auth.userId)
         res.status(201).json({ sale })
     } catch (error) {
         console.log(error)
@@ -414,7 +472,7 @@ export const updateSale = async (req, res) => {
     try {
         const sale = await ShantiSale.findById(req.params.id)
         if (!sale) return res.status(404).json({ error: 'not_found' })
-        const { clientId, date, items, amount, paidAmount, method, methodBreakdown, comment } = req.body
+        const { clientId, date, items, bonusItems, amount, paidAmount, method, methodBreakdown, comment } = req.body
         if (method && !SHANTI_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
 
         let newItems = sale.items
@@ -422,6 +480,14 @@ export const updateSale = async (req, res) => {
             const itemsError = await validateItems(items)
             if (itemsError) return res.status(400).json({ error: itemsError })
             newItems = items.map(i => ({ productId: i.productId, quantity: i.quantity, price: i.price }))
+        }
+        // omitted = leave the bonus alone (e.g. a comment-only edit); an array, even an empty one,
+        // replaces it - which is how an admin removes a bonus from an existing sale
+        let newBonusItems = sale.bonusItems
+        if (bonusItems !== undefined) {
+            const bonus = await resolveBonusItems(bonusItems, newItems, sale.bonusItems)
+            if (bonus.error) return res.status(400).json({ error: bonus.error })
+            newBonusItems = bonus.items
         }
 
         const computedTotal = newItems.reduce((sum, i) => sum + i.quantity * i.price, 0)
@@ -436,8 +502,8 @@ export const updateSale = async (req, res) => {
 
         // reverse the OLD items' stock effect, then apply the NEW ones - correct whether items
         // actually changed or not (a no-op reverse+reapply for unchanged items nets to zero)
-        await applyStockDelta(sale.items, 1)
-        await applyStockDelta(newItems, -1)
+        await applyStockDelta([...sale.items, ...sale.bonusItems], 1)
+        await applyStockDelta([...newItems, ...newBonusItems], -1)
 
         if (clientId !== undefined) {
             const client = await ShantiClient.findById(clientId)
@@ -445,6 +511,7 @@ export const updateSale = async (req, res) => {
             sale.clientId = clientId
         }
         sale.items = newItems
+        sale.bonusItems = newBonusItems
         sale.amount = newAmount
         sale.paidAmount = newPaid
         if (date !== undefined) sale.date = new Date(date)
@@ -457,6 +524,8 @@ export const updateSale = async (req, res) => {
         }
         if (comment !== undefined) sale.comment = comment
         await sale.save()
+        const client = await ShantiClient.findById(sale.clientId).select('name').lean()
+        await syncBonusExpense(sale, client?.name || '', req.auth.userId)
         res.json({ sale })
     } catch (error) {
         console.log(error)
@@ -468,7 +537,8 @@ export const deleteSale = async (req, res) => {
     try {
         const sale = await ShantiSale.findById(req.params.id)
         if (!sale) return res.status(404).json({ error: 'not_found' })
-        await applyStockDelta(sale.items, 1)
+        await applyStockDelta([...sale.items, ...sale.bonusItems], 1)
+        await removeBonusExpense(sale._id)
         await sale.deleteOne()
         res.json({ deleted: true })
     } catch (error) {

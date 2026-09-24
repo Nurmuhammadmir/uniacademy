@@ -17,6 +17,11 @@ import NewPurchaseModal from './NewPurchaseModal.jsx'
 
 const DEFAULT_FILTERS = { dateFrom: '', dateTo: '', category: '', amountMin: '', amountMax: '' }
 
+// a 'bonus' row is the expense auto-booked for a sale's free goods (expense.saleId is set) - it
+// belongs to that sale, so it's listed here but edited/deleted only by changing the sale itself
+const TYPE_BADGE = { purchase: 'bg-accent-soft text-accent', bonus: 'bg-amber-50 text-amber-700', expense: 'bg-rose-50 text-rose-700' }
+const TYPE_LABEL_KEY = { purchase: 'typePurchase', bonus: 'typeBonus', expense: 'typeExpense' }
+
 // a purchase's own paidAmount (money WE actually paid a supplier AT the point of purchase) belongs
 // here just as much as a general company Expense does - both are real cash going out. The two
 // collections are merged for DISPLAY only; each row is still edited/deleted through its own real
@@ -57,7 +62,7 @@ const ExpensesList = () => {
     ])
     if (!expensesRes || !purchasesRes) return
     let merged = [
-      ...expensesRes.expenses.map(e => ({ type: 'expense', _id: e._id, date: e.date, amount: e.amount, category: e.category, sellerName: e.sellerId?.name, method: e.method, methodBreakdown: e.methodBreakdown, comment: e.comment, raw: e })),
+      ...expensesRes.expenses.map(e => ({ type: e.saleId ? 'bonus' : 'expense', _id: e._id, date: e.date, amount: e.amount, category: e.category, sellerName: e.sellerId?.name, method: e.method, methodBreakdown: e.methodBreakdown, comment: e.comment, raw: e })),
       ...purchasesRes.purchases.filter(p => p.paidAmount > 0).map(p => ({ type: 'purchase', _id: p._id, date: p.date, amount: p.paidAmount, category: p.materialId?.category, sellerName: p.sellerId?.name, method: p.method, methodBreakdown: p.methodBreakdown, comment: p.comment, raw: p })),
     ]
     if (amountMin) merged = merged.filter(x => x.amount >= Number(amountMin))
@@ -186,8 +191,8 @@ const ExpensesList = () => {
               <tr key={e.type + e._id} className='border-b border-hairline last:border-0'>
                 <td className='px-4 py-3 text-muted whitespace-nowrap'>{formatDateTime(e.date)}</td>
                 <td className='px-4 py-3'>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${e.type === 'purchase' ? 'bg-accent-soft text-accent' : 'bg-rose-50 text-rose-700'}`}>
-                    {e.type === 'purchase' ? t('typePurchase') : t('typeExpense')}
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[e.type]}`}>
+                    {t(TYPE_LABEL_KEY[e.type])}
                   </span>
                 </td>
                 <td className='px-4 py-3 text-ink'>{e.category || '—'}</td>
@@ -196,8 +201,12 @@ const ExpensesList = () => {
                 <td className='px-4 py-3 text-muted' title={methodDisplay(e, METHOD_LABEL).title}>{methodDisplay(e, METHOD_LABEL).label}</td>
                 <td className='px-4 py-3 text-muted max-w-[200px] truncate' title={e.comment}>{e.comment || '—'}</td>
                 <td className='px-4 py-3 text-right whitespace-nowrap'>
-                  <button onClick={() => e.type === 'purchase' ? setEditingPurchase(e.raw) : setEditingExpense(e.raw)}
-                    className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-xs font-medium mr-2'>{t('edit')}</button>
+                  {e.type === 'bonus' ? (
+                    <span className='text-xs text-muted'>{t('bonusManagedViaSale')}</span>
+                  ) : (
+                    <button onClick={() => e.type === 'purchase' ? setEditingPurchase(e.raw) : setEditingExpense(e.raw)}
+                      className='px-3 py-1.5 rounded-lg bg-accent-soft text-accent text-xs font-medium mr-2'>{t('edit')}</button>
+                  )}
                   {e.type === 'expense' && (
                     <button onClick={() => handleDelete(e._id)} className='px-2.5 py-1 rounded-lg bg-bg border border-hairline text-muted text-xs font-medium'>{t('delete')}</button>
                   )}
@@ -222,8 +231,8 @@ const ExpensesList = () => {
             <div className='flex justify-between items-start'>
               <div className='min-w-0'>
                 <div className='flex items-center gap-1.5'>
-                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${e.type === 'purchase' ? 'bg-accent-soft text-accent' : 'bg-rose-50 text-rose-700'}`}>
-                    {e.type === 'purchase' ? t('typePurchase') : t('typeExpense')}
+                  <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${TYPE_BADGE[e.type]}`}>
+                    {t(TYPE_LABEL_KEY[e.type])}
                   </span>
                   <p className='font-semibold text-[#1D1D1F] text-sm truncate'>{e.category}{e.sellerName ? ` · ${e.sellerName}` : ''}</p>
                 </div>
@@ -232,7 +241,9 @@ const ExpensesList = () => {
               <p className='text-base font-bold text-rose-600 flex-shrink-0 ml-3'><Money value={e.amount} /></p>
             </div>
             <div className='flex gap-3 mt-2'>
-              <button onClick={() => e.type === 'purchase' ? setEditingPurchase(e.raw) : setEditingExpense(e.raw)} className='text-xs text-accent font-medium'>{t('edit')}</button>
+              {e.type === 'bonus'
+                ? <span className='text-xs text-muted'>{t('bonusManagedViaSale')}</span>
+                : <button onClick={() => e.type === 'purchase' ? setEditingPurchase(e.raw) : setEditingExpense(e.raw)} className='text-xs text-accent font-medium'>{t('edit')}</button>}
               {e.type === 'expense' && <button onClick={() => handleDelete(e._id)} className='text-xs text-muted'>{t('delete')}</button>}
             </div>
           </div>

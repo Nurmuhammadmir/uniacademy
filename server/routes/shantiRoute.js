@@ -12,7 +12,7 @@ import {
     listClientCategories, createClientCategory, updateClientCategory, deleteClientCategory,
     listClients, createClient, updateClient, deleteClient,
     listProducts, createProduct, updateProduct, deleteProduct, restockProduct,
-    getSalesOverview, getSalesDebtors, getSaleDetail, createSale, updateSale, deleteSale,
+    getSalesOverview, getSalesDebtors, getBonusesOverview, getSaleDetail, createSale, updateSale, deleteSale,
 } from "../controllers/shantiSalesController.js"
 import { getPaymentsOverview, createPayment, updatePayment, deletePayment, getPaymentsChart } from "../controllers/shantiFinanceController.js"
 import { getDashboardSummary, getDashboardSeries } from "../controllers/shantiDashboardController.js"
@@ -106,6 +106,7 @@ shantiRouter.delete('/products/:id/photo', deleteProductPhoto)
 
 // same ordering note as purchases/debts above
 shantiRouter.get('/sales/debtors', getSalesDebtors)
+shantiRouter.get('/sales/bonuses', getBonusesOverview)
 shantiRouter.get('/sales', getSalesOverview)
 shantiRouter.get('/sales/:id', getSaleDetail)
 shantiRouter.post('/sales', createSale)

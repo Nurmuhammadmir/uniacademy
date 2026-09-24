@@ -180,13 +180,17 @@ const ShantiContextProvider = (props) => {
         try { await axios.put(backendUrl + '/api/shanti/expenses/' + id, payload, authHeader); getBalance(); return true }
         catch (error) {
             const code = error.response?.data?.error
-            toast.error(code === 'amount_exceeds_debt' ? t('amountExceedsDebtError') : (code || t('couldNotEdit')))
+            toast.error(code === 'amount_exceeds_debt' ? t('amountExceedsDebtError') : code === 'expense_managed_by_sale' ? t('expenseManagedBySaleError') : (code || t('couldNotEdit')))
             return false
         }
     }
     const deleteExpense = async (id) => {
         try { await axios.delete(backendUrl + '/api/shanti/expenses/' + id, authHeader); getBalance(); return true }
-        catch (error) { toast.error(error.response?.data?.error || t('couldNotDelete')); return false }
+        catch (error) {
+            const code = error.response?.data?.error
+            toast.error(code === 'expense_managed_by_sale' ? t('expenseManagedBySaleError') : (code || t('couldNotDelete')))
+            return false
+        }
     }
 
     // ==== Purchases ====
@@ -297,13 +301,23 @@ const ShantiContextProvider = (props) => {
         try { const { data } = await axios.get(backendUrl + '/api/shanti/sales/debtors', { ...authHeader, params: filters }); return data }
         catch (error) { toast.error(error.response?.data?.error || t('couldNotLoadDebtors')); return false }
     }
+    const getBonusesOverview = async (filters) => {
+        try { const { data } = await axios.get(backendUrl + '/api/shanti/sales/bonuses', { ...authHeader, params: filters }); return data }
+        catch (error) { toast.error(error.response?.data?.error || t('couldNotLoadBonuses')); return false }
+    }
+    // bonus lines are validated server-side (price resolution), so their error codes need real text
+    const saleErrorText = (code, fallback) => (
+        code === 'bonus_price_required' ? t('bonusPriceRequiredError')
+            : code === 'invalid_bonus_item' ? t('invalidBonusItemError')
+                : (code || fallback)
+    )
     const createSale = async (payload) => {
         try { await axios.post(backendUrl + '/api/shanti/sales', payload, authHeader); toast.success(t('saleAdded')); getProducts(); getBalance(); return true }
-        catch (error) { toast.error(error.response?.data?.error || t('couldNotAddSale')); return false }
+        catch (error) { toast.error(saleErrorText(error.response?.data?.error, t('couldNotAddSale'))); return false }
     }
     const updateSale = async (id, payload) => {
         try { await axios.put(backendUrl + '/api/shanti/sales/' + id, payload, authHeader); getProducts(); getBalance(); return true }
-        catch (error) { toast.error(error.response?.data?.error || t('couldNotEdit')); return false }
+        catch (error) { toast.error(saleErrorText(error.response?.data?.error, t('couldNotEdit'))); return false }
     }
     const deleteSale = async (id) => {
         try { await axios.delete(backendUrl + '/api/shanti/sales/' + id, authHeader); getProducts(); getBalance(); return true }
@@ -392,7 +406,7 @@ const ShantiContextProvider = (props) => {
         clientCategories, getClientCategories, createClientCategory, updateClientCategory, deleteClientCategory,
         clients, getClients, createClient, updateClient, deleteClient,
         products, getProducts, createProduct, updateProduct, deleteProduct, restockProduct, uploadProductPhoto, deleteProductPhoto,
-        getSalesOverview, getSalesDebtors, createSale, updateSale, deleteSale,
+        getSalesOverview, getSalesDebtors, getBonusesOverview, createSale, updateSale, deleteSale,
         getDashboardSummary, getDashboardSeries,
         getPaymentsOverview, getPaymentsChart, createPayment, updatePayment, deletePayment,
         getBalanceAdjustments, createBalanceAdjustment, updateBalanceAdjustment, deleteBalanceAdjustment,

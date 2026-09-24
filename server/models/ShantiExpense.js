@@ -18,12 +18,16 @@ const shantiExpenseSchema = new mongoose.Schema({
     method: { type: String, enum: SHANTI_METHODS, default: 'cash' },
     methodBreakdown: { type: [methodBreakdownSchema], default: [] },
     sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'ShantiSeller', default: null },
+    // set ONLY on the auto-generated "Бонус" expense that mirrors a sale's bonusItems. That row is
+    // owned by the sale (created/updated/deleted with it), so it can't be edited or deleted directly.
+    saleId: { type: mongoose.Schema.Types.ObjectId, ref: 'ShantiSale', default: null },
     comment: { type: String, default: '' },
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'ShantiUser', required: true },
 }, { timestamps: true })
 
 shantiExpenseSchema.index({ date: 1 })
 shantiExpenseSchema.index({ sellerId: 1 })
+shantiExpenseSchema.index({ saleId: 1 })
 
 const ShantiExpense = mongoose.models.ShantiExpense || mongoose.model('ShantiExpense', shantiExpenseSchema)
 export default ShantiExpense

@@ -20,6 +20,12 @@ const shantiSaleSchema = new mongoose.Schema({
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'ShantiClient', required: true },
     date: { type: Date, default: Date.now },
     items: { type: [shantiSaleItemSchema], required: true },
+    // free goods thrown in with this sale. Same shape as `items`, but `price` here is the per-unit
+    // COST we absorb (never revenue): they leave stock like any sold item, add nothing to `amount`,
+    // and are booked as ONE linked cash ShantiExpense (see shantiBonus.service.js). The price is
+    // resolved by the server (never typed by the user) and kept as a snapshot, so a later catalog
+    // price change doesn't rewrite history.
+    bonusItems: { type: [shantiSaleItemSchema], default: [] },
     amount: { type: Number, required: true },
     paidAmount: { type: Number, required: true },
     method: { type: String, enum: SHANTI_METHODS, default: 'cash' },

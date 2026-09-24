@@ -81,6 +81,17 @@ export const TRANSLATIONS = {
         saleTotalDefaultLabel: 'Итоговая сумма (по умолчанию — {total}, можно изменить)',
         confirmEditSale: 'Изменить эту продажу?',
 
+        // Bonuses (free goods given with a sale; booked as a cash expense)
+        bonusesTab: 'Бонусы', addBonusBtn: 'Добавить бонус', bonusLabel: 'Бонус',
+        bonusHint: 'Бесплатно для клиента: списывается со склада и записывается в расходы наличными по цене товара',
+        bonusPriceReadonlyHint: 'Цена считается автоматически и не меняется', bonusCostTotal: 'Расход на бонус: {total}',
+        bonusPriceRequiredError: 'У товара нет цены: укажите её в профиле товара или в этой продаже',
+        invalidBonusItemError: 'Некорректная строка бонуса',
+        typeBonus: 'Бонус', bonusManagedViaSale: 'Меняется через продажу', expenseManagedBySaleError: 'Этот расход меняется только через продажу',
+        couldNotLoadBonuses: 'Не удалось загрузить бонусы', noBonusesYet: 'Бонусов пока нет',
+        totalBonusCostLabel: 'Расход на бонусы', bonusesByClientTitle: 'По клиентам', bonusesByProductTitle: 'По товарам',
+        bonusesDetailsTitle: 'Все бонусы', bonusSalesCountLabel: 'Продаж с бонусом', bonusCostLabel: 'Стоимость',
+
         // Materials
         manageUnitsTitle: 'Единицы измерения', unitExamplePlaceholder: 'Например: коробка',
         categoryNamePlaceholder: 'Название категории', addCategoryBtn: 'Добавить категорию', unitsBtn: 'Единицы измерения',
@@ -196,6 +207,16 @@ export const TRANSLATIONS = {
         chooseClientPlaceholder: 'Mijozni tanlang', addItemBtn: "Mahsulot qo'shish",
         saleTotalDefaultLabel: "Umumiy summa (odatda - {total}, o'zgartirish mumkin)",
         confirmEditSale: 'Bu sotuvni o\'zgartirasizmi?',
+
+        bonusesTab: 'Bonuslar', addBonusBtn: "Bonus qo'shish", bonusLabel: 'Bonus',
+        bonusHint: "Mijoz uchun bepul: ombordan chiqariladi va mahsulot narxida xarajatlarga (naqd) yoziladi",
+        bonusPriceReadonlyHint: "Narx avtomatik hisoblanadi va o'zgarmaydi", bonusCostTotal: 'Bonus xarajati: {total}',
+        bonusPriceRequiredError: "Mahsulotda narx yo'q: uni mahsulot profilida yoki shu sotuvda kiriting",
+        invalidBonusItemError: "Bonus qatori noto'g'ri",
+        typeBonus: 'Bonus', bonusManagedViaSale: "Sotuv orqali o'zgartiriladi", expenseManagedBySaleError: "Bu xarajat faqat sotuv orqali o'zgartiriladi",
+        couldNotLoadBonuses: "Bonuslarni yuklab bo'lmadi", noBonusesYet: "Hozircha bonuslar yo'q",
+        totalBonusCostLabel: 'Bonuslar xarajati', bonusesByClientTitle: 'Mijozlar bo\'yicha', bonusesByProductTitle: "Mahsulotlar bo'yicha",
+        bonusesDetailsTitle: 'Barcha bonuslar', bonusSalesCountLabel: 'Bonusli sotuvlar', bonusCostLabel: 'Qiymati',
 
         manageUnitsTitle: "O'lchov birliklari", unitExamplePlaceholder: 'Masalan: quti',
         categoryNamePlaceholder: 'Kategoriya nomi', addCategoryBtn: "Kategoriya qo'shish", unitsBtn: "O'lchov birliklari",
