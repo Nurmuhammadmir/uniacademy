@@ -29,7 +29,7 @@ import { suggestLeastLoadedGroup } from "../services/loadBalance.service.js"
 import { enrollStudentMidCycle } from "../services/enrollMidCycle.service.js"
 import { computeDayCounter, startDateForTargetDayToday } from "../services/dayCounter.service.js"
 import { hardDeleteGroup } from "../services/groupCascade.service.js"
-import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
+import { calculateSalaries, getTeacherSalaryDetail, salaryPeriodFields } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
 import { startOfLocalDay, endOfLocalDay, isEditableToday } from "../services/businessTime.service.js"
 import { ensureDefaultCategories, ensureCategoryExists, SALARY_CATEGORY, PREPAYMENT_CATEGORY, REFUND_CATEGORY } from "../services/expenseCategories.service.js"
@@ -1773,6 +1773,7 @@ export const paySalary = async (req, res) => {
             recipient: teacher?.name || '', method,
             date: new Date(),
             note: dateFrom && dateTo ? `Salary for ${dateFrom} — ${dateTo}` : 'Salary payout',
+            ...salaryPeriodFields(dateFrom, dateTo),
             createdBy: req.auth.userId,
         })
         const branchAccount = await getOrCreateAccount('branch', req.auth.branchId)
@@ -1830,6 +1831,7 @@ export const prepaySalary = async (req, res) => {
             recipient: teacher?.name || '', method,
             date: new Date(),
             note: dateFrom && dateTo ? `Prepayment for ${dateFrom} — ${dateTo}` : 'Salary prepayment',
+            ...salaryPeriodFields(dateFrom, dateTo),
             createdBy: req.auth.userId,
         })
         const branchAccount = await getOrCreateAccount('branch', req.auth.branchId)

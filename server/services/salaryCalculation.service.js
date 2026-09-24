@@ -5,6 +5,7 @@ import { getScheduleDays } from "./scheduleDays.service.js"
 import { prorateByDateOverlap } from "./attribution.service.js"
 import { computeCoveredDebtPeriodsBatch } from "./billingCycle.service.js"
 import { SALARY_CATEGORY, PREPAYMENT_CATEGORY } from "./expenseCategories.service.js"
+import { startOfLocalDay, endOfLocalDay, localMonthKey } from "./businessTime.service.js"
 
 // every branch ran payroll through a different, non-platform system through August 2026 and staff
 // were already paid for that whole span through it - this platform's own billing only starts
@@ -162,36 +163,57 @@ const computeTeacherAcrossGroups = async (teacher, teacherGroups, rates, dateFro
     return { total, groupBreakdown, revenueEntries, lessonEntries, ...uniformRate }
 }
 
-// computes each of this branch's teachers' salary for a date range, using whichever rate resolves
-// per group (group-specific override > teacher-level override > branch default). A teacher with no
-// groups, or whose groups all resolve to no rate at all, is skipped entirely - there's nothing to
-// calculate until at least a branch default rate is set.
-export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
-    dateFrom = clampToLegacyCutoff(dateFrom)
-    if (dateFrom > dateTo) return [] // the whole requested range predates this platform's own billing start
+// what Pay/Prepay stores on the payout Expense so it's attributed to the period it was FOR (the
+// range the Salary page had selected), not merely to the day the money left the till. Empty when
+// the request carries no usable range - such a payout falls back to `date` (see loadPaidByTeacher).
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/
+export const salaryPeriodFields = (dateFrom, dateTo) => {
+    if (!ISO_DAY.test(dateFrom || '') || !ISO_DAY.test(dateTo || '')) return {}
+    const from = startOfLocalDay(dateFrom)
+    const to = endOfLocalDay(dateTo)
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || from > to) return {}
+    return { salaryPeriodFrom: from, salaryPeriodTo: to }
+}
 
-    const teachers = await User.find({
-        role: 'teacher',
-        $or: [{ branchId }, { additionalBranchIds: branchId }],
-    }).select('name').lean()
+// everything already given to each teacher for this period - a real payout AND any advance both
+// count as "already paid" toward the same number, so the admin sees one simple figure (how much of
+// the calculated total is still owed for this period) instead of a separate paid/prepaid
+// distinction to reconcile in their head. A payout belongs to the period it was made FOR
+// (salaryPeriodFrom falling inside the range); older payouts without one belong to whichever range
+// contains the day the money left the till. `rangeFrom` is the caller's own unclamped start - the
+// stored salaryPeriodFrom was never clamped to the legacy cutoff, so it must be compared unclamped.
+// Returns Map(String(teacherId) -> { amount, payments[] }).
+const loadPaidByTeacher = async (branchId, teacherIds, rangeFrom, dateTo) => {
+    const dateFrom = clampToLegacyCutoff(rangeFrom)
+    const payouts = await Expense.find({
+        branchId, category: { $in: [SALARY_CATEGORY, PREPAYMENT_CATEGORY] }, teacherId: { $in: teacherIds },
+        $or: [
+            { salaryPeriodFrom: { $gte: rangeFrom, $lte: dateTo } },
+            { salaryPeriodFrom: null, date: { $gte: dateFrom, $lte: dateTo } },
+        ],
+    }).lean()
+    const paidByTeacher = new Map()
+    for (const e of payouts) {
+        const key = String(e.teacherId)
+        if (!paidByTeacher.has(key)) paidByTeacher.set(key, { amount: 0, payments: [] })
+        const entry = paidByTeacher.get(key)
+        entry.amount += e.amount
+        entry.payments.push({ amount: e.amount, date: e.date, method: e.method, category: e.category })
+    }
+    return paidByTeacher
+}
+
+// each teacher's calculated salary (nothing about payouts) for one date range, using whichever rate
+// resolves per group (group-specific override > teacher-level override > branch default). A teacher
+// with no groups, or whose groups all resolve to no rate at all, is skipped entirely - there's
+// nothing to calculate until at least a branch default rate is set. `teacherIds` optionally narrows
+// it to just those teachers (the carry-over chain below only needs the few who have money in play).
+const computeTotals = async (branchId, rates, dateFrom, dateTo, teacherIds = null) => {
+    const teacherQuery = { role: 'teacher', $or: [{ branchId }, { additionalBranchIds: branchId }] }
+    if (teacherIds) teacherQuery._id = { $in: teacherIds }
+    const teachers = await User.find(teacherQuery).select('name').lean()
 
     const groups = await Group.find({ branchId }).lean()
-
-    // everything already given to a teacher for this exact date range - a real payout AND any
-    // advance both count as "already paid" toward the same number, so the admin sees one simple
-    // figure (how much of the calculated total is still owed for this period) instead of a separate
-    // paid/prepaid distinction to reconcile in their head
-    const existingPayouts = await Expense.find({
-        branchId, category: { $in: [SALARY_CATEGORY, PREPAYMENT_CATEGORY] }, teacherId: { $in: teachers.map(t => t._id) },
-        date: { $gte: dateFrom, $lte: dateTo },
-    })
-    const paidByTeacher = {}
-    for (const e of existingPayouts) {
-        const key = String(e.teacherId)
-        if (!paidByTeacher[key]) paidByTeacher[key] = { amount: 0, payments: [] }
-        paidByTeacher[key].amount += e.amount
-        paidByTeacher[key].payments.push({ amount: e.amount, date: e.date, method: e.method, category: e.category })
-    }
 
     // each teacher's computation only reads shared inputs (rates/groups) and writes to its own
     // result - fully independent of every other teacher's, so they're run concurrently instead of
@@ -209,20 +231,115 @@ export const calculateSalaries = async (branchId, rates, dateFrom, dateTo) => {
         const uniqueStudents = new Set()
         teacherGroups.forEach(g => g.studentIds.forEach(id => uniqueStudents.add(String(id))))
 
-        const paidInfo = paidByTeacher[String(teacher._id)] || { amount: 0, payments: [] }
-
         return {
             teacherId: teacher._id, name: teacher.name, groupCount: teacherGroups.length, studentCount: uniqueStudents.size,
             rateType, rateValue, total,
-            paidAmount: paidInfo.amount,
-            // always a live figure, never a locked-in one - if a student pays more after a payout
-            // already happened for this period, the next Hisoblang just shows the new gap directly
-            remaining: Math.max(0, total - paidInfo.amount),
-            payments: paidInfo.payments,
         }
     }))
 
     return perTeacher.filter(Boolean)
+}
+
+const monthBounds = (key) => {
+    const [year, month] = key.split('-').map(Number)
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+    return { from: startOfLocalDay(`${key}-01`), to: endOfLocalDay(`${key}-${String(lastDay).padStart(2, '0')}`) }
+}
+
+const nextMonthKey = (key) => {
+    const [year, month] = key.split('-').map(Number)
+    return month === 12 ? `${year + 1}-01` : `${year}-${String(month + 1).padStart(2, '0')}`
+}
+
+const FIRST_BILLING_MONTH = localMonthKey(LEGACY_BILLING_CUTOFF)
+// a Salary request for a month absurdly far out would otherwise walk every month up to it
+const MAX_CARRY_MONTHS = 120
+
+// The running "already given beyond what was earned" balance, month by month. Each month's carry-out
+// is max(0, carryIn + paidThatMonth - earnedThatMonth): money handed over beyond a month's earnings
+// rolls into the next month (and keeps rolling while later months don't fully use it up), whereas a
+// month's SHORTFALL is not carried - it stays owed on that month's own row and gets settled there.
+// Pure apart from the two injected loaders (getPaid(monthKey) -> Map(id -> paid), getTotals(monthKey,
+// ids) -> Map(id -> earned)) so the arithmetic can be exercised without a database. Only teachers
+// with something in play that month (a carried balance or a payout) cost a totals calculation.
+// Returns Map(String(teacherId) -> { amount, since: 'YYYY-MM' the balance started building }).
+export const carryOverChain = async ({ monthKeys, teacherIds, getPaid, getTotals }) => {
+    const carries = new Map()
+    for (const key of monthKeys) {
+        const paid = await getPaid(key)
+        const needed = teacherIds.filter(id => (carries.get(String(id))?.amount || 0) > 0 || (paid.get(String(id)) || 0) > 0)
+        if (needed.length === 0) continue
+        const totals = await getTotals(key, needed)
+        for (const id of needed) {
+            const k = String(id)
+            const previous = carries.get(k)
+            const next = Math.max(0, (previous?.amount || 0) + (paid.get(k) || 0) - Math.max(0, totals.get(k) || 0))
+            if (next > 0) carries.set(k, { amount: next, since: previous ? previous.since : key })
+            else carries.delete(k)
+        }
+    }
+    return carries
+}
+
+// the balance carried INTO the calendar month `rangeFrom` falls in, built from every earlier month
+// since this platform's own billing began. Reuses loadPaidByTeacher/computeTotals - the exact same
+// functions the Salary table itself is built from - so what carries forward is always precisely the
+// overpayment the previous month's row showed, never a separately-derived figure that could drift.
+const computeCarryIn = (branchId, rates, teacherIds, rangeFrom) => {
+    const monthKeys = []
+    const stopAt = localMonthKey(rangeFrom)
+    for (let key = FIRST_BILLING_MONTH; key < stopAt && monthKeys.length < MAX_CARRY_MONTHS; key = nextMonthKey(key)) monthKeys.push(key)
+    return carryOverChain({
+        monthKeys, teacherIds,
+        getPaid: async (key) => {
+            const { from, to } = monthBounds(key)
+            const paid = await loadPaidByTeacher(branchId, teacherIds, from, to)
+            return new Map([...paid].map(([id, p]) => [id, p.amount]))
+        },
+        getTotals: async (key, ids) => {
+            const { from, to } = monthBounds(key)
+            const rows = await computeTotals(branchId, rates, clampToLegacyCutoff(from), to, ids)
+            return new Map(rows.map(r => [String(r.teacherId), r.total]))
+        },
+    })
+}
+
+// computes each of this branch's teachers' salary for a date range, then nets it against what's
+// already been given: payouts made FOR this period, and any overpayment carried in from earlier
+// months. Per row: `remaining` is what's still owed, `carryInApplied`/`carryInFrom` how much earlier
+// overpayment was credited here and the 'YYYY-MM' it started building in, and `overpaid` what's been
+// given beyond this period's earnings (it carries into the next period).
+export const calculateSalaries = async (branchId, rates, rangeFrom, dateTo) => {
+    const dateFrom = clampToLegacyCutoff(rangeFrom)
+    if (dateFrom > dateTo) return [] // the whole requested range predates this platform's own billing start
+
+    const rows = await computeTotals(branchId, rates, dateFrom, dateTo)
+    if (rows.length === 0) return []
+    const teacherIds = rows.map(r => r.teacherId)
+
+    const [paidByTeacher, carries] = await Promise.all([
+        loadPaidByTeacher(branchId, teacherIds, rangeFrom, dateTo),
+        computeCarryIn(branchId, rates, teacherIds, rangeFrom),
+    ])
+
+    return rows.map(row => {
+        const key = String(row.teacherId)
+        const paidInfo = paidByTeacher.get(key) || { amount: 0, payments: [] }
+        const carry = carries.get(key)
+        const carryAmount = carry?.amount || 0
+        const earned = Math.max(0, row.total)
+        return {
+            ...row,
+            paidAmount: paidInfo.amount,
+            carryInApplied: Math.min(carryAmount, earned),
+            carryInFrom: carryAmount > 0 ? carry.since : null,
+            overpaid: Math.max(0, paidInfo.amount + carryAmount - earned),
+            // always a live figure, never a locked-in one - if a student pays more after a payout
+            // already happened for this period, the next Hisoblang just shows the new gap directly
+            remaining: Math.max(0, earned - carryAmount - paidInfo.amount),
+            payments: paidInfo.payments,
+        }
+    })
 }
 
 // itemized breakdown for one teacher - backs the Salary page's "Details" button, so an admin can

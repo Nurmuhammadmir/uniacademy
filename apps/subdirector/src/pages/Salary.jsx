@@ -15,6 +15,8 @@ const RATE_UNIT_KEYS = {
 }
 const SELECTABLE_RATE_TYPES = ['fixed_monthly', 'percent_of_revenue']
 const PAYOUT_METHODS = ['cash', 'card', 'click', 'bank_transfer', 'payme', 'apelsin']
+// 'YYYY-MM' -> 'MM.YYYY' (day-before-month, same convention as every other date in the app)
+const formatMonthKey = (key) => key ? `${key.slice(5, 7)}.${key.slice(0, 4)}` : ''
 
 // same calculator as admin's own Salary page, just driven by whichever branchId the Finance page's
 // switcher has selected instead of the caller's own home branch
@@ -280,10 +282,16 @@ const Salary = ({ branchId }) => {
                   {r.paidAmount > 0 && (
                     <p className='text-[11px] text-muted mt-1'>{t('alreadyPaidLabel')}: {formatMoney(r.paidAmount)}</p>
                   )}
+                  {r.carryInApplied > 0 && (
+                    <p className='text-[11px] text-accent mt-1'>{t('carryInAppliedLabel', { amount: formatMoney(r.carryInApplied), month: formatMonthKey(r.carryInFrom) })}</p>
+                  )}
+                  {r.overpaid > 0 && (
+                    <p className='text-[11px] text-amber-600 mt-1'>{t('overpaidLabel', { amount: formatMoney(r.overpaid) })}</p>
+                  )}
                 </td>
                 <td className='px-4 py-4'>
                   {r.remaining <= 0 ? (
-                    <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent'>{t('paidBadge')}</span>
+                    <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent'>{t(r.paidAmount === 0 && r.carryInApplied > 0 ? 'coveredByCarryBadge' : 'paidBadge')}</span>
                   ) : (
                     <div className='flex flex-col gap-1.5 items-start'>
                       {r.paidAmount > 0 && (
@@ -336,9 +344,11 @@ const Salary = ({ branchId }) => {
               <div>
                 <p className='font-mono text-ink text-base'>{formatMoney(r.total)}</p>
                 {r.paidAmount > 0 && <p className='text-[11px] text-muted mt-0.5'>{t('alreadyPaidLabel')}: {formatMoney(r.paidAmount)}</p>}
+                {r.carryInApplied > 0 && <p className='text-[11px] text-accent mt-0.5'>{t('carryInAppliedLabel', { amount: formatMoney(r.carryInApplied), month: formatMonthKey(r.carryInFrom) })}</p>}
+                {r.overpaid > 0 && <p className='text-[11px] text-amber-600 mt-0.5'>{t('overpaidLabel', { amount: formatMoney(r.overpaid) })}</p>}
               </div>
               {r.remaining <= 0 ? (
-                <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent'>{t('paidBadge')}</span>
+                <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent'>{t(r.paidAmount === 0 && r.carryInApplied > 0 ? 'coveredByCarryBadge' : 'paidBadge')}</span>
               ) : (
                 <div className='flex flex-col gap-1.5 items-end'>
                   {r.paidAmount > 0 && <span className='text-xs text-amber-600'>{t('remainingToPayLabel')}: {formatMoney(r.remaining)}</span>}
@@ -367,6 +377,7 @@ const Salary = ({ branchId }) => {
             <p className='text-xs text-muted mb-4'>
               {t('totalSalaryCol')}: {formatMoney(payingRow.total)}
               {payingRow.paidAmount > 0 && ` · ${t('alreadyPaidLabel')}: ${formatMoney(payingRow.paidAmount)}`}
+              {payingRow.carryInApplied > 0 && ` · ${t('carryInShortLabel')} (${formatMonthKey(payingRow.carryInFrom)}): ${formatMoney(payingRow.carryInApplied)}`}
             </p>
 
             <form onSubmit={submitPay} className='flex flex-col gap-3'>

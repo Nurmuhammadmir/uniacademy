@@ -28,7 +28,7 @@ import { assertNoScheduleConflict } from "../services/scheduleConflict.service.j
 import { computeDayCounter } from "../services/dayCounter.service.js"
 import { earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
 import { deleteLevelContent, deleteDayContent } from "../services/contentCascade.service.js"
-import { calculateSalaries, getTeacherSalaryDetail } from "../services/salaryCalculation.service.js"
+import { calculateSalaries, getTeacherSalaryDetail, salaryPeriodFields } from "../services/salaryCalculation.service.js"
 import { getFinanceOverview as getFinanceOverviewService } from "../services/financeOverview.service.js"
 import { startOfLocalDay, endOfLocalDay } from "../services/businessTime.service.js"
 import { ensureDefaultCategories, ensureCategoryExists, SALARY_CATEGORY, PREPAYMENT_CATEGORY, OTHER_CATEGORY } from "../services/expenseCategories.service.js"
@@ -1771,6 +1771,7 @@ export const paySalary = async (req, res) => {
             recipient: teacher?.name || '', method,
             date: expenseDate,
             note: dateFrom && dateTo ? `Salary for ${dateFrom} — ${dateTo}` : 'Salary payout',
+            ...salaryPeriodFields(dateFrom, dateTo),
             createdBy: req.auth.userId,
         })
 
@@ -1823,6 +1824,7 @@ export const prepaySalary = async (req, res) => {
             recipient: teacher?.name || '', method,
             date: expenseDate,
             note: dateFrom && dateTo ? `Prepayment for ${dateFrom} — ${dateTo}` : 'Salary prepayment',
+            ...salaryPeriodFields(dateFrom, dateTo),
             createdBy: req.auth.userId,
         })
 

@@ -8,6 +8,8 @@ import MoneyInput from '../components/MoneyInput.jsx'
 import { currentMonthISO, lastDayOfMonthISO, formatUTCDate } from '../lib/date.js'
 
 const PAYOUT_METHODS = ['cash', 'card', 'click', 'bank_transfer', 'payme', 'apelsin']
+// 'YYYY-MM' -> 'MM.YYYY' (day-before-month, same convention as every other date in the app)
+const formatMonthKey = (key) => key ? `${key.slice(5, 7)}.${key.slice(0, 4)}` : ''
 
 // how much each teacher gets paid ("Hisoblash usuli" - the rate type/percent behind that number)
 // is director-only, confirmed - this page only ever shows the resulting amount/students/groups and
@@ -106,6 +108,12 @@ const Salary = () => {
                   {r.paidAmount > 0 && (
                     <p className='text-[11px] text-muted mt-1'>{t('alreadyPaidLabel')}: {formatMoney(r.paidAmount)}</p>
                   )}
+                  {r.carryInApplied > 0 && (
+                    <p className='text-[11px] text-accent dark:text-[#818CF8] mt-1'>{t('carryInAppliedLabel', { amount: formatMoney(r.carryInApplied), month: formatMonthKey(r.carryInFrom) })}</p>
+                  )}
+                  {r.overpaid > 0 && (
+                    <p className='text-[11px] text-amber-600 dark:text-amber-400 mt-1'>{t('overpaidLabel', { amount: formatMoney(r.overpaid) })}</p>
+                  )}
                 </td>
                 <td className='px-4 py-4'>
                   {r.remaining > 0 ? (
@@ -124,7 +132,7 @@ const Salary = () => {
                       whose students paid nothing this period) - that's not the same as "Paid", so the
                       badge only shows once something real was actually earned and settled */}
                       {r.total > 0 && (
-                        <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]'>{t('paidBadge')}</span>
+                        <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]'>{t(r.paidAmount === 0 && r.carryInApplied > 0 ? 'coveredByCarryBadge' : 'paidBadge')}</span>
                       )}
                       <button onClick={() => openPay(r, 'prepay')} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-ink text-xs font-medium'>{t('debtBtn')}</button>
                     </div>
@@ -171,6 +179,8 @@ const Salary = () => {
               <div>
                 <p className='font-mono text-ink text-base'>{formatMoney(r.total)}</p>
                 {r.paidAmount > 0 && <p className='text-[11px] text-muted mt-0.5'>{t('alreadyPaidLabel')}: {formatMoney(r.paidAmount)}</p>}
+                {r.carryInApplied > 0 && <p className='text-[11px] text-accent dark:text-[#818CF8] mt-0.5'>{t('carryInAppliedLabel', { amount: formatMoney(r.carryInApplied), month: formatMonthKey(r.carryInFrom) })}</p>}
+                {r.overpaid > 0 && <p className='text-[11px] text-amber-600 dark:text-amber-400 mt-0.5'>{t('overpaidLabel', { amount: formatMoney(r.overpaid) })}</p>}
               </div>
               {r.remaining > 0 ? (
                 <div className='flex flex-col gap-1.5 items-end'>
@@ -183,7 +193,7 @@ const Salary = () => {
               ) : (
                 <div className='flex flex-col gap-1.5 items-end'>
                   {r.total > 0 && (
-                    <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]'>{t('paidBadge')}</span>
+                    <span className='text-xs font-medium px-2 py-1 rounded-full bg-accent-soft text-accent dark:bg-[#1E1B4B] dark:text-[#818CF8]'>{t(r.paidAmount === 0 && r.carryInApplied > 0 ? 'coveredByCarryBadge' : 'paidBadge')}</span>
                   )}
                   <button onClick={() => openPay(r, 'prepay')} className='px-3 py-1.5 rounded-lg bg-bg border border-hairline text-ink text-xs font-medium'>{t('debtBtn')}</button>
                 </div>
@@ -207,6 +217,7 @@ const Salary = () => {
             <p className='text-xs text-muted mb-4'>
               {t('totalSalaryCol')}: {formatMoney(payingRow.total)}
               {payingRow.paidAmount > 0 && ` · ${t('alreadyPaidLabel')}: ${formatMoney(payingRow.paidAmount)}`}
+              {payingRow.carryInApplied > 0 && ` · ${t('carryInShortLabel')} (${formatMonthKey(payingRow.carryInFrom)}): ${formatMoney(payingRow.carryInApplied)}`}
             </p>
 
             <form onSubmit={submitPay} className='flex flex-col gap-3'>

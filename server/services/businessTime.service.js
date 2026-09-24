@@ -10,6 +10,9 @@ export const startOfLocalDay = (dateStr) => new Date(new Date(dateStr + 'T00:00:
 
 export const endOfLocalDay = (dateStr) => new Date(startOfLocalDay(dateStr).getTime() + 24 * 60 * 60 * 1000 - 1)
 
+// 'YYYY-MM' of the business-local calendar month a moment falls in
+export const localMonthKey = (date) => new Date(date.getTime() + TZ_OFFSET_MS).toISOString().slice(0, 7)
+
 // "today" as a 'YYYY-MM-DD' string in the admin's own wall-clock day (Asia/Tashkent), for the same
 // "today" a human means when they say "today's expense" - not the UTC calendar date, which can
 // already be tomorrow in Tashkent for several hours each evening

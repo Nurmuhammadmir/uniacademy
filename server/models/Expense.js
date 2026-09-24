@@ -15,6 +15,13 @@ const expenseSchema = new mongoose.Schema({
     method: { type: String, enum: EXPENSE_METHODS, default: 'cash' },
     note: { type: String, default: '' },
     teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // set for category:'salary' rows
+    // salary/prepayment payouts only: the pay period the money was FOR (what the Salary page had
+    // selected when Pay/Prepay was clicked), independent of `date` (when the money left the till).
+    // The Salary calculator attributes a payout to the period it was for, so paying September's
+    // salary on Oct 3 still counts against September. Rows without it (older payouts) fall back to
+    // `date`.
+    salaryPeriodFrom: { type: Date, default: null },
+    salaryPeriodTo: { type: Date, default: null },
     // set only for a refund's own bookkeeping Expense (see adminController.refundPayment) - the one
     // link back to the Payment it refunded, so deletePayment can find and remove it too. Without this,
     // permanently deleting a payment that had been refunded correctly erases the ledger's own trace of
