@@ -5,7 +5,8 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, useSortable, verticalListSortingStrategy, horizontalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Lock, Unlock, Trash2, FileText, Settings, Zap, X, Plus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { GripVertical, Lock, Unlock, Trash2, FileText, Settings, Zap, X, Plus, GraduationCap } from 'lucide-react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Select from '../components/Select.jsx'
@@ -27,7 +28,7 @@ const bucketKey = (columnId, subgroupId) => `bucket-${columnId}-${subgroupId || 
 // The delete button lives here, in the edit modal, behind no extra confirm step of its own beyond
 // what deleteLead's own context function already does (a real confirm() dialog, same as every other
 // permanent-delete action in this app).
-const LeadEditModal = ({ lead, sources, onSave, onDelete, onEditForm, onClose, t }) => {
+const LeadEditModal = ({ lead, sources, onSave, onDelete, onEditForm, onViewStudent, onClose, t }) => {
   const [form, setForm] = useState({ name: lead.name, phone: lead.phone, source: lead.source, comment: lead.comment })
 
   const save = async (e) => {
@@ -60,6 +61,12 @@ const LeadEditModal = ({ lead, sources, onSave, onDelete, onEditForm, onClose, t
           {lead.formId && (
             <button type='button' onClick={() => onEditForm(lead.formId)} className='text-accent dark:text-[#818CF8] text-xs font-medium text-left'>{t('editFormBtn')}</button>
           )}
+          {lead.convertedStudentId && (
+            <button type='button' onClick={() => onViewStudent(lead.convertedStudentId)}
+              className='flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 text-sm font-medium transition-colors'>
+              <GraduationCap size={15} strokeWidth={1.75} /> {t('viewConvertedStudentBtn')}
+            </button>
+          )}
           <div className='flex gap-2 mt-2'>
             <button type='button' onClick={remove}
               className='px-4 py-2.5 rounded-xl bg-white border border-rose-200 text-rose-500 text-sm font-medium hover:bg-rose-50 dark:bg-[#1E293B] dark:border-rose-500/30 dark:text-rose-400 dark:hover:bg-rose-500/10 transition-colors flex items-center gap-1.5'>
@@ -75,7 +82,7 @@ const LeadEditModal = ({ lead, sources, onSave, onDelete, onEditForm, onClose, t
 
 const DEFAULT_DOT_COLOR = '#94A3B8'
 
-const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onDelete, onEditForm, t, isCompact }) => {
+const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onDelete, onEditForm, onViewStudent, t, isCompact }) => {
   const [editing, setEditing] = useState(false)
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: 'lead-' + lead._id, data: { type: 'lead', leadId: lead._id, columnId, subgroupId },
@@ -89,10 +96,12 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onDelete, onEdi
         className='bg-white border border-slate-100 dark:bg-[#1E293B] dark:border-slate-800 rounded-xl py-1.5 px-3 mb-1 cursor-grab'>
         <button onClick={() => setEditing(true)} className='plain w-full text-left flex items-center justify-between gap-2'>
           <p className='font-semibold text-slate-700 dark:text-slate-300 text-xs truncate'>{lead.name}</p>
-          <span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: dotColor }} />
+          {lead.convertedStudentId ? <GraduationCap size={13} strokeWidth={2} className='flex-shrink-0 text-emerald-500 dark:text-emerald-400' /> : (
+            <span className='w-2 h-2 rounded-full flex-shrink-0' style={{ backgroundColor: dotColor }} />
+          )}
         </button>
         {editing && (
-          <LeadEditModal lead={lead} sources={sources} onSave={onSave} onDelete={onDelete} onEditForm={onEditForm} onClose={() => setEditing(false)} t={t} />
+          <LeadEditModal lead={lead} sources={sources} onSave={onSave} onDelete={onDelete} onEditForm={onEditForm} onViewStudent={onViewStudent} onClose={() => setEditing(false)} t={t} />
         )}
       </div>
     )
@@ -110,19 +119,26 @@ const LeadCard = ({ lead, columnId, subgroupId, sources, onSave, onDelete, onEdi
           </div>
           <div className='flex items-center justify-between gap-2 mt-0.5'>
             <p className='text-[#6E6E73] dark:text-[#94A3B8] text-xs truncate'>{lead.phone}</p>
-            <span className='inline-block flex-shrink-0 bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE] dark:bg-[#1E1B4B] dark:text-[#818CF8] dark:border-[#312E81] font-medium px-2 py-0.5 rounded-lg text-[11px]'>{lead.source}</span>
+            <span className='flex items-center gap-1 flex-shrink-0'>
+              {lead.convertedStudentId && (
+                <span className='inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 font-medium px-2 py-0.5 rounded-lg text-[11px]'>
+                  <GraduationCap size={11} strokeWidth={2} /> {t('convertedBadge')}
+                </span>
+              )}
+              <span className='inline-block bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE] dark:bg-[#1E1B4B] dark:text-[#818CF8] dark:border-[#312E81] font-medium px-2 py-0.5 rounded-lg text-[11px]'>{lead.source}</span>
+            </span>
           </div>
         </button>
       </div>
 
       {editing && (
-        <LeadEditModal lead={lead} sources={sources} onSave={onSave} onDelete={onDelete} onEditForm={onEditForm} onClose={() => setEditing(false)} t={t} />
+        <LeadEditModal lead={lead} sources={sources} onSave={onSave} onDelete={onDelete} onEditForm={onEditForm} onViewStudent={onViewStudent} onClose={() => setEditing(false)} t={t} />
       )}
     </div>
   )
 }
 
-const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, onDeleteLead, onAddLead, onEditForm, isCompact }) => {
+const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, onDeleteLead, onAddLead, onEditForm, onViewStudent, isCompact }) => {
   const { setNodeRef } = useDroppable({ id: bucketKey(columnId, subgroupId), data: { type: 'bucket', columnId, subgroupId } })
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', source: sources[0]?.name || 'Other', comment: '' })
@@ -138,7 +154,7 @@ const Bucket = ({ columnId, subgroupId, leads, locked, sources, t, onSaveLead, o
       <SortableContext items={leads.map(l => 'lead-' + l._id)} strategy={verticalListSortingStrategy}>
         {leads.map(lead => (
           <LeadCard key={lead._id} lead={lead} columnId={columnId} subgroupId={subgroupId} sources={sources}
-            onSave={onSaveLead} onDelete={onDeleteLead} onEditForm={onEditForm} t={t} isCompact={isCompact} />
+            onSave={onSaveLead} onDelete={onDeleteLead} onEditForm={onEditForm} onViewStudent={onViewStudent} t={t} isCompact={isCompact} />
         ))}
       </SortableContext>
       {!locked && (adding ? (
@@ -293,6 +309,8 @@ const LeadsBoard = ({ branchId, t }) => {
   const [loaded, setLoaded] = useState(false)
   const [search, setSearch] = usePersistedState('director.leads.search', '')
   const [sourceFilter, setSourceFilter] = usePersistedState('director.leads.sourceFilter', '')
+  const [showConvertedOnly, setShowConvertedOnly] = useState(false)
+  const navigate = useNavigate()
   const [addingColumn, setAddingColumn] = useState(false)
   const [newColumnName, setNewColumnName] = useState('')
   const [showSourceManager, setShowSourceManager] = useState(false)
@@ -337,8 +355,10 @@ const LeadsBoard = ({ branchId, t }) => {
   const filteredLeads = leads.filter(l => {
     const matchesSearch = !search || l.name.toLowerCase().includes(search.toLowerCase()) || l.phone.includes(search)
     const matchesSource = !sourceFilter || l.source === sourceFilter
-    return matchesSearch && matchesSource
+    const matchesConverted = !showConvertedOnly || !!l.convertedStudentId
+    return matchesSearch && matchesSource && matchesConverted
   })
+  const convertedCount = leads.filter(l => l.convertedStudentId).length
 
   const onRename = async (id, name) => {
     setColumns(cols => cols.map(c => c._id === id ? { ...c, name } : c))
@@ -476,6 +496,10 @@ const LeadsBoard = ({ branchId, t }) => {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('searchLeadsPlaceholder')} className={`${FIELD} w-full md:max-w-xs`} />
           <Select className='w-full md:w-40' value={sourceFilter} onChange={setSourceFilter} placeholder={t('anySource')}
             options={[{ value: '', label: t('anySource') }, ...leadSources.map(s => ({ value: s.name, label: s.name }))]} />
+          <button onClick={() => setShowConvertedOnly(v => !v)}
+            className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-1.5 transition-colors ${showConvertedOnly ? 'bg-emerald-500 text-white' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20'}`}>
+            <GraduationCap size={14} strokeWidth={2} /> {t('convertedLeadsCountLabel', { count: convertedCount })}
+          </button>
           <button onClick={() => setShowSourceManager(true)} className='px-3 py-2 rounded-lg bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] dark:bg-[#1E293B] dark:hover:bg-[#334155] dark:text-slate-200 dark:border-none text-sm font-medium flex items-center justify-center gap-1.5 transition-colors'>
             <Settings size={14} /> {t('manageSourcesBtn')}
           </button>
@@ -511,7 +535,7 @@ const LeadsBoard = ({ branchId, t }) => {
                   onAddSubgroup={onAddSubgroup} onRenameSubgroup={onRenameSubgroup} onDeleteSubgroup={onDeleteSubgroup}
                   onOpenAutoIntake={setAutoIntakeSubgroup} onOpenFormWizard={(columnId) => setFormWizard({ columnId })}
                   onSaveLead={onSaveLead} onDeleteLead={onDeleteLead} onAddLead={onAddLead}
-                  onEditForm={(formId) => setFormWizard({ formId })} isCompact={isCompact} />
+                  onEditForm={(formId) => setFormWizard({ formId })} onViewStudent={(studentId) => navigate('/students/' + studentId)} isCompact={isCompact} />
               </div>
             ))}
           </SortableContext>

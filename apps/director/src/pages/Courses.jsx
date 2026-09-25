@@ -19,7 +19,7 @@ const Courses = () => {
   const [tagFilter, setTagFilter] = usePersistedState('director.courses.tagFilter', '')
   const [showAddLanguage, setShowAddLanguage] = useState(false)
   const [editingLanguage, setEditingLanguage] = useState(null)
-  const [languageForm, setLanguageForm] = useState({ code: '', name: '', categoryIds: [] })
+  const [languageForm, setLanguageForm] = useState({ name: '', categoryIds: [] })
   const [showManageTags, setShowManageTags] = useState(false)
   const [newTagName, setNewTagName] = useState('')
   const [editingTagId, setEditingTagId] = useState(null)
@@ -51,12 +51,12 @@ const Courses = () => {
     const ok = editingLanguage
       ? await updateLanguage(editingLanguage._id, languageForm)
       : await createLanguage(languageForm)
-    if (ok) { setShowAddLanguage(false); setEditingLanguage(null); setLanguageForm({ code: '', name: '', categoryIds: [] }) }
+    if (ok) { setShowAddLanguage(false); setEditingLanguage(null); setLanguageForm({ name: '', categoryIds: [] }) }
   }
 
   const openEditLanguage = (language) => {
     setEditingLanguage(language)
-    setLanguageForm({ code: language.code, name: language.name, categoryIds: (language.categoryIds || []).map(c => c._id || c) })
+    setLanguageForm({ name: language.name, categoryIds: (language.categoryIds || []).map(c => c._id || c) })
     setShowAddLanguage(true)
   }
 
@@ -98,12 +98,12 @@ const Courses = () => {
     setLevelForm({ name: level.name, order: level.order, durationDays: level.durationDays || 300, hasReading: level.hasReading !== false })
   }
 
-  // search by name/code, narrow further by tag - once a branch runs dozens of courses, scrolling
+  // search by name, narrow further by tag - once a branch runs dozens of courses, scrolling
   // one flat list stops being practical
   const visibleLanguages = useMemo(() => {
     const q = search.trim().toLowerCase()
     return languages.filter(lang => {
-      if (q && !lang.name.toLowerCase().includes(q) && !lang.code.toLowerCase().includes(q)) return false
+      if (q && !lang.name.toLowerCase().includes(q)) return false
       if (tagFilter && !(lang.categoryIds || []).some(c => (c._id || c) === tagFilter)) return false
       return true
     })
@@ -120,7 +120,7 @@ const Courses = () => {
           <button onClick={() => setShowManageTags(true)} className='px-4 py-2.5 rounded-xl bg-bg-elevated border border-hairline text-ink text-sm font-medium'>
             {t('manageTagsTitle')}
           </button>
-          <button onClick={() => { setEditingLanguage(null); setLanguageForm({ code: '', name: '', categoryIds: [] }); setShowAddLanguage(true) }}
+          <button onClick={() => { setEditingLanguage(null); setLanguageForm({ name: '', categoryIds: [] }); setShowAddLanguage(true) }}
             className='flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-accent text-white text-sm font-medium'>
             <Plus size={15} strokeWidth={2} /> {t('addLanguage')}
           </button>
@@ -149,7 +149,6 @@ const Courses = () => {
               <div className='min-w-0'>
                 <div className='flex items-baseline gap-2 flex-wrap'>
                   <p className='text-ink font-semibold text-base'>{lang.name}</p>
-                  <span className='text-muted text-xs font-mono'>{lang.code}</span>
                 </div>
                 {(lang.categoryIds || []).length > 0 && (
                   <div className='flex flex-wrap gap-1.5 mt-2'>
@@ -224,8 +223,6 @@ const Courses = () => {
         <Modal title={editingLanguage ? t('editX', { name: editingLanguage.name }) : t('addLanguageTitle')} onClose={() => { setShowAddLanguage(false); setEditingLanguage(null) }}>
           <form onSubmit={submitLanguage} className='flex flex-col gap-3'>
             <input placeholder={t('languageName')} value={languageForm.name} onChange={e => setLanguageForm({ ...languageForm, name: e.target.value })}
-              className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
-            <input placeholder={t('languageCode')} value={languageForm.code} onChange={e => setLanguageForm({ ...languageForm, code: e.target.value })}
               className='px-4 py-3 rounded-xl bg-bg border border-hairline' required />
             <div>
               <p className='text-xs text-muted mb-1.5'>{t('courseTagsLabel')}</p>

@@ -269,6 +269,24 @@ const StudentProfile = () => {
         </div>
 
         <div>
+          <div className='flex items-baseline justify-between gap-2 mb-2'>
+            <p className='text-ink font-medium'>{t('discountsSectionTitle')}</p>
+            {data.totalDiscount > 0 && <p className='text-muted text-xs'>{t('discountsTotalLabel', { amount: formatMoney(data.totalDiscount) })}</p>}
+          </div>
+          <div className='flex flex-col gap-3'>
+            {(data.discounts || []).map(d => (
+              <div key={d._id} className='flex flex-wrap justify-between items-center gap-2 text-sm bg-bg-elevated border border-hairline rounded-lg px-3 py-2'>
+                <span className='text-muted'>
+                  {new Date(d.date).toLocaleDateString('en-GB')}{d.languageName ? ` · ${d.languageName}` : ''}{d.givenBy ? ` · ${t('discountGivenBy', { name: d.givenBy })}` : ''}
+                </span>
+                <span className='font-mono text-accent'>-{formatMoney(d.amount)}</span>
+              </div>
+            ))}
+            {(data.discounts || []).length === 0 && <p className='text-muted text-sm'>{t('noDiscountsGiven')}</p>}
+          </div>
+        </div>
+
+        <div>
           <p className='text-ink font-medium mb-2'>{t('paymentHistory')}</p>
           <div className='flex flex-col gap-3'>
             {data.payments.map(p => (

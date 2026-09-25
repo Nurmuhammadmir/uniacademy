@@ -418,6 +418,24 @@ const StudentProfile = () => {
           </div>
 
           <div className={CARD}>
+            <div className='flex items-baseline justify-between gap-2 mb-2'>
+              <p className='text-ink font-medium'>{t('discountsSectionTitle')}</p>
+              {data.totalDiscount > 0 && <p className='text-muted text-xs'>{t('discountsTotalLabel', { amount: formatMoney(data.totalDiscount) })}</p>}
+            </div>
+            <div className='flex flex-col gap-2'>
+              {(data.discounts || []).map(d => (
+                <div key={d._id} className='flex flex-wrap justify-between items-center gap-2 text-sm bg-[#f5f5f7] rounded-lg px-3 py-2 dark:bg-slate-800/40'>
+                  <span className='text-muted'>
+                    {formatDateTime(d.date)}{d.languageName ? ` · ${d.languageName}` : ''}{d.givenBy ? ` · ${t('discountGivenBy', { name: d.givenBy })}` : ''}
+                  </span>
+                  <span className='font-mono text-accent dark:text-[#818CF8]'>-{formatMoney(d.amount)}</span>
+                </div>
+              ))}
+              {(data.discounts || []).length === 0 && <p className='text-muted text-sm'>{t('noDiscountsGiven')}</p>}
+            </div>
+          </div>
+
+          <div className={CARD}>
             {/* no standalone "add language"/"correct level" tools anymore - a course only ever
                 exists because the student was added to a GROUP (which fixes its language, level,
                 and price all at once - see the Groups card's "add to group" flow below). Courses

@@ -37,7 +37,7 @@ import { computeStudentStatements, computeReconciliation, computeGroupRevenue, c
 import { earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
 import { computeEffectiveLessonStatuses, computeEffectiveLessonStatus } from "../services/lessonStatus.service.js"
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
-import { applyDiscountToStudent, deleteDiscountEntry } from "../services/discountApplication.service.js"
+import { applyDiscountToStudent, deleteDiscountEntry, listStudentDiscounts } from "../services/discountApplication.service.js"
 import { openMembership, closeMembership } from "../services/groupMembership.service.js"
 import { getOrCreateAccount, postTransfer, postEntry, deleteEntries, formatAmount } from "../services/ledger.service.js"
 import { recognizeEnrollmentDebt, computeCourseOwed, recomputeEnrollmentStatus, reverseUnusedPeriod, recognizeNextPeriod } from "../services/billingCycle.service.js"
@@ -601,6 +601,7 @@ export const getStudentProfile = async (req, res) => {
         const openMemberships = await GroupMembership.find({ studentId: student._id, leftAt: null }).sort({ joinedAt: 1 }).lean()
         const joinedAtByGroup = Object.fromEntries(openMemberships.map(m => [String(m.groupId), m.joinedAt]))
         const groupsWithJoinedAt = groups.map(g => ({ ...g, joinedAt: joinedAtByGroup[String(g._id)] || null }))
+        const discountInfo = await listStudentDiscounts(student._id)
         res.json({
             student,
             courses: coursesWithPrice,
@@ -610,6 +611,7 @@ export const getStudentProfile = async (req, res) => {
             // refundedAmount existed (theirs stayed 0 and was never backfilled)
             totalPaid: payments.reduce((sum, p) => sum + (p.refunded ? 0 : p.amount - (p.refundedAmount || 0)), 0),
             groups: groupsWithJoinedAt,
+            ...discountInfo,
         })
     } catch (error) {
         console.log(error)

@@ -56,6 +56,20 @@ export const applyDiscountToStudent = async ({ student, languageId, type, value,
     return { amount, entry }
 }
 
+// every discount ever given to one student, newest first, plus their total - shown on the student's
+// profile in the admin and director apps so "was a discount given, and how much" is one glance.
+export const listStudentDiscounts = async (studentId) => {
+    const entries = await LedgerEntry.find({ kind: 'discount', studentId }).sort({ date: -1, _id: -1 })
+        .populate('languageId', 'name').populate('createdBy', 'name').lean()
+    return {
+        discounts: entries.map(e => ({
+            _id: e._id, amount: e.amount, date: e.date, description: e.description,
+            languageName: e.languageId?.name || null, givenBy: e.createdBy?.name || null,
+        })),
+        totalDiscount: entries.reduce((sum, e) => sum + e.amount, 0),
+    }
+}
+
 // undoes a discount entirely - the student's balance/debt returns to exactly what it was before,
 // same true-delete guarantee deletePayment/deleteExpense already give (deleteEntries reverses the
 // account and re-stamps every later entry's balanceAfter snapshot, not just a quick balance patch)

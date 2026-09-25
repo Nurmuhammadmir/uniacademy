@@ -12,6 +12,8 @@ import Account from "../models/Account.js"
 import { computeCourseOwed, recomputeEnrollmentStatus, recognizeEnrollmentDebt } from "../services/billingCycle.service.js"
 import { computeOwedByPeriod } from "../services/studentLedger.service.js"
 import Language from "../models/Language.js"
+import { generateLanguageCode } from "../services/languageCode.service.js"
+import { listStudentDiscounts } from "../services/discountApplication.service.js"
 import CourseCategory from "../models/CourseCategory.js"
 import Level from "../models/Level.js"
 import Settings from "../models/Settings.js"
@@ -245,6 +247,7 @@ export const getStudentProfile = async (req, res) => {
         const examAttempts = await ExamAttempt.find({ studentId: student._id }).sort({ date: -1 })
             .populate({ path: 'examId', populate: [{ path: 'languageId', select: 'name' }, { path: 'levelId', select: 'name' }] })
             .lean()
+        const discountInfo = await listStudentDiscounts(student._id)
 
         res.json({
             student,
@@ -256,6 +259,7 @@ export const getStudentProfile = async (req, res) => {
             totalPaid: payments.reduce((sum, p) => sum + (p.refunded ? 0 : p.amount - (p.refundedAmount || 0)), 0),
             groups,
             examAttempts,
+            ...discountInfo,
         })
     } catch (error) {
         console.log(error)
@@ -1000,24 +1004,35 @@ export const deleteBranch = async (req, res) => {
 // api to add a new course language (e.g. Spanish)
 export const createLanguage = async (req, res) => {
     try {
-        const { code, name, categoryIds } = req.body
-        const language = await Language.create({ code, name, categoryIds: categoryIds || [] })
-        res.status(201).json({ language })
+        const { name, categoryIds } = req.body
+        if (!name || !String(name).trim()) return res.status(400).json({ error: 'missing_fields' })
+        // the code is generated from the name - no client sends one any more. A concurrent create can
+        // still grab the same generated code between the lookup and the insert, hence the retry.
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const code = await generateLanguageCode(name, attempt)
+            try {
+                const language = await Language.create({ code, name: String(name).trim(), categoryIds: categoryIds || [] })
+                return res.status(201).json({ language })
+            } catch (error) {
+                if (error.code !== 11000) throw error
+            }
+        }
+        res.status(409).json({ error: 'language_code_taken' })
     } catch (error) {
-        if (error.code === 11000) return res.status(409).json({ error: 'language_code_taken' })
         console.log(error)
         res.status(500).json({ error: 'server_error' })
     }
 }
 
+// the code is an internal identifier that stays fixed for the life of the course - renaming a
+// course never changes it
 export const updateLanguage = async (req, res) => {
     try {
-        const { code, name, categoryIds } = req.body
-        const language = await Language.findByIdAndUpdate(req.params.id, { code, name, categoryIds: categoryIds || [] }, { new: true, runValidators: true })
+        const { name, categoryIds } = req.body
+        const language = await Language.findByIdAndUpdate(req.params.id, { name, categoryIds: categoryIds || [] }, { new: true, runValidators: true })
         if (!language) return res.status(404).json({ error: 'not_found' })
         res.json({ language })
     } catch (error) {
-        if (error.code === 11000) return res.status(409).json({ error: 'language_code_taken' })
         console.log(error)
         res.status(500).json({ error: 'server_error' })
     }
