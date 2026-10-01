@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Phone, Wallet, Pencil, Archive, Receipt, UsersRound, Plus, Printer, Snowflake, Lock, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Phone, Wallet, Pencil, Archive, Receipt, UsersRound, Plus, Printer, Snowflake, Lock, MessageSquare, History } from 'lucide-react'
 import { formatMoney, paymentMethodLabelKey, remainingAmount, groupLabel } from '../lib/format.js'
 import { todayISO, formatUTCDate, formatDateTime } from '../lib/date.js'
 import { AdminContext } from '../context/AdminContext.jsx'
@@ -99,6 +99,34 @@ const CommentsModal = ({ studentId, onClose }) => {
   )
 }
 
+// read-only list of every past freeze/unfreeze cycle (User.freezeHistory) - the only place this is
+// ever visible, since the live frozen/frozenAt/frozenReason fields shown on the profile card itself
+// only ever describe the CURRENT state and get wiped the moment a student unfreezes. Newest first.
+const FreezeHistoryModal = ({ history, onClose }) => {
+  const { t } = useLanguage()
+  const sorted = [...history].sort((a, b) => new Date(b.frozenAt) - new Date(a.frozenAt))
+  return (
+    <Modal title={t('freezeHistoryTitle')} onClose={onClose}>
+      <div className='flex flex-col gap-2 max-h-96 overflow-y-auto'>
+        {sorted.map((f, i) => (
+          <div key={f._id || i} className='bg-[#f5f5f7] dark:bg-[#1E293B] rounded-xl px-3 py-2.5'>
+            <div className='flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300'>
+              <Snowflake size={13} strokeWidth={1.75} className='text-blue-500 flex-shrink-0' />
+              <span className='font-medium'>{formatUTCDate(f.frozenAt)}</span>
+              <span className='text-muted'>→</span>
+              {f.unfrozenAt
+                ? <span className='font-medium'>{formatUTCDate(f.unfrozenAt)}</span>
+                : <span className='text-blue-600 dark:text-blue-400 font-medium'>{t('frozenBadge')}</span>}
+            </div>
+            {f.reason && <p className='text-muted text-xs mt-1'>{f.reason}</p>}
+          </div>
+        ))}
+        {sorted.length === 0 && <p className='text-muted text-sm'>{t('noFreezeHistoryYet')}</p>}
+      </div>
+    </Modal>
+  )
+}
+
 // full profile page - registration date, every course with price/balance, full payment history
 // (with inline refund), exam attempt history, every group ever been in (with add/remove tools),
 // and a free-text notes section. Deliberately does NOT show address/geo - only the director is
@@ -134,6 +162,7 @@ const StudentProfile = () => {
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [printingPaymentId, setPrintingPaymentId] = useState(null)
   const [showFreezeModal, setShowFreezeModal] = useState(false)
+  const [showFreezeHistory, setShowFreezeHistory] = useState(false)
   const [freezeForm, setFreezeForm] = useState({ reason: '', frozenAt: todayISO() })
   const [showComments, setShowComments] = useState(false)
 
@@ -345,6 +374,11 @@ const StudentProfile = () => {
               <p className='text-slate-400 text-xs mt-1 dark:text-slate-600'>{t('registeredOn', { date: new Date(data.student.createdAt).toLocaleDateString('en-GB') })}</p>
               {data.student.frozen && data.student.frozenReason && (
                 <p className='text-blue-600 dark:text-blue-400 text-xs mt-1'>{data.student.frozenReason}</p>
+              )}
+              {data.student.freezeHistory?.length > 0 && (
+                <button onClick={() => setShowFreezeHistory(true)} className='plain flex items-center gap-1 text-muted text-xs mt-1.5 hover:text-slate-700 dark:hover:text-slate-300 transition-colors'>
+                  <History size={12} strokeWidth={1.75} /> {t('freezeHistoryTitle')} ({data.student.freezeHistory.length})
+                </button>
               )}
             </div>
 
@@ -708,6 +742,7 @@ const StudentProfile = () => {
       {printingPaymentId && <ReceiptModal paymentId={printingPaymentId} onClose={() => setPrintingPaymentId(null)} />}
 
       {showComments && <CommentsModal studentId={studentId} onClose={() => setShowComments(false)} />}
+      {showFreezeHistory && <FreezeHistoryModal history={data.student.freezeHistory} onClose={() => setShowFreezeHistory(false)} />}
     </div>
   )
 }

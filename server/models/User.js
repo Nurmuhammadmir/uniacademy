@@ -1,6 +1,17 @@
 // one document per person, role field decides what they can do (see middleware/auth.js)
 import mongoose from "mongoose"
 
+// one row per past freeze/unfreeze cycle - independent of the live frozen/frozenAt/frozenReason
+// fields below (those only ever describe the CURRENT state, and frozenAt gets wiped back to null the
+// moment a student unfreezes). The admin profile reads this array to answer "when was this student
+// frozen before" - nothing else on the document can, once they're unfrozen. unfrozenAt stays null for
+// the in-progress entry while still frozen.
+const freezePeriodSchema = new mongoose.Schema({
+    frozenAt: { type: Date, required: true },
+    unfrozenAt: { type: Date, default: null },
+    reason: { type: String, default: '' },
+}, { timestamps: true })
+
 // a student can study MORE THAN ONE language at once (e.g. English + German), but never the same
 // language twice - that uniqueness is enforced in adminController.addStudentCourse, not here.
 //
@@ -65,6 +76,7 @@ const userSchema = new mongoose.Schema({
     frozen: { type: Boolean, default: false },
     frozenAt: { type: Date, default: null },
     frozenReason: { type: String, default: '' },
+    freezeHistory: { type: [freezePeriodSchema], default: [] },
     notes: { type: String, default: '' }, // student-only: free-text admin/director notes about this student
     createdByAdminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null }, // student-only: which admin registered them
     // parent-only: which student(s) this login can see - a phone number can be linked to more than

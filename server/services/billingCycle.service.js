@@ -278,54 +278,77 @@ export const recognizeEnrollmentDebt = async (student, course, createdBy, enroll
 // rescheduled lesson doesn't retroactively change anything (the schedule, not attendance, decides).
 //
 // asOf lets a freeze be backdated (confirmed spec: "freeze as of last Tuesday", not just "freeze
-// starting right now") - every date this function would otherwise call "today" (which period counts
-// as currently open, how many lessons are unused, what date the reversal itself is dated) uses asOf
+// starting right now") - every date this function would otherwise call "today" (which period(s) count
+// as needing reversal, how many lessons are unused, what date the reversal itself is dated) uses asOf
 // instead when given. Defaults to the real today, so every other caller (removeStudentFromGroup,
 // a same-day freeze) is completely unaffected.
+//
+// Confirmed real bug, found live: a backdated freeze only ever reversed the ONE period open AT asOf -
+// if the daily cron had already posted a further month (or two) by the time the admin actually entered
+// the backdated freeze (entirely normal: the cron has no way to know a freeze is coming until it's
+// actually in the system), those later, fully-unused periods were left charged in full forever, with
+// nothing short of a manual balance correction to fix it. This now walks every not-yet-reversed debt
+// whose periodEnd is on or after asOf: the one period asOf actually falls inside gets the existing
+// lesson-prorated partial reversal (today still counts as attended), and any period that starts
+// entirely AFTER asOf - impossible for a same-day call, only reachable via backdating - gets reversed
+// in full (every one of its lessons is unused, since the student was already frozen for all of it).
 export const reverseUnusedPeriod = async (student, course, group, createdBy = null, reason = 'Removed from group', asOf = null) => {
     const studentAccount = await getOrCreateAccount('student', student._id)
-    const today = asOf ? dateOnlyUTC(asOf) : dateOnlyUTC(new Date())
+    const asOfDate = asOf ? dateOnlyUTC(asOf) : dateOnlyUTC(new Date())
 
-    const currentDebt = await LedgerEntry.findOne({
+    const candidateDebts = await LedgerEntry.find({
         accountId: studentAccount._id, languageId: course.languageId, kind: 'debt',
-        periodStart: { $lte: today }, periodEnd: { $gte: today },
-    }).sort({ periodStart: -1 })
-    if (!currentDebt) return null
+        periodEnd: { $gte: asOfDate },
+    }).sort({ periodStart: 1 })
 
-    // confirmed real bug, found live: freezing a student then also removing them from the group (or
-    // any other double call to this function before a new debt gets recognized for the same period)
-    // found this SAME still-open debt entry both times and reversed its unused tail twice, refunding
-    // the student for lessons they'd already been refunded for. The original debt entry is immutable
-    // so it can't record "already partially reversed" on itself - checking for an existing
-    // debt_reversal pointing back at it (sourceId, set below) is the only way to make this idempotent.
-    const alreadyReversed = await LedgerEntry.exists({ accountId: studentAccount._id, kind: 'debt_reversal', sourceId: currentDebt._id })
-    if (alreadyReversed) return null
+    const entries = []
+    for (const currentDebt of candidateDebts) {
+        // confirmed real bug, found live: freezing a student then also removing them from the group (or
+        // any other double call to this function before a new debt gets recognized for the same period)
+        // found this SAME still-open debt entry both times and reversed its unused tail twice, refunding
+        // the student for lessons they'd already been refunded for. The original debt entry is immutable
+        // so it can't record "already partially reversed" on itself - checking for an existing
+        // debt_reversal pointing back at it (sourceId, set below) is the only way to make this idempotent.
+        const alreadyReversed = await LedgerEntry.exists({ accountId: studentAccount._id, kind: 'debt_reversal', sourceId: currentDebt._id })
+        if (alreadyReversed) continue
 
-    const periodStart = dateOnlyUTC(currentDebt.periodStart)
-    const periodEnd = dateOnlyUTC(currentDebt.periodEnd)
-    const dayAfterToday = new Date(today); dayAfterToday.setUTCDate(dayAfterToday.getUTCDate() + 1)
+        const periodStart = dateOnlyUTC(currentDebt.periodStart)
+        const periodEnd = dateOnlyUTC(currentDebt.periodEnd)
+        const isFullyAfterFreeze = periodStart > asOfDate
 
-    const totalLessons = countScheduledDaysInRange(group, periodStart, periodEnd)
-    const unusedLessons = countScheduledDaysInRange(group, dayAfterToday, periodEnd)
-    if (totalLessons <= 0 || unusedLessons <= 0) return null
+        let totalLessons, unusedLessons, reversalAmount
+        if (isFullyAfterFreeze) {
+            // the whole period happened after the freeze date - nothing in it was attended
+            totalLessons = unusedLessons = countScheduledDaysInRange(group, periodStart, periodEnd)
+            reversalAmount = currentDebt.amount // exact, not lesson-ratio-computed - avoids a rounding mismatch on what should be a 100% refund
+        } else {
+            const dayAfterAsOf = new Date(asOfDate); dayAfterAsOf.setUTCDate(dayAfterAsOf.getUTCDate() + 1)
+            totalLessons = countScheduledDaysInRange(group, periodStart, periodEnd)
+            unusedLessons = countScheduledDaysInRange(group, dayAfterAsOf, periodEnd)
+            reversalAmount = Math.round(currentDebt.amount * unusedLessons / totalLessons)
+        }
+        if (totalLessons <= 0 || unusedLessons <= 0 || reversalAmount <= 0) continue
 
-    const reversalAmount = Math.round(currentDebt.amount * unusedLessons / totalLessons)
-    if (reversalAmount <= 0) return null
+        const description = isFullyAfterFreeze
+            ? `${reason} ${asOfDate.toISOString().slice(0, 10)} - period starts after the freeze date, full ${formatAmount(currentDebt.amount)} returned`
+            : `${reason} ${asOfDate.toISOString().slice(0, 10)} - ${unusedLessons}/${totalLessons} unused lessons of ${formatAmount(currentDebt.amount)} returned = ${formatAmount(reversalAmount)}`
 
-    const entry = await postEntry({
-        accountId: studentAccount._id,
-        direction: 'decrease',
-        amount: reversalAmount,
-        kind: 'debt_reversal',
-        meta: {
-            studentId: student._id, groupId: group._id, languageId: course.languageId, levelId: course.levelId,
-            teacherId: group.teacherId, periodStart: currentDebt.periodStart, periodEnd: currentDebt.periodEnd,
-            sourceType: 'ledgerEntry', sourceId: currentDebt._id,
-        },
-        description: `${reason} ${today.toISOString().slice(0, 10)} - ${unusedLessons}/${totalLessons} unused lessons of ${formatAmount(currentDebt.amount)} returned = ${formatAmount(reversalAmount)}`,
-        createdBy,
-        date: today,
-    })
+        const entry = await postEntry({
+            accountId: studentAccount._id,
+            direction: 'decrease',
+            amount: reversalAmount,
+            kind: 'debt_reversal',
+            meta: {
+                studentId: student._id, groupId: group._id, languageId: course.languageId, levelId: course.levelId,
+                teacherId: group.teacherId, periodStart: currentDebt.periodStart, periodEnd: currentDebt.periodEnd,
+                sourceType: 'ledgerEntry', sourceId: currentDebt._id,
+            },
+            description,
+            createdBy,
+            date: asOfDate,
+        })
+        if (entry) entries.push(entry)
+    }
 
     // confirmed real bug (found live, on production data): course.recognizedThrough was left pointing
     // at the END of the now-partially-reversed period, so re-adding this student to a group for the
@@ -334,9 +357,9 @@ export const reverseUnusedPeriod = async (student, course, group, createdBy = nu
     // both removeStudentFromGroup and setStudentFreeze route through) makes recognizeNextPeriod treat
     // the next call exactly like a fresh mid-month enrollment - it re-prorates from whatever day
     // they're actually re-added/unfrozen on, instead of jumping straight to next month.
-    if (entry) course.recognizedThrough = null
+    if (entries.length > 0) course.recognizedThrough = null
 
-    return entry
+    return entries[entries.length - 1] || null
 }
 
 // cash-basis on purpose (confirmed): a teacher's revenue share is only ever earned on a period

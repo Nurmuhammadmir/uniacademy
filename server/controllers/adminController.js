@@ -808,17 +808,21 @@ export const listDiscounts = async (req, res) => {
 
 // freeze/unfreeze a student's WHOLE account - for when they can't come for a while (e.g. travelling
 // abroad). Whole-account, not per-course/per-group (confirmed spec).
-// Freezing immediately returns the UNUSED tail of whatever period is currently in progress on each
-// of their courses back to their balance - the exact same day-proration reversal
-// removeStudentFromGroup already uses (see reverseUnusedPeriod) - and "un-recognizes" that
-// now-partially-reversed period (clears recognizedThrough) so it isn't silently left looking
-// already-paid-for. Unfreezing immediately re-bills the remaining days of whatever calendar month it
-// happens to land in: with recognizedThrough cleared, recognizeNextPeriod's own no-history path
-// treats "today" (the unfreeze date) exactly like a fresh enrollment date, prorating from there to
-// the end of that month - so a student frozen mid-month and unfrozen mid-month only ever pays for
-// the days they could actually attend on either side of the freeze, never the days in between.
-// Attendance/homework are completely untouched - they're driven by Group.schedulePattern/dayCounter,
-// an entirely separate system. Toggled from the student's profile.
+// Freezing immediately returns the UNUSED portion of billing back to their balance on each of their
+// courses - reverseUnusedPeriod handles both the currently-open period (lesson-prorated, same as
+// removeStudentFromGroup) AND, when the freeze is backdated far enough, any further already-posted
+// period(s) in between (reversed in full) - and "un-recognizes" whatever it touched (clears
+// recognizedThrough) so none of it is silently left looking already-paid-for. Unfreezing immediately
+// re-bills the remaining days of whatever calendar month it happens to land in: with recognizedThrough
+// cleared, recognizeNextPeriod's own no-history path treats "today" (the unfreeze date) exactly like a
+// fresh enrollment date, prorating from there to the end of that month - so a student frozen mid-month
+// and unfrozen mid-month only ever pays for the days they could actually attend on either side of the
+// freeze, never the days in between. Attendance/homework are completely untouched - they're driven by
+// Group.schedulePattern/dayCounter, an entirely separate system.
+// freezeHistory logs every past cycle (frozenAt/unfrozenAt/reason) purely for display on the admin
+// profile - the live frozen/frozenAt/frozenReason fields below only ever describe the current state and
+// can't answer "when was this student frozen before" once they're unfrozen again.
+// Toggled from the student's profile.
 export const setStudentFreeze = async (req, res) => {
     try {
         const { frozen, reason, frozenAt } = req.body
@@ -836,9 +840,21 @@ export const setStudentFreeze = async (req, res) => {
             effectiveFrozenAt = parsed
         }
 
+        const wasFrozen = student.frozen
         student.frozen = !!frozen
         student.frozenAt = frozen ? effectiveFrozenAt : null
         student.frozenReason = frozen ? (reason || '') : ''
+
+        // freezeHistory is the only place a PAST freeze survives - frozenAt/frozenReason above get
+        // wiped back to their defaults the moment the student unfreezes, so without this there'd be no
+        // way to later answer "when was this student frozen before" at all
+        if (frozen && !wasFrozen) {
+            student.freezeHistory.push({ frozenAt: effectiveFrozenAt, unfrozenAt: null, reason: reason || '' })
+        } else if (!frozen && wasFrozen) {
+            for (let i = student.freezeHistory.length - 1; i >= 0; i--) {
+                if (!student.freezeHistory[i].unfrozenAt) { student.freezeHistory[i].unfrozenAt = new Date(); break }
+            }
+        }
 
         for (const course of student.courses) {
             if (!course.groupId || course.courseCompleted) continue
