@@ -22,8 +22,8 @@ const Select = ({ value, onChange, options, placeholder, className = '', disable
           <span className={`truncate ${selected ? 'text-slate-900' : 'text-slate-400'}`}>{selected ? selected.label : (placeholder || '')}</span>
           <ChevronDown size={15} strokeWidth={1.5} className='text-slate-400 flex-shrink-0' />
         </Listbox.Button>
-        <Listbox.Options transition
-          className='absolute z-20 mt-1.5 w-full max-h-72 overflow-auto rounded-xl bg-white border border-slate-100 shadow-lg shadow-slate-200/50 py-1 focus:outline-none transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0'>
+        <Listbox.Options anchor='bottom start' transition
+          className='z-50 w-[var(--button-width)] max-h-72 overflow-auto rounded-xl bg-white border border-slate-100 shadow-lg shadow-slate-200/50 py-1 focus:outline-none transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 [--anchor-gap:6px]'>
           {showSearch && (
             <div className='sticky -top-1 px-2 pt-1 pb-1.5 mb-1 bg-white border-b border-slate-100'>
               <div className='relative'>

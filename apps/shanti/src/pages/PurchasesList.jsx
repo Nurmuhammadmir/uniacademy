@@ -1,6 +1,6 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { Suspense, lazy, useContext, useEffect, useState } from 'react'
 import { Menu } from '@headlessui/react'
-import { Plus, SlidersHorizontal, MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+import { Plus, SlidersHorizontal, MoreHorizontal, Pencil, Trash2, Receipt } from 'lucide-react'
 import { ShantiContext } from '../context/ShantiContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import Select from '../components/Select.jsx'
@@ -9,9 +9,14 @@ import NumberInput from '../components/NumberInput.jsx'
 import { methodDisplay } from '../components/MethodPicker.jsx'
 import { confirm } from '../lib/confirm.js'
 import Money from '../components/Money.jsx'
+import Spinner from '../components/Spinner.jsx'
 import { formatQuantity } from '../lib/format.js'
 import { formatDateTime } from '../lib/date.js'
 import NewPurchaseModal from './NewPurchaseModal.jsx'
+
+// lazy - pulls in @react-pdf/renderer, a large library only ever needed once someone actually
+// clicks "Акт сверки", not on every Purchases page load
+const StatementModal = lazy(() => import('./StatementModal.jsx'))
 
 // no date bounds by default - shows the whole history rather than just this month
 const DEFAULT_FILTERS = { dateFrom: '', dateTo: '', category: '', materialId: '', sellerId: '', amountMin: '', amountMax: '' }
@@ -44,6 +49,7 @@ const PurchasesList = () => {
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [data, setData] = useState(null)
   const [showFilters, setShowFilters] = useState(false)
+  const [showStatement, setShowStatement] = useState(false)
   const [showNew, setShowNew] = useState(false)
   const [editingPurchase, setEditingPurchase] = useState(null)
   const [editingComment, setEditingComment] = useState(null)
@@ -82,6 +88,10 @@ const PurchasesList = () => {
           <button onClick={() => setShowFilters(v => !v)}
             className={`h-10 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors ${showFilters ? 'bg-accent-soft text-accent' : 'bg-slate-100 text-slate-700'}`}>
             <SlidersHorizontal size={15} strokeWidth={1.75} /> {t('filterBtn')}
+          </button>
+          <button onClick={() => setShowStatement(true)}
+            className='h-10 px-3 rounded-xl text-xs font-semibold flex items-center gap-1.5 bg-accent-soft text-accent transition-colors'>
+            <Receipt size={15} strokeWidth={1.75} /> {t('statementBtn')}
           </button>
           <button onClick={() => setShowNew(true)}
             className='px-4 py-2 rounded-xl bg-accent text-white text-sm font-medium transition-colors shadow-sm flex items-center gap-1.5'>
@@ -208,6 +218,11 @@ const PurchasesList = () => {
 
       {showNew && <NewPurchaseModal onClose={() => setShowNew(false)} onCreated={load} />}
       {editingPurchase && <NewPurchaseModal purchase={editingPurchase} onClose={() => setEditingPurchase(null)} onCreated={load} />}
+      {showStatement && (
+        <Suspense fallback={<div className='fixed inset-0 z-50 bg-slate-900/20 backdrop-blur-md flex items-center justify-center'><Spinner size={28} className='text-white' /></div>}>
+          <StatementModal kind='purchases' onClose={() => setShowStatement(false)} />
+        </Suspense>
+      )}
     </div>
   )
 }

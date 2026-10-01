@@ -7,6 +7,7 @@ import ShantiClient from "../models/ShantiClient.js"
 import ShantiProduct from "../models/ShantiProduct.js"
 import ShantiMaterial from "../models/ShantiMaterial.js"
 import ShantiSale from "../models/ShantiSale.js"
+import ShantiPayment from "../models/ShantiPayment.js"
 import { SHANTI_METHODS } from "../models/shantiConstants.js"
 import { ensureOtherClientCategoryExists, OTHER_CLIENT_CATEGORY } from "../services/shantiCatalog.service.js"
 import { getClientDebtMap } from "../services/shantiDebt.service.js"
@@ -337,6 +338,66 @@ export const getSalesDebtors = async (req, res) => {
         const totalQuantity = Object.entries(quantityByUnit).map(([unit, quantity]) => ({ unit, quantity }))
 
         res.json({ debtors, totalQuantity })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// "Акт сверки" (reconciliation statement) for one client - every sale (debit: what they were
+// charged, credit: what they paid at the time) plus every standalone debt-collection ShantiPayment
+// (credit-only), merged into one chronological ledger with a running balance. Sales/payments dated
+// before dateFrom are folded into openingBalance rather than dropped, so the statement's running
+// balance always reflects the client's real-world debt even when the visible rows only cover part
+// of their history. productId optionally scopes the whole statement to sales containing that
+// product - the balance then reflects only those transactions, not the client's true overall debt
+// (reasonable for "show me our history on this one product", misleading as a legal settlement
+// document, but this is a CRM convenience export, not formal accounting paperwork).
+export const getClientStatement = async (req, res) => {
+    try {
+        const { clientId, dateFrom, dateTo, productId } = req.query
+        if (!clientId) return res.status(400).json({ error: 'client_required' })
+        const client = await ShantiClient.findById(clientId).select('name phone category').lean()
+        if (!client) return res.status(400).json({ error: 'client_not_found' })
+
+        const saleMatch = { clientId: new mongoose.Types.ObjectId(clientId) }
+        if (productId) saleMatch['items.productId'] = new mongoose.Types.ObjectId(productId)
+
+        const [sales, payments] = await Promise.all([
+            ShantiSale.find(saleMatch).sort({ date: 1 }).populate('items.productId', 'name unit').lean(),
+            ShantiPayment.find({ clientId }).sort({ date: 1 }).lean(),
+        ])
+
+        const from = dateFrom ? new Date(dateFrom + 'T00:00:00.000Z') : null
+        const to = dateTo ? new Date(dateTo + 'T23:59:59.999Z') : null
+
+        let openingBalance = 0
+        const rows = []
+        for (const s of sales) {
+            if (from && new Date(s.date) < from) { openingBalance += s.amount - s.paidAmount; continue }
+            if (to && new Date(s.date) > to) continue
+            rows.push({
+                date: s.date, type: 'sale',
+                description: s.items.map(i => `${i.productId?.name || '—'} ×${i.quantity}`).join(', '),
+                comment: s.comment || '', debit: s.amount, credit: s.paidAmount,
+            })
+        }
+        for (const p of payments) {
+            if (from && new Date(p.date) < from) { openingBalance -= p.amount; continue }
+            if (to && new Date(p.date) > to) continue
+            rows.push({ date: p.date, type: 'payment', description: '', comment: p.comment || '', debit: 0, credit: p.amount })
+        }
+        rows.sort((a, b) => new Date(a.date) - new Date(b.date))
+
+        let balance = openingBalance
+        for (const row of rows) { balance += row.debit - row.credit; row.balance = balance }
+
+        res.json({
+            client, dateFrom: dateFrom || null, dateTo: dateTo || null,
+            openingBalance, closingBalance: balance, rows,
+            totalDebit: rows.reduce((sum, r) => sum + r.debit, 0),
+            totalCredit: rows.reduce((sum, r) => sum + r.credit, 0),
+        })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

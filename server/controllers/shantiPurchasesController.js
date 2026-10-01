@@ -315,6 +315,64 @@ export const getSellerDebts = async (req, res) => {
     }
 }
 
+// "Акт сверки" (reconciliation statement) for one seller - mirror of getClientStatement on the
+// sales side: every purchase (debit: what we were charged, credit: what we paid at the time) plus
+// every seller-linked debt-payment ShantiExpense (credit-only), merged chronologically with a
+// running balance. Purchases/expenses before dateFrom fold into openingBalance instead of being
+// dropped. materialId optionally scopes the statement to purchases of that material only - see
+// getClientStatement's comment for why that makes the balance a filtered view, not the seller's
+// true overall debt.
+export const getSellerStatement = async (req, res) => {
+    try {
+        const { sellerId, dateFrom, dateTo, materialId } = req.query
+        if (!sellerId) return res.status(400).json({ error: 'seller_required' })
+        const seller = await ShantiSeller.findById(sellerId).select('name phone').lean()
+        if (!seller) return res.status(400).json({ error: 'seller_not_found' })
+
+        const purchaseMatch = { sellerId: new mongoose.Types.ObjectId(sellerId) }
+        if (materialId) purchaseMatch.materialId = new mongoose.Types.ObjectId(materialId)
+
+        const [purchases, expenses] = await Promise.all([
+            ShantiPurchase.find(purchaseMatch).sort({ date: 1 }).populate('materialId', 'name unit').lean(),
+            ShantiExpense.find({ sellerId }).sort({ date: 1 }).lean(),
+        ])
+
+        const from = dateFrom ? new Date(dateFrom + 'T00:00:00.000Z') : null
+        const to = dateTo ? new Date(dateTo + 'T23:59:59.999Z') : null
+
+        let openingBalance = 0
+        const rows = []
+        for (const p of purchases) {
+            if (from && new Date(p.date) < from) { openingBalance += p.amount - p.paidAmount; continue }
+            if (to && new Date(p.date) > to) continue
+            rows.push({
+                date: p.date, type: 'purchase',
+                description: `${p.materialId?.name || '—'} ×${p.quantity}${p.materialId?.unit ? ' ' + p.materialId.unit : ''}`,
+                comment: p.comment || '', debit: p.amount, credit: p.paidAmount,
+            })
+        }
+        for (const e of expenses) {
+            if (from && new Date(e.date) < from) { openingBalance -= e.amount; continue }
+            if (to && new Date(e.date) > to) continue
+            rows.push({ date: e.date, type: 'expense', description: '', comment: e.comment || '', debit: 0, credit: e.amount })
+        }
+        rows.sort((a, b) => new Date(a.date) - new Date(b.date))
+
+        let balance = openingBalance
+        for (const row of rows) { balance += row.debit - row.credit; row.balance = balance }
+
+        res.json({
+            seller, dateFrom: dateFrom || null, dateTo: dateTo || null,
+            openingBalance, closingBalance: balance, rows,
+            totalDebit: rows.reduce((sum, r) => sum + r.debit, 0),
+            totalCredit: rows.reduce((sum, r) => sum + r.credit, 0),
+        })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
 export const getPurchaseDebts = async (req, res) => {
     try {
         const match = await buildPurchaseMatch(req.query)

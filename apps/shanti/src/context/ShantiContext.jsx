@@ -206,6 +206,10 @@ const ShantiContextProvider = (props) => {
         try { const { data } = await axios.get(backendUrl + '/api/shanti/purchases/seller-debts', authHeader); return data }
         catch (error) { toast.error(error.response?.data?.error || t('couldNotLoadDebts')); return false }
     }
+    const getSellerStatement = async (filters) => {
+        try { const { data } = await axios.get(backendUrl + '/api/shanti/purchases/statement', { ...authHeader, params: filters }); return data }
+        catch (error) { toast.error(error.response?.data?.error || t('couldNotLoadStatement')); return false }
+    }
     const createPurchase = async (payload) => {
         try { await axios.post(backendUrl + '/api/shanti/purchases', payload, authHeader); toast.success(t('purchaseAdded')); getMaterials(); getBalance(); return true }
         catch (error) { toast.error(error.response?.data?.error || t('couldNotAddPurchase')); return false }
@@ -300,6 +304,10 @@ const ShantiContextProvider = (props) => {
     const getSalesDebtors = async (filters) => {
         try { const { data } = await axios.get(backendUrl + '/api/shanti/sales/debtors', { ...authHeader, params: filters }); return data }
         catch (error) { toast.error(error.response?.data?.error || t('couldNotLoadDebtors')); return false }
+    }
+    const getClientStatement = async (filters) => {
+        try { const { data } = await axios.get(backendUrl + '/api/shanti/sales/statement', { ...authHeader, params: filters }); return data }
+        catch (error) { toast.error(error.response?.data?.error || t('couldNotLoadStatement')); return false }
     }
     const getBonusesOverview = async (filters) => {
         try { const { data } = await axios.get(backendUrl + '/api/shanti/sales/bonuses', { ...authHeader, params: filters }); return data }
@@ -402,11 +410,11 @@ const ShantiContextProvider = (props) => {
         sellers, getSellers, createSeller, updateSeller, deleteSeller,
         expenseCategories, getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
         getExpensesOverview, getExpensesChart, createExpense, updateExpense, deleteExpense,
-        getPurchasesOverview, getPurchaseDebts, getSellerDebts, createPurchase, updatePurchase, deletePurchase,
+        getPurchasesOverview, getPurchaseDebts, getSellerDebts, getSellerStatement, createPurchase, updatePurchase, deletePurchase,
         clientCategories, getClientCategories, createClientCategory, updateClientCategory, deleteClientCategory,
         clients, getClients, createClient, updateClient, deleteClient,
         products, getProducts, createProduct, updateProduct, deleteProduct, restockProduct, uploadProductPhoto, deleteProductPhoto,
-        getSalesOverview, getSalesDebtors, getBonusesOverview, createSale, updateSale, deleteSale,
+        getSalesOverview, getSalesDebtors, getClientStatement, getBonusesOverview, createSale, updateSale, deleteSale,
         getDashboardSummary, getDashboardSeries,
         getPaymentsOverview, getPaymentsChart, createPayment, updatePayment, deletePayment,
         getBalanceAdjustments, createBalanceAdjustment, updateBalanceAdjustment, deleteBalanceAdjustment,

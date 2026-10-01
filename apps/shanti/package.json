@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.10",
+    "@react-pdf/renderer": "^4.9.0",
     "axios": "^1.7.2",
     "lucide-react": "^1.34.0",
     "react": "^18.3.1",

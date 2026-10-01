@@ -6,13 +6,13 @@ import {
     listMaterialCategories, createMaterialCategory, updateMaterialCategory, deleteMaterialCategory,
     listMaterials, createMaterial, updateMaterial, deleteMaterial,
     listSellers, createSeller, updateSeller, deleteSeller,
-    getPurchasesOverview, getPurchaseDebts, getSellerDebts, getPurchaseDetail, createPurchase, updatePurchase, deletePurchase,
+    getPurchasesOverview, getPurchaseDebts, getSellerDebts, getSellerStatement, getPurchaseDetail, createPurchase, updatePurchase, deletePurchase,
 } from "../controllers/shantiPurchasesController.js"
 import {
     listClientCategories, createClientCategory, updateClientCategory, deleteClientCategory,
     listClients, createClient, updateClient, deleteClient,
     listProducts, createProduct, updateProduct, deleteProduct, restockProduct,
-    getSalesOverview, getSalesDebtors, getBonusesOverview, getSaleDetail, createSale, updateSale, deleteSale,
+    getSalesOverview, getSalesDebtors, getClientStatement, getBonusesOverview, getSaleDetail, createSale, updateSale, deleteSale,
 } from "../controllers/shantiSalesController.js"
 import { getPaymentsOverview, createPayment, updatePayment, deletePayment, getPaymentsChart } from "../controllers/shantiFinanceController.js"
 import { getDashboardSummary, getDashboardSeries } from "../controllers/shantiDashboardController.js"
@@ -80,6 +80,7 @@ shantiRouter.delete('/sellers/:id', deleteSeller)
 // registration order, and :id would otherwise greedily match the literal "debts"/"seller-debts" segment
 shantiRouter.get('/purchases/debts', getPurchaseDebts)
 shantiRouter.get('/purchases/seller-debts', getSellerDebts)
+shantiRouter.get('/purchases/statement', getSellerStatement)
 shantiRouter.get('/purchases', getPurchasesOverview)
 shantiRouter.get('/purchases/:id', getPurchaseDetail)
 shantiRouter.post('/purchases', createPurchase)
@@ -106,6 +107,7 @@ shantiRouter.delete('/products/:id/photo', deleteProductPhoto)
 
 // same ordering note as purchases/debts above
 shantiRouter.get('/sales/debtors', getSalesDebtors)
+shantiRouter.get('/sales/statement', getClientStatement)
 shantiRouter.get('/sales/bonuses', getBonusesOverview)
 shantiRouter.get('/sales', getSalesOverview)
 shantiRouter.get('/sales/:id', getSaleDetail)

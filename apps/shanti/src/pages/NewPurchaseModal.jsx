@@ -27,6 +27,8 @@ const formFromPurchase = (purchase) => ({
 const pricePerUnitFromPurchase = (purchase) => {
   if (!purchase || !(purchase.quantity > 0)) return ''
   const perUnit = purchase.amount / purchase.quantity
+  // 2 decimals is the exact, complete value for a USD price (not a rounding-away of real precision,
+  // same reasoning as formatPrice) - this only clears float-division noise beyond the cent
   return String(Math.round(perUnit * 100) / 100)
 }
 
