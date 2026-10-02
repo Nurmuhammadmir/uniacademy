@@ -266,8 +266,11 @@ export const recognizeEnrollmentDebt = async (student, course, createdBy, enroll
 // the one this reverses. Safe to call unconditionally: no-ops if there's no currently-open period, or
 // if today is already the period's last day (nothing left to return).
 //
-// Prorated by ACTUAL SCHEDULED LESSONS strictly after today (today itself still counts as attended),
-// out of the total lessons the whole period was originally priced for - the same lesson-based
+// Prorated by ACTUAL SCHEDULED LESSONS from today onward INCLUSIVE (today itself now counts as
+// unused too - confirmed spec change 2026-10-02: a student removed/frozen today didn't attend
+// today's own lesson either, so it gets returned exactly like every later one in the period, not
+// kept as if they'd been taught it), out of the total lessons the whole period was originally priced
+// for - the same lesson-based
 // proration computePeriodCost uses on the "joining mid-month" side (see its own comment for the full
 // reasoning), NOT calendar days. Confirmed real bug, found live: this used to prorate by calendar
 // days instead, so two students removed on the same calendar date got refunded the same fraction of
@@ -292,6 +295,14 @@ export const recognizeEnrollmentDebt = async (student, course, createdBy, enroll
 // lesson-prorated partial reversal (today still counts as attended), and any period that starts
 // entirely AFTER asOf - impossible for a same-day call, only reachable via backdating - gets reversed
 // in full (every one of its lessons is unused, since the student was already frozen for all of it).
+//
+// Retroactive correction, 2026-10-02: a one-off migration (not kept in this codebase) re-priced every
+// historical partial-period debt that had been computed by calendar days instead of lessons (the two
+// formulas agreed only by coincidence before computePeriodCost switched, so earlier entries could be
+// off either direction), and topped up every already-posted partial reversal for the asOf-day-also-
+// unused change below, posting one or two new correction entries per affected student/period rather
+// than touching any existing (immutable) row. Confirmed with the user: applies platform-wide, both to
+// freeze and to plain group removal, since they already shared this one function.
 export const reverseUnusedPeriod = async (student, course, group, createdBy = null, reason = 'Removed from group', asOf = null) => {
     const studentAccount = await getOrCreateAccount('student', student._id)
     const asOfDate = asOf ? dateOnlyUTC(asOf) : dateOnlyUTC(new Date())
@@ -322,9 +333,9 @@ export const reverseUnusedPeriod = async (student, course, group, createdBy = nu
             totalLessons = unusedLessons = countScheduledDaysInRange(group, periodStart, periodEnd)
             reversalAmount = currentDebt.amount // exact, not lesson-ratio-computed - avoids a rounding mismatch on what should be a 100% refund
         } else {
-            const dayAfterAsOf = new Date(asOfDate); dayAfterAsOf.setUTCDate(dayAfterAsOf.getUTCDate() + 1)
+            // asOfDate itself is included as unused now (see comment block above) - was asOfDate+1
             totalLessons = countScheduledDaysInRange(group, periodStart, periodEnd)
-            unusedLessons = countScheduledDaysInRange(group, dayAfterAsOf, periodEnd)
+            unusedLessons = countScheduledDaysInRange(group, asOfDate, periodEnd)
             reversalAmount = Math.round(currentDebt.amount * unusedLessons / totalLessons)
         }
         if (totalLessons <= 0 || unusedLessons <= 0 || reversalAmount <= 0) continue
