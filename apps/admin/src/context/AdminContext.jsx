@@ -1362,6 +1362,15 @@ const AdminContextProvider = (props) => {
             Promise.all([
                 getStudents(), getGroups(), getTeachers(), getLanguages(), getMe(), getSettings(), getRooms(), getExpenseCategories(), getLeadSources(), getPricingList(),
             ]).finally(() => setInitialLoading(false))
+
+            // students carry a live balance (Account.balance) that can change from outside this tab's
+            // own actions - a payment/correction entered on another device, or a backend-only
+            // migration - and unlike every other list here, this one previously only ever loaded once
+            // at login. Polling matches the same pattern the director app already uses for its own
+            // student list (DirectorContext.jsx), so an already-open admin tab self-corrects within
+            // 20s instead of showing a stale balance until the next unrelated mutation or a hard reload.
+            const interval = setInterval(() => { getStudents() }, 20000)
+            return () => clearInterval(interval)
         }
     }, [token])
 
