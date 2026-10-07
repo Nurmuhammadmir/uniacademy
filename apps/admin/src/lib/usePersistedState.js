@@ -1,24 +1,25 @@
 import { useState } from 'react'
 
 // Drop-in replacement for useState (same [value, setValue] shape, setValue accepts a function
-// updater too) that remembers its value in sessionStorage under `key` - so a filter/search/tab
-// choice on a list page survives navigating away (to a profile, another page) and back, instead of
-// resetting to its default every time the component remounts. sessionStorage on purpose: scoped to
-// this browser tab, not a permanent cross-device account setting - matches the same storage this
-// app already uses for list scroll position (see useScrollRestore.js).
+// updater too) that remembers its value in an in-memory module-level store under `key` - so a
+// filter/search/tab choice on a list page survives navigating away (to a profile, another page)
+// and back, instead of resetting to its default every time the component remounts. Deliberately
+// NOT sessionStorage: that also survived a real page reload/refresh, which was the actual
+// complaint ("перезагрузить страницу - фильтры должны сбрасываться") - a hard reload re-executes
+// this module from scratch and clears the store automatically, while in-app navigation (no reload)
+// keeps it alive, which is exactly the split we want.
 // initialValue may be a plain value or a lazy () => value initializer, same as useState itself.
+const store = new Map()
+
 export const usePersistedState = (key, initialValue) => {
   const [value, setValue] = useState(() => {
-    try {
-      const saved = sessionStorage.getItem(key)
-      if (saved !== null) return JSON.parse(saved)
-    } catch { /* fall through to initialValue */ }
+    if (store.has(key)) return store.get(key)
     return typeof initialValue === 'function' ? initialValue() : initialValue
   })
   const setPersisted = (next) => {
     setValue((prev) => {
       const resolved = typeof next === 'function' ? next(prev) : next
-      try { sessionStorage.setItem(key, JSON.stringify(resolved)) } catch { /* storage unavailable (private mode, quota) - state still works in-memory for this render */ }
+      store.set(key, resolved)
       return resolved
     })
   }
