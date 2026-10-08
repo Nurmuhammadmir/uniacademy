@@ -403,9 +403,21 @@ export const computeCoveredDebtPeriodsBatch = async (studentIds, languageId) => 
     if (accounts.length === 0) return result // nobody here has ever had a billing event yet
 
     const studentIdByAccount = new Map(accounts.map(a => [String(a._id), String(a.ownerId)]))
-    const entries = await LedgerEntry.find({
+    const rawEntries = await LedgerEntry.find({
         accountId: { $in: accounts.map(a => a._id) }, kind: { $in: ALLOCATION_KINDS },
     }).sort({ date: 1, _id: 1 })
+    // a course-less 'debt' (languageId null) can only be a director's manual archive/backfill
+    // correction (adjustStudentBalance) - recognizeNextPeriod, the only normal path that ever posts a
+    // real course charge, always stamps languageId/groupId/teacherId, so this combination never
+    // occurs for a genuine billing event. Confirmed real bug, found live 2026-10: these sat first in
+    // the oldest-debt-first queue (same queue every OTHER course's debt competes in) and silently
+    // swallowed real same-month cash before any teacher's own course debt got a turn, crediting a
+    // teacher far less than the student actually paid that month - while the student's own balance
+    // stayed correct, since computeAccountAllocation (DISPLAY_KINDS, what the balance/profile page
+    // reads) is untouched by this filter and still sees these rows exactly as before. No course-less
+    // debt can ever belong to ANY teacher by construction, so excluding it here only ever frees cash
+    // up for a real course's teacher - it never takes revenue away from one.
+    const entries = rawEntries.filter(e => !(e.kind === 'debt' && !e.languageId))
 
     const entriesByStudent = new Map()
     for (const e of entries) {
