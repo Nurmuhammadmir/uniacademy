@@ -1,7 +1,10 @@
-// one sale to a client, one or more product lines. `amount` defaults to sum(items.qty*price) at
-// create time but is directly overridable (confirmed: neither a line's price nor the sale's total
+// one sale to a client, normally one or more product lines. `amount` defaults to sum(items.qty*price)
+// at create time but is directly overridable (confirmed: neither a line's price nor the sale's total
 // should be hard-locked to the product catalog). `paidAmount` defaults to `amount`; debt is computed
 // on read, same idiom as ShantiPurchase.
+// `items` can be empty - confirmed spec: a pure-bonus "deal" (free goods with nothing actually sold,
+// e.g. a promo giveaway) is still a real sale worth recording, as long as `bonusItems` carries
+// something; the controller enforces "not both empty" since a sale with neither is nothing at all.
 import mongoose from "mongoose"
 import { SHANTI_METHODS } from "./shantiConstants.js"
 
@@ -19,7 +22,7 @@ const methodBreakdownSchema = new mongoose.Schema({
 const shantiSaleSchema = new mongoose.Schema({
     clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'ShantiClient', required: true },
     date: { type: Date, default: Date.now },
-    items: { type: [shantiSaleItemSchema], required: true },
+    items: { type: [shantiSaleItemSchema], default: [] },
     // free goods thrown in with this sale. Same shape as `items`, but `price` here is the per-unit
     // COST we absorb (never revenue): they leave stock like any sold item, add nothing to `amount`,
     // and are booked as ONE linked cash ShantiExpense (see shantiBonus.service.js). The price is

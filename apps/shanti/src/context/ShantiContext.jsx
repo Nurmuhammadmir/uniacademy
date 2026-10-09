@@ -317,7 +317,8 @@ const ShantiContextProvider = (props) => {
     const saleErrorText = (code, fallback) => (
         code === 'bonus_price_required' ? t('bonusPriceRequiredError')
             : code === 'invalid_bonus_item' ? t('invalidBonusItemError')
-                : (code || fallback)
+                : code === 'nothing_to_record' ? t('nothingToRecordError')
+                    : (code || fallback)
     )
     const createSale = async (payload) => {
         try { await axios.post(backendUrl + '/api/shanti/sales', payload, authHeader); toast.success(t('saleAdded')); getProducts(); getBalance(); return true }

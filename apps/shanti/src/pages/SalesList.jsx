@@ -174,13 +174,13 @@ const SalesList = () => {
                   <td className='px-4 py-3 text-ink'>{s.clientId?.name || '—'}</td>
                   <td className='px-4 py-3 text-muted max-w-[180px]'>
                     <p className='truncate' title={s.items.map(i => `${i.productId?.name} ×${i.quantity}`).join(', ')}>
-                      {s.items.map(i => `${i.productId?.name} ×${i.quantity}`).join(', ')}
+                      {s.items.length > 0 ? s.items.map(i => `${i.productId?.name} ×${i.quantity}`).join(', ') : '—'}
                     </p>
                     {s.bonusItems?.length > 0 && (
                       <p className='truncate text-xs text-amber-600' title={bonusText(s)}>{t('bonusLabel')}: {bonusText(s)}</p>
                     )}
                   </td>
-                  <td className='px-4 py-3 text-muted whitespace-nowrap'>{saleQuantityText(s.items)}</td>
+                  <td className='px-4 py-3 text-muted whitespace-nowrap'>{saleQuantityText(s.items) || '—'}</td>
                   <td className='px-4 py-3 font-mono text-ink font-semibold'><Money value={s.amount} /></td>
                   <td className='px-4 py-3 font-mono text-emerald-600 font-semibold'><Money value={s.paidAmount} /></td>
                   <td className={`px-4 py-3 font-mono ${debt > 0 ? 'text-amber-600 font-semibold' : 'text-muted'}`}>{debt > 0 ? <Money value={debt} /> : '—'}</td>
@@ -223,7 +223,7 @@ const SalesList = () => {
               <div className='flex justify-between items-start'>
                 <div className='min-w-0'>
                   <p className='font-semibold text-[#1D1D1F] text-sm truncate'>{s.clientId?.name || '—'}</p>
-                  <p className='text-xs text-slate-400 mt-1'>{formatDateTime(s.date)} · {saleQuantityText(s.items)}</p>
+                  <p className='text-xs text-slate-400 mt-1'>{formatDateTime(s.date)}{saleQuantityText(s.items) ? ` · ${saleQuantityText(s.items)}` : ''}</p>
                   {s.bonusItems?.length > 0 && <p className='text-xs text-amber-600 mt-1'>{t('bonusLabel')}: {bonusText(s)}</p>}
                 </div>
                 <div className='flex items-center gap-1 flex-shrink-0 ml-3'>

@@ -81,7 +81,9 @@ const NewSaleModal = ({ sale, onClose, onCreated }) => {
     e.preventDefault()
     if (!clientId) return
     const validItems = items.filter(i => i.productId && Number(i.quantity) > 0)
-    if (validItems.length === 0) return
+    // a pure-bonus deal (nothing actually sold, just free goods given) is allowed - only block
+    // submit when there's truly nothing to record on either side
+    if (validItems.length === 0 && validBonusItems.length === 0) return
     if (!isMethodSplitValid(split, breakdown, resolvedPaid)) return
     if (validBonusItems.some(i => !(bonusUnitPrice(i.productId) > 0))) { toast.error(t('bonusPriceRequiredError')); return }
     if (isEditing && !(await confirm(t('confirmEditSale')))) return

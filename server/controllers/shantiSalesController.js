@@ -467,8 +467,10 @@ export const getSaleDetail = async (req, res) => {
     }
 }
 
+// empty is allowed here - a sale with nothing sold but something bonused (see createSale/updateSale's
+// own "both empty" check) is valid; this only validates the shape of whatever lines ARE present.
 const validateItems = async (items) => {
-    if (!Array.isArray(items) || items.length === 0) return 'items_required'
+    if (!Array.isArray(items)) return 'invalid_item'
     for (const item of items) {
         if (!item.productId || !(item.quantity > 0) || !(item.price >= 0)) return 'invalid_item'
         const product = await ShantiProduct.findById(item.productId)
@@ -501,6 +503,9 @@ export const createSale = async (req, res) => {
         if (method && !SHANTI_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_method' })
         const bonus = await resolveBonusItems(bonusItems || [], items)
         if (bonus.error) return res.status(400).json({ error: bonus.error })
+        // a sale needs to record SOMETHING - either a sold item or a bonus line - but a pure-bonus
+        // "deal" (nothing actually sold) is deliberately allowed, see ShantiSale.js's own comment
+        if (items.length === 0 && bonus.items.length === 0) return res.status(400).json({ error: 'nothing_to_record' })
 
         const computedTotal = items.reduce((sum, i) => sum + i.quantity * i.price, 0)
         const resolvedAmount = amount !== undefined ? Number(amount) : computedTotal
@@ -550,6 +555,7 @@ export const updateSale = async (req, res) => {
             if (bonus.error) return res.status(400).json({ error: bonus.error })
             newBonusItems = bonus.items
         }
+        if (newItems.length === 0 && newBonusItems.length === 0) return res.status(400).json({ error: 'nothing_to_record' })
 
         const computedTotal = newItems.reduce((sum, i) => sum + i.quantity * i.price, 0)
         const newAmount = amount !== undefined ? Number(amount) : (items !== undefined ? computedTotal : sale.amount)
