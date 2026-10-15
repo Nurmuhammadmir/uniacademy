@@ -1484,7 +1484,20 @@ export const removeStudentFromGroup = async (req, res) => {
         // just stops the course from being tied to a group they're no longer part of, the same
         // "taking a course, not currently placed in a group" state a fresh enrollment starts in.
         const student = await User.findById(req.params.studentId)
-        const course = student?.courses.find(c => String(c.groupId) === String(group._id))
+        // matching by groupId alone silently no-ops this whole block whenever the student was
+        // already moved onto ANOTHER group of the same language before this removal gets called
+        // (e.g. an admin clicks "add to new group" first, then "remove from old group" second -
+        // nothing enforces the opposite order, and these are two independent clicks). addStudentToGroup
+        // overwrites this course's groupId immediately, so by the time this runs the groupId match
+        // below finds nothing, reverseUnusedPeriod never fires, and the old group/teacher keeps 100%
+        // credit for the rest of the period while the new teacher gets none of it until next month.
+        // Confirmed real bug, found live 2026-10 (student moved from one Turk tili group to another).
+        // The languageId fallback still finds the right course (a student can never have two course
+        // entries for the same language - enforced in adminController.addStudentCourse), so
+        // reverseUnusedPeriod still runs and frees the unused days for whichever group the course is
+        // now actually pointing at.
+        const directMatch = student?.courses.find(c => String(c.groupId) === String(group._id))
+        const course = directMatch || student?.courses.find(c => String(c.languageId) === String(group.languageId))
         if (course) {
             // confirmed spec: removing a student mid-period returns the unused days of whatever
             // billing period is currently in progress back to their balance, rather than keeping the
@@ -1493,17 +1506,21 @@ export const removeStudentFromGroup = async (req, res) => {
             // teacher's revenue share for those days too, unlike a discount).
             await reverseUnusedPeriod(student, course, group, req.auth.userId)
 
-            // a course that was never actually billed (removed the same day they were added, or a
-            // mistaken add) leaves nothing worth keeping - just drop the entry entirely instead of a
-            // permanent "unpaid, no price, no group" ghost row that clutters the profile forever.
-            // One that DOES have real ledger history stays (groupId cleared, same as before) so the
-            // admin can still see what this student was ever billed for that course.
-            const studentAccount = await getOrCreateAccount('student', student._id)
-            const hasHistory = await LedgerEntry.exists({ accountId: studentAccount._id, languageId: course.languageId })
-            if (hasHistory) course.groupId = null
-            else student.courses = student.courses.filter(c => c._id.toString() !== course._id.toString())
-            // this course no longer participates in the pooled active/inactive flip (its groupId is
-            // gone, so recomputeEnrollmentStatus's own loop already skips it going forward) - but
+            // only touch course.groupId/drop the course when IT was actually still pointing at the
+            // group being removed (directMatch) - when we only got here via the languageId fallback,
+            // course.groupId already correctly points at the student's new group, and clearing it (or
+            // dropping the course entirely) would wrongly undo that real, current enrollment.
+            if (directMatch) {
+                // a course that was never actually billed (removed the same day they were added, or a
+                // mistaken add) leaves nothing worth keeping - just drop the entry entirely instead of a
+                // permanent "unpaid, no price, no group" ghost row that clutters the profile forever.
+                // One that DOES have real ledger history stays (groupId cleared, same as before) so the
+                // admin can still see what this student was ever billed for that course.
+                const studentAccount = await getOrCreateAccount('student', student._id)
+                const hasHistory = await LedgerEntry.exists({ accountId: studentAccount._id, languageId: course.languageId })
+                if (hasHistory) course.groupId = null
+                else student.courses = student.courses.filter(c => c._id.toString() !== course._id.toString())
+            }
             // every course this student is STILL actually placed in deserves a fresh read of the
             // account's current overall balance too, not a status left over from before this removal
             await recomputeEnrollmentStatus(student)
