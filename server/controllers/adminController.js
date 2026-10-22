@@ -950,12 +950,21 @@ const PAYMENT_METHODS = ['cash', 'bank_transfer', 'card', 'click', 'payme']
 
 export const createPayment = async (req, res) => {
     try {
-        const { studentId, amount, method, date, comment } = req.body
+        const { studentId, amount, method, date, comment, priorityLanguageId } = req.body
         if (!PAYMENT_METHODS.includes(method)) return res.status(400).json({ error: 'invalid_payment_method' })
         if (!(amount > 0)) return res.status(400).json({ error: 'invalid_amount' })
 
         const student = await User.findOne({ _id: studentId, branchId: req.auth.branchId })
         if (!student) return res.status(404).json({ error: 'not_found' })
+
+        // optional - the admin picked one of the student's own courses in the pay modal (only shown
+        // when they have 2+ groups) so this payment settles THAT course's debt first instead of the
+        // account-wide FIFO grabbing it for an older, unrelated course - see
+        // billingCycle.service.js's foldReversalsAndAllocate. Must be a course this student is
+        // actually enrolled in, never trusted bare off the request.
+        const validPriorityLanguageId = priorityLanguageId && student.courses.some(c => String(c.languageId) === String(priorityLanguageId))
+            ? priorityLanguageId : null
+        if (priorityLanguageId && !validPriorityLanguageId) return res.status(400).json({ error: 'invalid_priority_language' })
 
         // optional - lets an admin record a payment that was actually received on an earlier date
         // (e.g. entering yesterday's cash payments this morning) without skewing "today"'s figures.
@@ -963,6 +972,7 @@ export const createPayment = async (req, res) => {
         const payment = await Payment.create({
             studentId, amount, method, date: paymentDate, adminId: req.auth.userId, branchId: req.auth.branchId,
             comment: typeof comment === 'string' ? comment.trim().slice(0, 2000) : '',
+            priorityLanguageId: validPriorityLanguageId,
         })
 
         const studentAccount = await getOrCreateAccount('student', studentId)
@@ -970,7 +980,7 @@ export const createPayment = async (req, res) => {
         const [studentEntry] = await postTransfer({
             fromAccountId: studentAccount._id, toAccountId: branchAccount._id,
             amount, kind: 'payment', method,
-            meta: { studentId, sourceType: 'payment', sourceId: payment._id },
+            meta: { studentId, sourceType: 'payment', sourceId: payment._id, priorityLanguageId: validPriorityLanguageId },
             description: `Payment received - ${formatAmount(amount)} via ${method}`,
             createdBy: req.auth.userId, date: paymentDate,
         }) || []

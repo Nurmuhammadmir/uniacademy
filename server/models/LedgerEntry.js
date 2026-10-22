@@ -39,6 +39,12 @@ const ledgerEntrySchema = new mongoose.Schema({
     teacherId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     periodStart: { type: Date, default: null },
     periodEnd: { type: Date, default: null },
+    // set ONLY on 'payment' entries, when the admin picked which of the student's several courses
+    // this money is for (StudentProfile's pay modal, shown only when they're enrolled in 2+ groups -
+    // confirmed real complaint: a student pays meaning it for course A, the account-wide FIFO below
+    // grabs it for course B's older debt instead, crediting B's teacher instead of A's). Null keeps
+    // today's plain pooled behavior unchanged - see foldReversalsAndAllocate's priority pool.
+    priorityLanguageId: { type: mongoose.Schema.Types.ObjectId, ref: 'Language', default: null },
     // points back to the originating document (Payment or Expense) for display fields this schema
     // deliberately doesn't duplicate (expense category, recipient, refund status, etc.) - 'ledgerEntry'
     // is the one exception, used only by 'debt_reversal' rows to point at the exact debt entry they

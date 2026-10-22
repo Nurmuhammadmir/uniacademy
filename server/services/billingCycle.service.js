@@ -74,21 +74,49 @@ export const foldReversalsAndAllocate = (entries) => {
     // via computeAccountAllocation's own DISPLAY_KINDS query, never via computeCoveredDebtPeriodsBatch's
     // ALLOCATION_KINDS-only query, so treating it as cash here is safe for teacher revenue by
     // construction: this branch never runs on the entry list salary calculation actually reads.
+    // a 'payment' entry carrying priorityLanguageId (admin picked a course in the pay modal because
+    // the student has 2+ groups) is kept OUT of this shared pool and into its own per-language pool
+    // instead - confirmed real complaint: the student meant this payment for course A, but an older,
+    // unrelated course B's debt was sitting first in the oldest-debt-first queue below and grabbed it
+    // out of the shared pool, crediting B's teacher instead of A's.
     let cashAvailable = 0
+    const priorityCashByLanguage = new Map()
     for (const e of relevantEntries) {
-        if (e.kind === 'payment' || e.kind === 'expense' || e.kind === 'discount' || e.kind === 'opening_balance') cashAvailable += e.amount
-        else if (e.kind === 'refund') cashAvailable -= e.amount
+        if (e.kind === 'payment' && e.priorityLanguageId) {
+            const key = String(e.priorityLanguageId)
+            priorityCashByLanguage.set(key, (priorityCashByLanguage.get(key) || 0) + e.amount)
+        } else if (e.kind === 'payment' || e.kind === 'expense' || e.kind === 'discount' || e.kind === 'opening_balance') {
+            cashAvailable += e.amount
+        } else if (e.kind === 'refund') {
+            cashAvailable -= e.amount
+        }
     }
 
-    // pass 2: spend that one pool against every debt ever posted, oldest first, regardless of which
-    // course each debt belongs to - a student who overpaid on course A and is then billed for course
-    // B gets B's debt covered immediately out of the SAME pool, exactly like a real wallet.
+    // pass 2a: spend oldest debt first as before, but a debt first draws down its OWN course's
+    // priority pool (if any earmarked cash exists for it) before touching the shared pool - so a
+    // directed payment can't be captured by an older, unrelated course's debt.
     const allocations = []
     for (const e of relevantEntries) {
         if (e.kind !== 'debt') continue
-        const covered = Math.min(e.amount, Math.max(0, cashAvailable))
-        cashAvailable -= covered
-        allocations.push({ entry: e, covered })
+        const languageKey = String(e.languageId)
+        const priorityPool = priorityCashByLanguage.get(languageKey) || 0
+        const fromPriority = Math.min(e.amount, Math.max(0, priorityPool))
+        priorityCashByLanguage.set(languageKey, priorityPool - fromPriority)
+        allocations.push({ entry: e, covered: fromPriority })
+    }
+    // directed cash left over once its own course has no more unpaid debt joins the shared pool -
+    // a directed payment that overshoots its course's debt isn't money stuck forever, it's exactly
+    // the same surplus-flows-to-the-next-debt behavior the shared pool already has.
+    for (const leftover of priorityCashByLanguage.values()) {
+        if (leftover > 0) cashAvailable += leftover
+    }
+    // pass 2b: top up whatever each debt still lacks from the shared pool, oldest debt first - same
+    // fairness order as before, just applied to what's left after priority cash already landed.
+    for (const a of allocations) {
+        const stillOwed = a.entry.amount - a.covered
+        const fromGeneral = Math.min(stillOwed, Math.max(0, cashAvailable))
+        cashAvailable -= fromGeneral
+        a.covered += fromGeneral
     }
     return allocations
 }

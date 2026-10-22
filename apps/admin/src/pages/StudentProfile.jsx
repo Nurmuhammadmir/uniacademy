@@ -158,7 +158,7 @@ const StudentProfile = () => {
   const [showEditStudent, setShowEditStudent] = useState(false)
   const [editStudentForm, setEditStudentForm] = useState({ name: '', phone: '', passportInfo: '' })
   const [showPayModal, setShowPayModal] = useState(false)
-  const [payForm, setPayForm] = useState({ amount: '', method: '', date: todayISO(), comment: '' })
+  const [payForm, setPayForm] = useState({ amount: '', method: '', date: todayISO(), comment: '', priorityLanguageId: '' })
   const [submittingPayment, setSubmittingPayment] = useState(false)
   const [printingPaymentId, setPrintingPaymentId] = useState(null)
   const [showFreezeModal, setShowFreezeModal] = useState(false)
@@ -317,7 +317,7 @@ const StudentProfile = () => {
   // student's one shared wallet. Defaults the amount to whatever the account currently owes overall
   // (nothing to suggest if they're already in credit), but the admin can freely type any amount.
   const openPayModal = () => {
-    setPayForm({ amount: owedTotal > 0 ? String(owedTotal) : '', method: '', date: todayISO(), comment: '' })
+    setPayForm({ amount: owedTotal > 0 ? String(owedTotal) : '', method: '', date: todayISO(), comment: '', priorityLanguageId: '' })
     setShowPayModal(true)
   }
 
@@ -327,7 +327,7 @@ const StudentProfile = () => {
     if (!payForm.method) { toast.error(t('selectPaymentMethodWarning')); return }
     if (!payForm.amount) return
     setSubmittingPayment(true)
-    const paymentId = await createPayment(studentId, Number(payForm.amount), payForm.method, payForm.date, payForm.comment)
+    const paymentId = await createPayment(studentId, Number(payForm.amount), payForm.method, payForm.date, payForm.comment, payForm.priorityLanguageId || null)
     setSubmittingPayment(false)
     if (paymentId) { setShowPayModal(false); reload(); setPrintingPaymentId(paymentId) }
   }
@@ -710,6 +710,14 @@ const StudentProfile = () => {
                 <Select value={payForm.method} onChange={(v) => setPayForm({ ...payForm, method: v })} placeholder={t('selectPaymentMethod')}
                   options={PAY_METHODS.map(m => ({ value: m, label: t(paymentMethodLabelKey(m)) }))} />
               </div>
+              {data.groups.length >= 2 && (
+                <div>
+                  <p className='text-xs text-muted mb-1'>{t('payForGroupLabel')}</p>
+                  <Select value={payForm.priorityLanguageId} onChange={(v) => setPayForm({ ...payForm, priorityLanguageId: v })} placeholder={t('payForGroupPlaceholder')}
+                    options={data.groups.map(g => ({ value: String(g.languageId?._id), label: g.name ? `${g.name} · ${g.languageId?.name}` : g.languageId?.name }))} />
+                  <p className='text-[11px] text-muted mt-1'>{t('payForGroupHint')}</p>
+                </div>
+              )}
               <div>
                 <p className='text-xs text-muted mb-1'>{t('paymentDateLabel')}</p>
                 <DatePicker value={payForm.date} onChange={(v) => setPayForm({ ...payForm, date: v })} />

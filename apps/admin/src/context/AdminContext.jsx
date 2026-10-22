@@ -249,13 +249,15 @@ const AdminContextProvider = (props) => {
         }
     }
 
-    // confirmed spec: a payment is never for one particular course - it's a deposit into the
-    // student's one shared wallet. No languageId/levelId is sent or asked for anymore; whichever
-    // course(s) this money ends up settling is decided entirely by the account-wide FIFO walk on
-    // the backend (see billingCycle.service.js), not by anything picked here.
-    const createPayment = async (studentId, amount, method, date, comment) => {
+    // confirmed spec: a payment is still never FOR one particular course - it's a deposit into the
+    // student's one shared wallet, settled by the account-wide FIFO walk on the backend (see
+    // billingCycle.service.js). priorityLanguageId is the one optional exception: when the admin
+    // picks a course in the pay modal (shown only when the student has 2+ groups), this payment's
+    // cash settles that course's debt first instead of an older, unrelated course's debt grabbing
+    // it out of the shared pool. Leave it undefined/null for the plain pooled behavior.
+    const createPayment = async (studentId, amount, method, date, comment, priorityLanguageId) => {
         try {
-            const { data } = await axios.post(backendUrl + '/api/admin/payments', { studentId, amount, method, date, comment }, authHeader)
+            const { data } = await axios.post(backendUrl + '/api/admin/payments', { studentId, amount, method, date, comment, priorityLanguageId }, authHeader)
             toast.success(t('paymentRecorded'))
             getStudents()
             // the id (not just true/false) - lets the caller pop the receipt for THIS exact payment
@@ -265,6 +267,7 @@ const AdminContextProvider = (props) => {
             const code = error.response?.data?.error
             if (code === 'invalid_payment_method') toast.error(t('invalidPaymentMethodError'))
             else if (code === 'invalid_amount') toast.error(t('invalidAmountError'))
+            else if (code === 'invalid_priority_language') toast.error(t('invalidPriorityLanguageError'))
             else toast.error(code || t('couldNotRecordPayment'))
             return false
         }

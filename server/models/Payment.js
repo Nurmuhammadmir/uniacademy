@@ -8,6 +8,12 @@ const paymentSchema = new mongoose.Schema({
     // payment's money actually settles is decided entirely by billingCycle.service.js's
     // account-wide FIFO walk, never by this field.
     languageId: { type: mongoose.Schema.Types.ObjectId, ref: 'Language', default: null },
+    // NOT the legacy field above - this is live and actually read by billingCycle.service.js's
+    // fold (see LedgerEntry.js's own field of the same name). Set when the admin picked one of the
+    // student's several courses in the pay modal (shown only when they have 2+ groups), so this
+    // payment's cash settles THAT course's debt first instead of an older, unrelated course's debt
+    // grabbing it out of the shared pool.
+    priorityLanguageId: { type: mongoose.Schema.Types.ObjectId, ref: 'Language', default: null },
     amount: { type: Number, required: true },
     date: { type: Date, default: Date.now },
     adminId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
