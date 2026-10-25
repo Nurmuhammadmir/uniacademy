@@ -335,10 +335,18 @@ const StudentProfile = () => {
   // whole-account freeze (not per-course, not per-group, confirmed) - pauses billing on every one
   // of the student's courses at once. Freezing opens a small modal (reason + optional backdated
   // start date); unfreezing needs neither, so it fires immediately.
+  // both branches also re-fetch `statement` (not just `reload()`) - confirmed real bug, found live
+  // (director support ticket, 2026-10-25): freezing/unfreezing posts a new debt/debt_reversal (see
+  // billingCycle.service.js's reverseUnusedPeriod) but `statement` only ever loads once per
+  // studentId (see the useEffect above), so without this the "Balans tarixi" timeline kept showing
+  // whatever reversal was there at page-load - every subsequent freeze in the same sitting looked
+  // like it "returned" the exact same first amount again, with only freezeHistory's own count (read
+  // straight off `data`, which `reload()` DOES refresh) visibly growing. Same fix already applied to
+  // openRefund/submitEditPayment below for the same underlying staleness.
   const toggleFreeze = async () => {
     if (data.student.frozen) {
       const ok = await setStudentFreeze(studentId, false)
-      if (ok) reload()
+      if (ok) { reload(); getStudentStatement(studentId).then(s => { if (s) setStatement(s) }) }
       return
     }
     setFreezeForm({ reason: '', frozenAt: todayISO() })
@@ -348,7 +356,11 @@ const StudentProfile = () => {
   const submitFreeze = async (e) => {
     e.preventDefault()
     const ok = await setStudentFreeze(studentId, true, freezeForm.reason, freezeForm.frozenAt)
-    if (ok) { setShowFreezeModal(false); reload() }
+    if (ok) {
+      setShowFreezeModal(false)
+      reload()
+      getStudentStatement(studentId).then(s => { if (s) setStatement(s) })
+    }
   }
 
   return (

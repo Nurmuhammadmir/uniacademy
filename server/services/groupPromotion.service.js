@@ -61,3 +61,33 @@ export const promoteGroupIfLevelComplete = async (group, durationDays) => {
         }
     }
 }
+
+// daily catch-up sweep (see server.js's 3am cron, same cadence as runDailyBillingCycle) - confirmed
+// real bug, found live (teacher support ticket, 2026-10-25): promoteGroupIfLevelComplete above was
+// ONLY ever triggered lazily from the STUDENT side (studentController's getGroupAndSyncWindow) - a
+// group whose students simply stop opening the app after its level's last lesson (entirely plausible:
+// nothing requires every enrolled student to open their homework page every day) never got promoted
+// at all, and since computeDayCounter caps AT durationDays and stays there forever (see
+// dayCounter.service.js), every TEACHER-side endpoint keyed off that same group/day number
+// (createAttendanceSession, markStudentAttendance) kept reopening/rewriting the SAME frozen day
+// indefinitely - attendance silently stopped advancing, with no error, while real calendar Lesson
+// rows kept generating and sitting unmarked. Sweeping every active, not-yet-completed group once a
+// day here means this can never again depend on which side (student or teacher) happens to ask first.
+// Each group wrapped in its own try/catch (same reasoning as runDailyBillingCycle) so one bad
+// group/level reference can't take the rest of the sweep down.
+export const runDailyGroupPromotionSweep = async () => {
+    const groups = await Group.find({ status: 'active', levelCompletedAt: null }).lean()
+    let promoted = 0
+    const failures = []
+    for (const group of groups) {
+        try {
+            const level = await Level.findById(group.levelId).select('durationDays').lean()
+            await promoteGroupIfLevelComplete(group, level?.durationDays || 30)
+            if (await Group.exists({ _id: group._id, levelCompletedAt: { $ne: null } })) promoted++
+        } catch (error) {
+            console.log('runDailyGroupPromotionSweep: failed for group', group._id, error)
+            failures.push({ groupId: group._id, error: error.message })
+        }
+    }
+    return { groupsChecked: groups.length, promoted, failures }
+}

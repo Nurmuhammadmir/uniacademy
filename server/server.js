@@ -20,6 +20,7 @@ import shantiRouter from './routes/shantiRoute.js'
 import lamusRouter from './routes/lamusRoute.js'
 import { sendDailyParentDigest } from './services/parentNotifications.service.js'
 import { runDailyBillingCycle } from './services/billingCycle.service.js'
+import { runDailyGroupPromotionSweep } from './services/groupPromotion.service.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -125,6 +126,17 @@ cron.schedule('0 3 * * *', () => {
     runDailyBillingCycle()
         .then(result => console.log('runDailyBillingCycle:', result))
         .catch(error => console.log('runDailyBillingCycle failed', error))
+}, { timezone: 'Asia/Tashkent' })
+
+// same cadence, independent of billing - catches any group whose level duration has elapsed but
+// which never got promoted because no student happened to open the app after its last lesson (see
+// groupPromotion.service.js's runDailyGroupPromotionSweep for the full incident this fixes). Kept as
+// its own cron.schedule call (not folded into the billing one above) so a failure here can never
+// affect billing, or vice versa.
+cron.schedule('0 3 * * *', () => {
+    runDailyGroupPromotionSweep()
+        .then(result => console.log('runDailyGroupPromotionSweep:', result))
+        .catch(error => console.log('runDailyGroupPromotionSweep failed', error))
 }, { timezone: 'Asia/Tashkent' })
 
 app.listen(port, () => console.log('server started on port', port))
