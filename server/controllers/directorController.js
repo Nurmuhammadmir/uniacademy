@@ -37,6 +37,7 @@ import { ensureDefaultCategories, ensureCategoryExists, SALARY_CATEGORY, PREPAYM
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
 import { hardDeleteStudent } from "../services/studentCascade.service.js"
 import { hardDeleteTeacher } from "../services/teacherCascade.service.js"
+import { stillHasLiveRoster, STILL_ACTIVE_GROUP_MATCH } from "../services/groupPromotion.service.js"
 
 const startOfThisMonth = () => {
     const d = new Date()
@@ -94,7 +95,7 @@ export const getStats = async (req, res) => {
 
         // top 3 teachers by current unique active-group student count
         const topTeachersRaw = await Group.aggregate([
-            { $match: { status: 'active', levelCompletedAt: null } },
+            { $match: { ...STILL_ACTIVE_GROUP_MATCH } },
             { $unwind: '$studentIds' },
             { $group: { _id: '$teacherId', students: { $addToSet: '$studentIds' } } },
             { $project: { teacherId: '$_id', count: { $size: '$students' } } },
@@ -703,7 +704,7 @@ export const createTeacher = async (req, res) => {
 export const listTeachers = async (req, res) => {
     try {
         const teachers = await User.find({ role: 'teacher', ...teacherBranchMembershipFilter(req) }).select('-passwordHash').populate('branchId', 'name').populate('additionalBranchIds', 'name')
-        const activeGroups = await Group.find({ status: 'active', levelCompletedAt: null }).select('teacherId studentIds').lean()
+        const activeGroups = await Group.find({ ...STILL_ACTIVE_GROUP_MATCH }).select('teacherId studentIds').lean()
 
         const withStudentCounts = teachers.map(t => {
             const groupsForTeacher = activeGroups.filter(g => String(g.teacherId) === String(t._id))
@@ -730,7 +731,7 @@ export const getTeacherProfile = async (req, res) => {
             .populate('levelId', 'name')
             .lean()
 
-        const activeGroups = groups.filter(g => g.status === 'active' && !g.levelCompletedAt)
+        const activeGroups = groups.filter(stillHasLiveRoster)
         const uniqueStudentIds = new Set()
         activeGroups.forEach(g => g.studentIds.forEach(id => uniqueStudentIds.add(String(id))))
 
@@ -1283,7 +1284,7 @@ export const getTodayTimetable = async (req, res) => {
         const startOfDay = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate()))
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
-        const branchGroups = await Group.find({ branchId: req.query.branchId, status: 'active', levelCompletedAt: null })
+        const branchGroups = await Group.find({ branchId: req.query.branchId, ...STILL_ACTIVE_GROUP_MATCH })
             .populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name').populate('roomId', 'name')
             .lean()
         const groupIds = branchGroups.map(g => g._id)

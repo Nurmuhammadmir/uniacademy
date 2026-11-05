@@ -39,6 +39,7 @@ import { computeEffectiveLessonStatuses, computeEffectiveLessonStatus } from "..
 import { computeBusinessLedger } from "../services/businessLedger.service.js"
 import { applyDiscountToStudent, deleteDiscountEntry, listStudentDiscounts } from "../services/discountApplication.service.js"
 import { openMembership, closeMembership } from "../services/groupMembership.service.js"
+import { stillHasLiveRoster, STILL_ACTIVE_GROUP_MATCH } from "../services/groupPromotion.service.js"
 import { getOrCreateAccount, postTransfer, postEntry, deleteEntries, formatAmount } from "../services/ledger.service.js"
 import { recognizeEnrollmentDebt, computeCourseOwed, recomputeEnrollmentStatus, reverseUnusedPeriod, recognizeNextPeriod } from "../services/billingCycle.service.js"
 
@@ -59,7 +60,7 @@ export const getTeacherProfile = async (req, res) => {
             .populate('levelId', 'name')
             .lean()
 
-        const activeGroups = groups.filter(g => g.status === 'active' && !g.levelCompletedAt)
+        const activeGroups = groups.filter(stillHasLiveRoster)
         const uniqueStudentIds = new Set()
         activeGroups.forEach(g => g.studentIds.forEach(id => uniqueStudentIds.add(String(id))))
 
@@ -104,7 +105,7 @@ export const getTeacherAttendanceGrid = async (req, res) => {
         const rangeStart = new Date(Date.UTC(year, mo - 1, 1))
         const rangeEnd = new Date(Date.UTC(year, mo, 0))
 
-        const groupDocs = await Group.find({ teacherId: teacher._id, status: 'active', levelCompletedAt: null })
+        const groupDocs = await Group.find({ teacherId: teacher._id, ...STILL_ACTIVE_GROUP_MATCH })
             .populate('languageId', 'name').populate('levelId', 'name').lean()
 
         let conducted = 0, total = 0
@@ -153,7 +154,7 @@ export const getStudentAttendanceGrid = async (req, res) => {
         const rangeStart = new Date(Date.UTC(year, mo - 1, 1))
         const rangeEnd = new Date(Date.UTC(year, mo, 0))
 
-        const groupDocs = await Group.find({ studentIds: student._id, status: 'active', levelCompletedAt: null })
+        const groupDocs = await Group.find({ studentIds: student._id, ...STILL_ACTIVE_GROUP_MATCH })
             .populate('languageId', 'name').populate('levelId', 'name').lean()
 
         let present = 0, total = 0

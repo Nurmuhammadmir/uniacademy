@@ -12,6 +12,7 @@ import ExamAttempt from "../models/ExamAttempt.js"
 import Level from "../models/Level.js"
 import ExtraLesson from "../models/ExtraLesson.js"
 import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
+import { STILL_ACTIVE_GROUP_MATCH } from "../services/groupPromotion.service.js"
 
 // ==== Rooms ====
 
@@ -257,7 +258,7 @@ export const getTodayTimetable = async (req, res) => {
         const startOfDay = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate()))
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
-        const branchGroups = await Group.find({ branchId: req.auth.branchId, status: 'active', levelCompletedAt: null })
+        const branchGroups = await Group.find({ branchId: req.auth.branchId, ...STILL_ACTIVE_GROUP_MATCH })
             .populate('languageId', 'name').populate('levelId', 'name').populate('teacherId', 'name').populate('roomId', 'name').lean()
         const groupIds = branchGroups.map(g => g._id)
 

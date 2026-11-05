@@ -3,6 +3,7 @@ import Group from "../models/Group.js"
 import Lesson from "../models/Lesson.js"
 import LessonAttendance from "../models/LessonAttendance.js"
 import { sendPushToParent } from "./pushNotification.service.js"
+import { STILL_ACTIVE_GROUP_MATCH } from "./groupPromotion.service.js"
 
 // real-time - fires the moment a student's own QR scan marks them present, so a parent finds out
 // the same day their child actually attended, not the next morning in a digest. Silent on any
@@ -43,7 +44,7 @@ export const sendDailyParentDigest = async () => {
             const child = await User.findById(childId).select('name courses')
             if (!child) continue
 
-            const groups = await Group.find({ studentIds: childId, status: 'active', levelCompletedAt: null })
+            const groups = await Group.find({ studentIds: childId, ...STILL_ACTIVE_GROUP_MATCH })
             for (const group of groups) {
                 const lesson = await Lesson.findOne({ groupId: group._id, date: { $gte: dayStart, $lt: dayEnd } })
                 if (!lesson) continue // group had no lesson yesterday - nothing to judge

@@ -13,6 +13,7 @@ import { computeCourseOwed } from "../services/billingCycle.service.js"
 import PushSubscription from "../models/PushSubscription.js"
 import { computeDayCounter } from "../services/dayCounter.service.js"
 import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
+import { STILL_ACTIVE_GROUP_MATCH } from "../services/groupPromotion.service.js"
 
 const assertOwnChild = (parent, studentId) => {
     return parent.childStudentIds.some(id => String(id) === String(studentId))
@@ -35,7 +36,7 @@ export const getChildAttendance = async (req, res) => {
         const parent = await User.findById(req.auth.userId).lean()
         if (!assertOwnChild(parent, req.params.studentId)) return res.status(403).json({ error: 'not_your_child' })
 
-        const groups = await Group.find({ studentIds: req.params.studentId, status: 'active', levelCompletedAt: null })
+        const groups = await Group.find({ studentIds: req.params.studentId, ...STILL_ACTIVE_GROUP_MATCH })
             .populate('languageId', 'name').populate('levelId', 'name durationDays').lean()
 
         const perGroup = await Promise.all(groups.map(async (g) => {
@@ -74,7 +75,7 @@ export const getChildProgress = async (req, res) => {
         const parent = await User.findById(req.auth.userId).lean()
         if (!assertOwnChild(parent, req.params.studentId)) return res.status(403).json({ error: 'not_your_child' })
 
-        const groups = await Group.find({ studentIds: req.params.studentId, status: 'active', levelCompletedAt: null })
+        const groups = await Group.find({ studentIds: req.params.studentId, ...STILL_ACTIVE_GROUP_MATCH })
             .populate('languageId', 'name').populate('levelId', 'name durationDays').lean()
 
         const perGroup = await Promise.all(groups.map(async (g) => {

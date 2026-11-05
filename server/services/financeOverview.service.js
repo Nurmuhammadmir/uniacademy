@@ -4,6 +4,7 @@ import Group from "../models/Group.js"
 import Payment from "../models/Payment.js"
 import Expense from "../models/Expense.js"
 import { startOfLocalDay, endOfLocalDay } from "./businessTime.service.js"
+import { STILL_ACTIVE_GROUP_MATCH } from "./groupPromotion.service.js"
 
 const isoWeekLabel = (date) => {
     const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
@@ -104,7 +105,7 @@ export const getFinanceOverview = async (branchIdRaw, query) => {
     const languageIdsOnPage = [...new Set(payments.map(p => p.languageId?._id || p.languageId).filter(Boolean).map(String))]
     const currentGroups = languageIdsOnPage.length
         ? await Group.find({
-            studentIds: { $in: studentIdsOnPage }, languageId: { $in: languageIdsOnPage }, status: 'active', levelCompletedAt: null,
+            studentIds: { $in: studentIdsOnPage }, languageId: { $in: languageIdsOnPage }, ...STILL_ACTIVE_GROUP_MATCH,
         }).select('studentIds languageId teacherId').populate('teacherId', 'name')
         : []
     const currentTeacherFor = (studentId, languageId) => {

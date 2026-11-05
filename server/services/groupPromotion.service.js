@@ -11,6 +11,20 @@ import User from "../models/User.js"
 import { closeMembership } from "./groupMembership.service.js"
 import { isPastLevelEnd } from "./dayCounter.service.js"
 
+// a group that just finished its level's content isn't actually "done" in any real-world sense
+// until an admin has migrated its roster to a next-level group - a manual, undeadlined decision
+// (see promoteGroupIfLevelComplete below). Until that happens its studentIds are still real,
+// paying, currently-taught students, and real Lesson rows keep generating for it every day - so
+// every "is this a class I need to show/manage" check (teacher's My Groups, attendance-taking,
+// admin/director dashboards and timetables, parent views) should keep treating it exactly like a
+// normal active group as long as its roster isn't actually empty. Only a group an admin has
+// already fully migrated away (0 students left) should drop out of those. This is deliberately
+// NOT used by anything that decides what HOMEWORK/BILLING content to serve (studentController,
+// subscription.service, loadBalance.service) - that correctly stops once the level's content is
+// exhausted, regardless of roster size.
+export const STILL_ACTIVE_GROUP_MATCH = { status: 'active', $or: [{ levelCompletedAt: null }, { 'studentIds.0': { $exists: true } }] }
+export const stillHasLiveRoster = (group) => group.status === 'active' && (!group.levelCompletedAt || group.studentIds.length > 0)
+
 // called lazily whenever a group's dayCounter gets resynced (see studentController's
 // getGroupAndSyncWindow) - so it can run concurrently for several students in the same finishing
 // group. Made race-safe with an atomic claim: the findOneAndUpdate filter requires

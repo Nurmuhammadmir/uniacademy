@@ -20,19 +20,20 @@ import Curriculum from "../models/Curriculum.js"
 import Concept from "../models/Concept.js" // required so mongoose can resolve populate('conceptId'/'options'/'correct') refs below
 import WordForm from "../models/WordForm.js"
 import Translation from "../models/Translation.js"
-import { computeDayCounter, isRestDay, isReviewDay } from "../services/dayCounter.service.js"
+import { computeDayCounter, isRestDay, isReviewDay, dateOfNthLessonDay } from "../services/dayCounter.service.js"
 import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
 import { getNextLessonDate, timeToMinutes, earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
 import { computeEffectiveLessonStatuses } from "../services/lessonStatus.service.js"
 import { pickReviewExercises } from "../services/reviewHomework.service.js"
+import { STILL_ACTIVE_GROUP_MATCH, stillHasLiveRoster } from "../services/groupPromotion.service.js"
 
 export const getMyGroups = async (req, res) => {
     try {
-        // active + levelCompletedAt:null - a graduated/archived group still exists for historical
-        // reporting (its roster is deliberately kept, see groupPromotion.service.js), but a
-        // teacher's own "my groups" list is for classes they're actually running today, not a
-        // history browser
-        const groups = await Group.find({ teacherId: req.auth.userId, status: 'active', levelCompletedAt: null })
+        // a graduated/archived group still exists for historical reporting (its roster is
+        // deliberately kept, see groupPromotion.service.js), but a teacher's own "my groups" list
+        // is for classes they're actually running today, not a history browser - STILL_ACTIVE_GROUP_MATCH
+        // keeps a level-completed group visible as long as it still has real, untransferred students
+        const groups = await Group.find({ teacherId: req.auth.userId, ...STILL_ACTIVE_GROUP_MATCH })
             .populate('languageId', 'name code')
             .populate('levelId', 'name order durationDays')
             .populate('roomId', 'name')
@@ -81,7 +82,7 @@ export const getMyTimetable = async (req, res) => {
         const startOfDay = new Date(Date.UTC(requestedDate.getUTCFullYear(), requestedDate.getUTCMonth(), requestedDate.getUTCDate()))
         const endOfDay = new Date(startOfDay); endOfDay.setUTCDate(endOfDay.getUTCDate() + 1)
 
-        const myGroups = await Group.find({ teacherId: req.auth.userId, status: 'active', levelCompletedAt: null })
+        const myGroups = await Group.find({ teacherId: req.auth.userId, ...STILL_ACTIVE_GROUP_MATCH })
             .populate('languageId', 'name').populate('levelId', 'name').populate('roomId', 'name').lean()
         const groupIds = myGroups.map(g => g._id)
 
@@ -297,11 +298,10 @@ export const getStudentDayDetail = async (req, res) => {
 // issues a new one; the old one silently stops working.
 export const createAttendanceSession = async (req, res) => {
     try {
-        // levelCompletedAt:null matters since a graduated group's studentIds are kept (not cleared)
-        // for historical reporting, and its status is never auto-changed (an admin's own manual
-        // call, always) - without this filter a teacher could still open a live attendance QR for
-        // a group whose cohort already promoted onward to a new one
-        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId, status: 'active', levelCompletedAt: null }).lean()
+        // STILL_ACTIVE_GROUP_MATCH: a graduated group whose roster was actually migrated away (0
+        // students left) can't open a QR session for anyone - but one still holding real,
+        // untransferred students is still a live class the teacher needs to run attendance for
+        const group = await Group.findOne({ _id: req.params.id, teacherId: req.auth.userId, ...STILL_ACTIVE_GROUP_MATCH }).lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         const level = await Level.findById(group.levelId).select('durationDays').lean()
@@ -348,7 +348,7 @@ export const getMe = async (req, res) => {
         if (!teacher) return res.status(404).json({ error: 'not_found' })
 
         const groups = await Group.find({ teacherId: teacher._id }).lean()
-        const activeGroups = groups.filter(g => g.status === 'active' && !g.levelCompletedAt)
+        const activeGroups = groups.filter(stillHasLiveRoster)
         const uniqueStudentIds = new Set()
         activeGroups.forEach(g => g.studentIds.forEach(id => uniqueStudentIds.add(String(id))))
 
@@ -427,7 +427,7 @@ export const getMyAttendanceGrid = async (req, res) => {
         const rangeStart = new Date(Date.UTC(year, mo - 1, 1))
         const rangeEnd = new Date(Date.UTC(year, mo, 0))
 
-        const groupDocs = await Group.find({ teacherId: req.auth.userId, status: 'active', levelCompletedAt: null })
+        const groupDocs = await Group.find({ teacherId: req.auth.userId, ...STILL_ACTIVE_GROUP_MATCH })
             .populate('languageId', 'name').populate('levelId', 'name').lean()
 
         let conducted = 0, total = 0
@@ -463,8 +463,8 @@ export const markStudentAttendance = async (req, res) => {
         const { id: groupId, studentId, day } = req.params
         const { present } = req.body
 
-        // status:'active', levelCompletedAt:null - see createAttendanceSession's comment above
-        const group = await Group.findOne({ _id: groupId, teacherId: req.auth.userId, status: 'active', levelCompletedAt: null }).lean()
+        // STILL_ACTIVE_GROUP_MATCH - see createAttendanceSession's comment above
+        const group = await Group.findOne({ _id: groupId, teacherId: req.auth.userId, ...STILL_ACTIVE_GROUP_MATCH }).lean()
         if (!group) return res.status(404).json({ error: 'not_found' })
 
         if (present) {
@@ -478,14 +478,15 @@ export const markStudentAttendance = async (req, res) => {
         }
 
         // also keeps the real-calendar LessonAttendance in sync - relative day N of the homework
-        // counter always corresponds to exactly startDate + (N-1) calendar days (see
-        // computeDayCounter), so the matching real Lesson can be resolved directly with no search.
-        // This is what makes manually marking a phone-less student ALSO count toward that lesson
-        // being "conducted" (see lessonStatus.service.js) - not just a QR scan.
-        const dayDate = new Date(group.startDate)
-        dayDate.setUTCDate(dayDate.getUTCDate() + (Number(day) - 1))
-        const dayStart = new Date(Date.UTC(dayDate.getUTCFullYear(), dayDate.getUTCMonth(), dayDate.getUTCDate()))
-        const [lesson] = await ensureLessonsGenerated(group, dayStart, dayStart)
+        // counter is the group's Nth SCHEDULED lesson (computeDayCounter only advances on actual
+        // lesson days, see dayCounter.service.js), not calendar day startDate+(N-1), so the matching
+        // real Lesson must be resolved via dateOfNthLessonDay the same way isPastLevelEnd does, or
+        // this silently marks the wrong calendar date on any non-daily schedule (Mon/Wed/Fri etc,
+        // which is effectively every group). This is what makes manually marking a phone-less
+        // student ALSO count toward that lesson being "conducted" (see lessonStatus.service.js) -
+        // not just a QR scan.
+        const dayStart = dateOfNthLessonDay(group, Number(day))
+        const [lesson] = dayStart ? await ensureLessonsGenerated(group, dayStart, dayStart) : []
         if (lesson) {
             if (present) {
                 await LessonAttendance.findOneAndUpdate(
