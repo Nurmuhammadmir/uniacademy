@@ -4,8 +4,10 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { TeacherContext } from './context/TeacherContext.jsx'
 import { LanguageProvider } from './i18n/LanguageContext.jsx'
+import { NewYearProvider, useNewYear } from './context/NewYearContext.jsx'
 import ConfirmHost from './components/ConfirmHost.jsx'
 import Spinner from './components/Spinner.jsx'
+import NewYearSnow from './components/NewYearSnow.jsx'
 import Login from './pages/Login.jsx'
 
 // every page below is its own lazily-fetched JS chunk instead of part of one giant bundle - a
@@ -40,23 +42,33 @@ const App = () => {
           <Login />
         </div>
       ) : (
-        <div className='min-h-screen bg-bg'>
-          <Suspense fallback={<PageFallback />}>
-            <Routes>
-              <Route path='/' element={<MyGroups />} />
-              <Route path='/groups/:id' element={<GroupRoster />} />
-              <Route path='/groups/:id/students/:studentId' element={<StudentDetail />} />
-              <Route path='/groups/:id/attendance' element={<Attendance />} />
-              <Route path='/timetable' element={<Timetable />} />
-              <Route path='/my-attendance' element={<MyAttendance />} />
-              <Route path='/profile' element={<Profile />} />
-              <Route path='*' element={<Navigate to='/' />} />
-            </Routes>
-          </Suspense>
-        </div>
+        <NewYearProvider>
+          <NewYearSnowLayer />
+          <div className='min-h-screen bg-bg'>
+            <Suspense fallback={<PageFallback />}>
+              <Routes>
+                <Route path='/' element={<MyGroups />} />
+                <Route path='/groups/:id' element={<GroupRoster />} />
+                <Route path='/groups/:id/students/:studentId' element={<StudentDetail />} />
+                <Route path='/groups/:id/attendance' element={<Attendance />} />
+                <Route path='/timetable' element={<Timetable />} />
+                <Route path='/my-attendance' element={<MyAttendance />} />
+                <Route path='/profile' element={<Profile />} />
+                <Route path='*' element={<Navigate to='/' />} />
+              </Routes>
+            </Suspense>
+          </div>
+        </NewYearProvider>
       )}
     </LanguageProvider>
   )
+}
+
+// split out only so it can call useNewYear() - needs to be inside NewYearProvider, which wraps
+// this same component's own parent return, so it can't read the context at that outer level
+const NewYearSnowLayer = () => {
+  const { enabled } = useNewYear()
+  return enabled ? <NewYearSnow /> : null
 }
 
 export default App

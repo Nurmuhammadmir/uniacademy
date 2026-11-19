@@ -4,10 +4,12 @@ import { ToastContainer } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
 import { DirectorContext } from './context/DirectorContext.jsx'
 import { LanguageProvider } from './i18n/LanguageContext.jsx'
+import { NewYearProvider, useNewYear } from './context/NewYearContext.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import Logo from './components/Logo.jsx'
 import ConfirmHost from './components/ConfirmHost.jsx'
 import Spinner from './components/Spinner.jsx'
+import NewYearSnow from './components/NewYearSnow.jsx'
 import Login from './pages/Login.jsx'
 
 // every page below is its own lazily-fetched JS chunk instead of part of one giant bundle - a
@@ -52,41 +54,51 @@ const App = () => {
           <Login />
         </div>
       ) : (
-        <div className='min-h-screen bg-bg flex'>
-          <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
-          <div className='flex-1 flex flex-col min-w-0 lg:ml-60'>
-            <header className='lg:hidden sticky top-0 z-30 flex items-center gap-3 bg-bg-elevated border-b border-hairline px-4 py-3'>
-              <button onClick={() => setNavOpen(true)} aria-label='Menu' className='plain text-ink text-2xl leading-none px-1'>☰</button>
-              <Logo size={28} />
-            </header>
-            <main className='flex-1 p-4 sm:p-8'>
-              <Suspense fallback={<PageFallback />}>
-                <Routes>
-                  <Route path='/' element={<Overview />} />
-                  <Route path='/branches' element={<Branches />} />
-                  <Route path='/students' element={<Students />} />
-                  <Route path='/students/:id' element={<StudentProfile />} />
-                  <Route path='/admins' element={<Admins />} />
-                  <Route path='/teachers' element={<Teachers />} />
-                  <Route path='/pricing' element={<Pricing />} />
-                  <Route path='/attendance' element={<Attendance />} />
-                  <Route path='/courses' element={<Courses />} />
-                  <Route path='/homework' element={<Homework />} />
-                  <Route path='/groups' element={<Groups />} />
-                  <Route path='/timetable' element={<Timetable />} />
-                  <Route path='/finance' element={<Finance />} />
-                  <Route path='/finance/payments/:id' element={<TransactionDetail />} />
-                  <Route path='/leads' element={<Leads />} />
-                  <Route path='/settings' element={<Settings />} />
-                  <Route path='*' element={<Navigate to='/' />} />
-                </Routes>
-              </Suspense>
-            </main>
+        <NewYearProvider>
+          <NewYearSnowLayer />
+          <div className='min-h-screen bg-bg flex'>
+            <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
+            <div className='flex-1 flex flex-col min-w-0 lg:ml-60'>
+              <header className='lg:hidden sticky top-0 z-30 flex items-center gap-3 bg-bg-elevated border-b border-hairline px-4 py-3'>
+                <button onClick={() => setNavOpen(true)} aria-label='Menu' className='plain text-ink text-2xl leading-none px-1'>☰</button>
+                <Logo size={28} />
+              </header>
+              <main className='flex-1 p-4 sm:p-8'>
+                <Suspense fallback={<PageFallback />}>
+                  <Routes>
+                    <Route path='/' element={<Overview />} />
+                    <Route path='/branches' element={<Branches />} />
+                    <Route path='/students' element={<Students />} />
+                    <Route path='/students/:id' element={<StudentProfile />} />
+                    <Route path='/admins' element={<Admins />} />
+                    <Route path='/teachers' element={<Teachers />} />
+                    <Route path='/pricing' element={<Pricing />} />
+                    <Route path='/attendance' element={<Attendance />} />
+                    <Route path='/courses' element={<Courses />} />
+                    <Route path='/homework' element={<Homework />} />
+                    <Route path='/groups' element={<Groups />} />
+                    <Route path='/timetable' element={<Timetable />} />
+                    <Route path='/finance' element={<Finance />} />
+                    <Route path='/finance/payments/:id' element={<TransactionDetail />} />
+                    <Route path='/leads' element={<Leads />} />
+                    <Route path='/settings' element={<Settings />} />
+                    <Route path='*' element={<Navigate to='/' />} />
+                  </Routes>
+                </Suspense>
+              </main>
+            </div>
           </div>
-        </div>
+        </NewYearProvider>
       )}
     </LanguageProvider>
   )
+}
+
+// split out only so it can call useNewYear() - needs to be inside NewYearProvider, which wraps
+// this same component's own parent return, so it can't read the context at that outer level
+const NewYearSnowLayer = () => {
+  const { enabled } = useNewYear()
+  return enabled ? <NewYearSnow /> : null
 }
 
 export default App

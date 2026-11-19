@@ -1,9 +1,10 @@
 import React, { useContext } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Sun, Moon } from 'lucide-react'
+import { Sun, Moon, CloudSnow } from 'lucide-react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
+import { useNewYear } from '../context/NewYearContext.jsx'
 import Logo from './Logo.jsx'
 
 // below `lg`, this becomes a slide-in drawer (off-canvas by default, toggled by App.jsx's mobile
@@ -14,6 +15,7 @@ const Sidebar = ({ open, onClose }) => {
   const { logout } = useContext(DirectorContext)
   const { t } = useLanguage()
   const { isDark, toggleTheme } = useTheme()
+  const { enabled: newYearEnabled, toggle: toggleNewYear } = useNewYear()
 
   const links = [
     { to: '/', label: t('navOverview') },
@@ -50,7 +52,12 @@ const Sidebar = ({ open, onClose }) => {
         {/* mt-auto lives here (not on the logout button below) so this row sits directly above
             the sign-out button as one settled-in group at the bottom - same placement convention
             as the admin app's ThemeContext rollout */}
-        <button onClick={toggleTheme} className='plain mt-auto flex items-center gap-2 text-sm text-muted text-left px-3 py-2'>
+        <button onClick={toggleNewYear}
+          className={`plain mt-auto flex items-center gap-2 text-sm text-left px-3 py-2 ${newYearEnabled ? 'text-accent font-medium' : 'text-muted'}`}>
+          <CloudSnow size={16} strokeWidth={1.75} />
+          {t('newYearModeBtn')}
+        </button>
+        <button onClick={toggleTheme} className='plain flex items-center gap-2 text-sm text-muted text-left px-3 py-2'>
           {isDark ? <Sun size={16} strokeWidth={1.75} /> : <Moon size={16} strokeWidth={1.75} />}
           {isDark ? t('lightModeBtn') : t('darkModeBtn')}
         </button>

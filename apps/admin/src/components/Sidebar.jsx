@@ -1,9 +1,10 @@
 import React, { useContext } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Users, FolderOpen, CreditCard, Layers, GraduationCap, Calendar, StickyNote, User, LogOut, Sun, Moon, BookOpen } from 'lucide-react'
+import { Users, FolderOpen, CreditCard, Layers, GraduationCap, Calendar, StickyNote, User, LogOut, Sun, Moon, BookOpen, CloudSnow } from 'lucide-react'
 import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
+import { useNewYear } from '../context/NewYearContext.jsx'
 import Logo from './Logo.jsx'
 
 // below `lg`, this becomes a slide-in drawer (off-canvas by default, toggled by App.jsx's mobile
@@ -14,6 +15,7 @@ const Sidebar = ({ open, onClose }) => {
   const { logout } = useContext(AdminContext)
   const { t } = useLanguage()
   const { isDark, toggleTheme } = useTheme()
+  const { enabled: newYearEnabled, toggle: toggleNewYear } = useNewYear()
 
   const links = [
     { to: '/', label: t('navStudents'), icon: Users },
@@ -51,8 +53,15 @@ const Sidebar = ({ open, onClose }) => {
             "Chiqish" as one settled-in group at the bottom, instead of floating in the middle of the
             nav list or sitting in the page's own top-right corner where it collided with page-level
             "+ Add" buttons on narrower layouts */}
+        <button onClick={toggleNewYear}
+          className={`plain mt-auto flex items-center gap-3 py-3 px-4 rounded-xl text-[15px] font-medium transition-colors ${newYearEnabled
+            ? 'text-accent bg-indigo-50 dark:bg-[#4F46E5]/20 dark:text-[#818CF8]'
+            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-[#1E293B]'}`}>
+          <CloudSnow size={20} strokeWidth={1.75} className='w-5 h-5 flex-shrink-0' />
+          {t('newYearModeBtn')}
+        </button>
         <button onClick={toggleTheme}
-          className='plain mt-auto flex items-center gap-3 py-3 px-4 rounded-xl text-[15px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-[#1E293B] transition-colors'>
+          className='plain flex items-center gap-3 py-3 px-4 rounded-xl text-[15px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-[#1E293B] transition-colors'>
           {isDark
             ? <Sun size={20} strokeWidth={1.75} className='w-5 h-5 flex-shrink-0' />
             : <Moon size={20} strokeWidth={1.75} className='w-5 h-5 flex-shrink-0' />}

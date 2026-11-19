@@ -107,3 +107,23 @@ table td, table th {
 table tbody tr:last-child td {
   border-bottom: none;
 }
+
+/* New Year mode's falling snow (see NewYearSnow.jsx) - a straight linear fall plus one gentle
+   side-to-side drift, looped forever by the animation itself so JS never has to touch it after
+   mount. The faint shadow is what keeps a near-white flake visible against the light theme's own
+   near-white background; it's a no-op against the dark theme's canvas. */
+@keyframes new-year-snow-fall {
+  0% { transform: translateY(-10px) translateX(0); }
+  50% { transform: translateY(50vh) translateX(10px); }
+  100% { transform: translateY(110vh) translateX(-10px); }
+}
+.new-year-snowflake {
+  position: absolute;
+  top: 0;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.15);
+  animation-name: new-year-snow-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}

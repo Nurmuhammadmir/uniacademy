@@ -1,9 +1,10 @@
 import React, { useContext, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sun, Moon } from 'lucide-react'
+import { Sun, Moon, CloudSnow } from 'lucide-react'
 import { TeacherContext } from '../context/TeacherContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
+import { useNewYear } from '../context/NewYearContext.jsx'
 import SelfAttendanceScanner from '../components/SelfAttendanceScanner.jsx'
 import InstallAppCard from '../components/InstallAppCard.jsx'
 
@@ -11,6 +12,7 @@ const Profile = () => {
   const { me, logout } = useContext(TeacherContext)
   const { t, lang, setLang, availableLanguages } = useLanguage()
   const { isDark, toggleTheme } = useTheme()
+  const { enabled: newYearEnabled, toggle: toggleNewYear } = useNewYear()
   const navigate = useNavigate()
   const [showScanner, setShowScanner] = useState(false)
 
@@ -81,6 +83,12 @@ const Profile = () => {
       </div>
 
       <InstallAppCard />
+
+      <button onClick={toggleNewYear}
+        className={`w-full py-4 rounded-2xl border border-hairline font-medium mb-3 flex items-center justify-center gap-2 ${newYearEnabled ? 'bg-accent-soft dark:bg-white/10 text-accent' : 'bg-bg-card text-ink'}`}>
+        <CloudSnow size={18} strokeWidth={1.75} />
+        {t('newYearModeBtn')}
+      </button>
 
       <button onClick={toggleTheme} className='w-full py-4 rounded-2xl bg-bg-card border border-hairline text-ink font-medium mb-3 flex items-center justify-center gap-2'>
         {isDark ? <Sun size={18} strokeWidth={1.75} /> : <Moon size={18} strokeWidth={1.75} />}
