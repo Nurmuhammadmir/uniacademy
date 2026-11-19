@@ -11,6 +11,7 @@ import ConfirmHost from './components/ConfirmHost.jsx'
 import Spinner from './components/Spinner.jsx'
 import ThemeToggle from './components/ThemeToggle.jsx'
 import NewYearSnow from './components/NewYearSnow.jsx'
+import NewYearMusic from './components/NewYearMusic.jsx'
 import Login from './pages/Login.jsx'
 
 // every page below is its own lazily-fetched JS chunk instead of part of one giant bundle - a
@@ -116,7 +117,12 @@ const AuthenticatedApp = () => {
 // this same component's own parent return, so it can't read the context at that outer level
 const NewYearSnowLayer = () => {
   const { enabled } = useNewYear()
-  return enabled ? <NewYearSnow /> : null
+  return (
+    <>
+      {enabled && <NewYearSnow />}
+      <NewYearMusic enabled={enabled} />
+    </>
+  )
 }
 
 const App = () => {

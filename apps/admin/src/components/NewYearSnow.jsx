@@ -17,20 +17,26 @@ const NewYearSnow = () => {
     opacity: 0.25 + Math.random() * 0.35,
   })), [])
 
-  if (reduceMotion) return null
-
   return (
-    <div className='fixed inset-0 z-30 overflow-hidden' style={{ pointerEvents: 'none' }} aria-hidden='true'>
-      {flakes.map(f => (
-        <span key={f.id} className='new-year-snowflake' style={{
-          left: `${f.left}%`,
-          width: f.size, height: f.size,
-          opacity: f.opacity,
-          animationDuration: `${f.duration}s`,
-          animationDelay: `${f.delay}s`,
-        }} />
-      ))}
-    </div>
+    <>
+      {/* a thin strip of garland lights across the very top of the viewport - one fixed element,
+          pure CSS background pattern (see .new-year-garland), so it shows up above every page in
+          every one of these 3 apps without touching each page's own header markup */}
+      <div className='new-year-garland fixed top-0 left-0 right-0 z-40' style={{ pointerEvents: 'none' }} aria-hidden='true' />
+      {!reduceMotion && (
+        <div className='fixed inset-0 z-30 overflow-hidden' style={{ pointerEvents: 'none' }} aria-hidden='true'>
+          {flakes.map(f => (
+            <span key={f.id} className='new-year-snowflake' style={{
+              left: `${f.left}%`,
+              width: f.size, height: f.size,
+              opacity: f.opacity,
+              animationDuration: `${f.duration}s`,
+              animationDelay: `${f.delay}s`,
+            }} />
+          ))}
+        </div>
+      )}
+    </>
   )
 }
 

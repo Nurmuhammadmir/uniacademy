@@ -14,6 +14,19 @@ const EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp']
 // page can render (sidebar + login, etc all share this one value during the same load).
 const CACHE_BUST = Date.now()
 
+// New Year mode's one hat-on-the-logo touch (see Sidebar.jsx's `festive` prop) - a simplified red
+// Santa hat perched on the top-left corner of the mark, tilted slightly. Pure decoration: sized off
+// the logo's own `size` so it scales with it, absolutely positioned so it never affects layout/flow.
+const SantaHat = ({ size }) => (
+  <svg width={size * 0.62} height={size * 0.62} viewBox='0 0 24 24'
+    style={{ position: 'absolute', top: -size * 0.32, left: -size * 0.22, transform: 'rotate(-18deg)', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' }}
+    aria-hidden='true'>
+    <path d='M4 20c0-9 5-16 13-16 1 0 2 3-1 5-2 1-3 3-1 5 3-2 6 0 6 3 0 4-6 7-11 7-3 0-6-1-6-4z' fill='#D7263D' />
+    <ellipse cx='9' cy='19.5' rx='7' ry='3' fill='#FFFFFF' />
+    <circle cx='18' cy='5' r='2.4' fill='#FFFFFF' />
+  </svg>
+)
+
 const PlaceholderMark = ({ size }) => (
   <svg width={size} height={size} viewBox='0 0 40 40' fill='none' xmlns='http://www.w3.org/2000/svg' style={{ filter: 'drop-shadow(0 2px 4px rgba(75,79,224,0.35))' }}>
     <defs>
@@ -41,7 +54,7 @@ const PlaceholderMark = ({ size }) => (
 // wordmark deliberately uses Clash Display inline rather than the platform's own font-display
 // utility (Plus Jakarta Sans, see tailwind-preset) - Clash Display is reserved for the brand name
 // alone, not for section headings elsewhere in the UI.
-const Logo = ({ size = 32, withWordmark = true }) => {
+const Logo = ({ size = 32, withWordmark = true, festive = false }) => {
   const [extIndex, setExtIndex] = useState(0)
   const [exhausted, setExhausted] = useState(false)
 
@@ -52,16 +65,19 @@ const Logo = ({ size = 32, withWordmark = true }) => {
 
   return (
     <div className='flex items-center gap-2.5'>
-      {exhausted ? (
-        <PlaceholderMark size={size} />
-      ) : (
-        <img
-          src={`${backendUrl}/static/logoUniacademy.${EXTENSIONS[extIndex]}?v=${CACHE_BUST}`}
-          alt='UniAcademy' width={size} height={size}
-          style={{ objectFit: 'contain', borderRadius: 8 }}
-          onError={handleError}
-        />
-      )}
+      <div style={{ position: 'relative' }}>
+        {festive && <SantaHat size={size} />}
+        {exhausted ? (
+          <PlaceholderMark size={size} />
+        ) : (
+          <img
+            src={`${backendUrl}/static/logoUniacademy.${EXTENSIONS[extIndex]}?v=${CACHE_BUST}`}
+            alt='UniAcademy' width={size} height={size}
+            style={{ objectFit: 'contain', borderRadius: 8 }}
+            onError={handleError}
+          />
+        )}
+      </div>
       {withWordmark && <span className='text-lg text-ink leading-none' style={{ fontFamily: '"Clash Display", sans-serif' }}>UniAcademy</span>}
     </div>
   )

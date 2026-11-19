@@ -338,9 +338,31 @@ table tbody tr:last-child td {
   position: absolute;
   top: 0;
   border-radius: 9999px;
-  background: #ffffff;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.15);
+  /* a plain white flake all but vanishes against the light theme's own near-white background
+     (confirmed real complaint) - a clear sky-blue reads as "snow" just as well and stays visible
+     on a light canvas; .dark below swaps it back to white, which is what reads as snow against a
+     dark canvas. */
+  background: #60a5fa;
+  box-shadow: 0 0 4px rgba(37, 99, 235, 0.4);
   animation-name: new-year-snow-fall;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+}
+.dark .new-year-snowflake {
+  background: #ffffff;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+}
+
+/* New Year mode's garland strip (see NewYearSnow.jsx) - a repeating red/green/gold "fairy light"
+   dot pattern plus a faint wire line, all one CSS background-image so it's a single paint, no DOM
+   per-bulb. */
+.new-year-garland {
+  height: 14px;
+  background-image:
+    radial-gradient(circle 4px at 12px 7px, #D7263D 95%, transparent 100%),
+    radial-gradient(circle 4px at 36px 7px, #2E7D32 95%, transparent 100%),
+    radial-gradient(circle 4px at 60px 7px, #D4AF37 95%, transparent 100%),
+    linear-gradient(to right, transparent 49%, rgba(0, 0, 0, 0.18) 50%, transparent 51%);
+  background-size: 72px 14px;
+  background-repeat: repeat-x;
 }

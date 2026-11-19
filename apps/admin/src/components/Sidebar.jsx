@@ -34,7 +34,7 @@ const Sidebar = ({ open, onClose }) => {
       {open && <div onClick={onClose} className='fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-md dark:bg-[#0B0F19]/60 dark:backdrop-blur-lg transition-all duration-300 lg:hidden' />}
 
       <aside className={`w-60 fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#161F30] border-r border-slate-100 dark:border-slate-800/80 p-6 flex flex-col transition-transform duration-200 ease-out lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className='mb-8'><Logo size={60} /></div>
+        <div className='mb-8'><Logo size={60} festive={newYearEnabled} /></div>
         <nav className='flex flex-col gap-1.5 flex-1 overflow-y-auto'>
           {links.map(link => {
             const Icon = link.icon
