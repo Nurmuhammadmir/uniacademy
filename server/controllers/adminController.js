@@ -10,6 +10,7 @@ import Pricing from "../models/Pricing.js"
 import Exam from "../models/Exam.js"
 import ExamAttempt from "../models/ExamAttempt.js"
 import Level from "../models/Level.js"
+import Language from "../models/Language.js"
 import TeacherAttendanceQR from "../models/TeacherAttendanceQR.js"
 import TeacherAttendance from "../models/TeacherAttendance.js"
 import Attendance from "../models/Attendance.js"
@@ -41,7 +42,7 @@ import { applyDiscountToStudent, deleteDiscountEntry, listStudentDiscounts } fro
 import { openMembership, closeMembership } from "../services/groupMembership.service.js"
 import { stillHasLiveRoster, STILL_ACTIVE_GROUP_MATCH } from "../services/groupPromotion.service.js"
 import { getOrCreateAccount, postTransfer, postEntry, deleteEntries, formatAmount } from "../services/ledger.service.js"
-import { recognizeEnrollmentDebt, computeCourseOwed, recomputeEnrollmentStatus, reverseUnusedPeriod, recognizeNextPeriod } from "../services/billingCycle.service.js"
+import { recognizeEnrollmentDebt, computeCourseOwed, recomputeEnrollmentStatus, reverseUnusedPeriod, recognizeNextPeriod, computePaymentCoverage } from "../services/billingCycle.service.js"
 
 // api for the teacher profile view, admin version - scoped to admin's own branch. A teacher may
 // work in more than one branch (additionalBranchIds), so visibility is membership, not equality -
@@ -1099,6 +1100,44 @@ export const getPaymentDetail = async (req, res) => {
         // field - same student-branch fallback getFinanceOverview already relies on for this reason
         const branchId = payment.branchId || payment.studentId?.branchId
         if (String(branchId) !== String(req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
+
+        // payment.languageId/groupId/teacherId above are the dead legacy attribution snapshot (see
+        // Payment.js's own comment) - always null on any row recorded after the shared-wallet rework,
+        // which is every row an admin could still be looking at today. What this payment's money
+        // actually settled has to be computed fresh from the ledger (confirmed real complaint: the
+        // old "course/group/teacher/qoplaydi" fields on this exact page always showed "-" for every
+        // payment, because nothing has set them in a long time).
+        payment.coverage = []
+        payment.coveredThrough = null
+        if (payment.studentId?._id) {
+            const studentAccount = await getOrCreateAccount('student', payment.studentId._id)
+            const paymentEntry = await LedgerEntry.findOne({ accountId: studentAccount._id, kind: 'payment', sourceId: payment._id }).lean()
+            if (paymentEntry) {
+                const rawCoverage = await computePaymentCoverage(studentAccount._id, paymentEntry._id)
+                const languageIds = [...new Set(rawCoverage.map(c => String(c.languageId)).filter(Boolean))]
+                const levelIds = [...new Set(rawCoverage.map(c => String(c.levelId)).filter(Boolean))]
+                const groupIds = [...new Set(rawCoverage.map(c => String(c.groupId)).filter(Boolean))]
+                const teacherIds = [...new Set(rawCoverage.map(c => String(c.teacherId)).filter(Boolean))]
+                const [languages, levels, groups, teachers] = await Promise.all([
+                    languageIds.length ? Language.find({ _id: { $in: languageIds } }).select('name').lean() : [],
+                    levelIds.length ? Level.find({ _id: { $in: levelIds } }).select('name').lean() : [],
+                    groupIds.length ? Group.find({ _id: { $in: groupIds } }).select('schedulePattern time name').lean() : [],
+                    teacherIds.length ? User.find({ _id: { $in: teacherIds } }).select('name').lean() : [],
+                ])
+                const byId = (arr) => new Map(arr.map(x => [String(x._id), x]))
+                const languageById = byId(languages), levelById = byId(levels), groupById = byId(groups), teacherById = byId(teachers)
+                payment.coverage = rawCoverage.map(c => ({
+                    amount: c.amount, periodStart: c.periodStart, periodEnd: c.periodEnd,
+                    languageName: languageById.get(String(c.languageId))?.name || null,
+                    levelName: levelById.get(String(c.levelId))?.name || null,
+                    groupLabel: groupById.get(String(c.groupId))?.name || null,
+                    teacherName: teacherById.get(String(c.teacherId))?.name || null,
+                }))
+                const periodEnds = rawCoverage.map(c => c.periodEnd).filter(Boolean)
+                if (periodEnds.length) payment.coveredThrough = new Date(Math.max(...periodEnds.map(d => new Date(d).getTime())))
+            }
+        }
+
         res.json({ payment })
     } catch (error) {
         console.log(error)

@@ -1,10 +1,13 @@
 import mongoose from "mongoose"
 import User from "../models/User.js"
-import Group from "../models/Group.js"
 import Payment from "../models/Payment.js"
 import Expense from "../models/Expense.js"
+import Account from "../models/Account.js"
+import LedgerEntry from "../models/LedgerEntry.js"
+import Language from "../models/Language.js"
+import Level from "../models/Level.js"
 import { startOfLocalDay, endOfLocalDay } from "./businessTime.service.js"
-import { STILL_ACTIVE_GROUP_MATCH } from "./groupPromotion.service.js"
+import { DISPLAY_KINDS, computeCoverageFromEntries } from "./billingCycle.service.js"
 
 const isoWeekLabel = (date) => {
     const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
@@ -68,6 +71,12 @@ export const getFinanceOverview = async (branchIdRaw, query) => {
         if (dateTo) dateRange.$lte = endOfLocalDay(dateTo)
         conditions.push({ date: dateRange })
     }
+    // NOT fixed yet (separate, bigger gap - flagged live 2026-11-19): this filters Payment's own
+    // groupId/teacherId fields, which are the same dead legacy attribution snapshot
+    // paymentsWithCurrentTeacher below works around for the list columns - never set on any payment
+    // recorded after the shared-wallet rework. Filtering by group/teacher here currently matches
+    // close to nothing on real data. A real fix needs coverage computed BEFORE paging (every
+    // candidate payment, not just the current page), not just before display.
     if (groupIdObj) conditions.push({ groupId: groupIdObj })
     if (teacherIdObj) conditions.push({ teacherId: teacherIdObj })
     if (method) conditions.push({ method })
@@ -99,23 +108,65 @@ export const getFinanceOverview = async (branchIdRaw, query) => {
         .populate('adminId', 'name')
 
     const studentIdsOnPage = [...new Set(payments.map(p => String(p.studentId?._id || p.studentId)))]
-    // a payment is never tied to a course anymore (confirmed spec: one shared wallet), so
-    // p.languageId is genuinely null on any new row - filter those out before building the $in
-    // array, or Mongoose tries to cast the literal string "null" to an ObjectId and 500s
-    const languageIdsOnPage = [...new Set(payments.map(p => p.languageId?._id || p.languageId).filter(Boolean).map(String))]
-    const currentGroups = languageIdsOnPage.length
-        ? await Group.find({
-            studentIds: { $in: studentIdsOnPage }, languageId: { $in: languageIdsOnPage }, ...STILL_ACTIVE_GROUP_MATCH,
-        }).select('studentIds languageId teacherId').populate('teacherId', 'name')
+
+    // which course/teacher a payment's own money actually settled can't be read off a stored field
+    // (Payment.languageId/teacherId are dead legacy fields, never set since the shared-wallet
+    // rework - see Payment.js's own comment and computeCoverageFromEntries's). Computed fresh from
+    // the ledger instead, batched one account-fetch per STUDENT on this page (not per payment) -
+    // a page of 25 payments is very often the same handful of students paying more than once.
+    const studentAccounts = studentIdsOnPage.length
+        ? await Account.find({ ownerType: 'student', ownerId: { $in: studentIdsOnPage } }).select('ownerId').lean()
         : []
-    const currentTeacherFor = (studentId, languageId) => {
-        const group = currentGroups.find(g => String(g.languageId) === String(languageId)
-            && g.studentIds.some(id => String(id) === String(studentId)))
-        return group?.teacherId || null
+    const accountIdByStudent = new Map(studentAccounts.map(a => [String(a.ownerId), String(a._id)]))
+    const accountIds = studentAccounts.map(a => a._id)
+    const allEntries = accountIds.length
+        ? await LedgerEntry.find({ accountId: { $in: accountIds }, kind: { $in: DISPLAY_KINDS } }).sort({ date: 1, _id: 1 }).lean()
+        : []
+    const entriesByAccount = new Map()
+    for (const e of allEntries) {
+        const key = String(e.accountId)
+        if (!entriesByAccount.has(key)) entriesByAccount.set(key, [])
+        entriesByAccount.get(key).push(e)
     }
-    const paymentsWithCurrentTeacher = payments.map(p => ({
-        ...p.toObject(), currentTeacherId: currentTeacherFor(p.studentId?._id, p.languageId?._id),
-    }))
+
+    const coverageByPaymentId = new Map()
+    const languageIds = new Set(), levelIds = new Set(), teacherIds = new Set()
+    for (const p of payments) {
+        const accountId = accountIdByStudent.get(String(p.studentId?._id || p.studentId))
+        if (!accountId) continue
+        const studentEntries = entriesByAccount.get(accountId) || []
+        const paymentEntry = studentEntries.find(e => e.kind === 'payment' && String(e.sourceId) === String(p._id))
+        if (!paymentEntry) continue
+        const coverage = computeCoverageFromEntries(studentEntries, paymentEntry._id)
+        coverageByPaymentId.set(String(p._id), coverage)
+        for (const c of coverage) {
+            if (c.languageId) languageIds.add(String(c.languageId))
+            if (c.levelId) levelIds.add(String(c.levelId))
+            if (c.teacherId) teacherIds.add(String(c.teacherId))
+        }
+    }
+    const [languages, levels, teachers] = await Promise.all([
+        languageIds.size ? Language.find({ _id: { $in: [...languageIds] } }).select('name').lean() : [],
+        levelIds.size ? Level.find({ _id: { $in: [...levelIds] } }).select('name').lean() : [],
+        teacherIds.size ? User.find({ _id: { $in: [...teacherIds] } }).select('name').lean() : [],
+    ])
+    const languageById = new Map(languages.map(l => [String(l._id), l]))
+    const levelById = new Map(levels.map(l => [String(l._id), l]))
+    const teacherById = new Map(teachers.map(t => [String(t._id), t]))
+
+    const paymentsWithCurrentTeacher = payments.map(p => {
+        // the single biggest course this payment's cash landed on, for the one-line list display -
+        // computeCoverageFromEntries already sorts largest-amount first. The detail page shows every
+        // course it touched; this list row only has room for one.
+        const top = (coverageByPaymentId.get(String(p._id)) || [])[0]
+        const topLanguage = top?.languageId ? languageById.get(String(top.languageId)) : null
+        const topLevel = top?.levelId ? levelById.get(String(top.levelId)) : null
+        return {
+            ...p.toObject(),
+            currentTeacherId: top?.teacherId ? teacherById.get(String(top.teacherId)) || null : null,
+            coveredCourseLabel: topLanguage ? `${topLanguage.name}${topLevel?.name ? ' · ' + topLevel.name : ''}` : null,
+        }
+    })
 
     // revenue is cash-basis (confirmed, final answer): counted the moment a real payment happens,
     // dated when it was paid. Never deferred to whichever future month's debt a prepayment happens

@@ -159,6 +159,42 @@ export const computeCourseCovered = async (accountId, languageId) => {
     return allocations.filter(a => String(a.entry.languageId) === String(languageId)).reduce((sum, a) => sum + a.covered, 0)
 }
 
+// which course(s) one specific payment's own money actually ended up settling - there is no stored
+// field to read this off of anymore (Payment.languageId/groupId/teacherId are a dead legacy
+// attribution snapshot, never set since the shared-wallet rework - see Payment.js's own comment),
+// since a payment's cash is pooled and spent oldest-debt-first across every course interleaved.
+// Computed by diffing the account's FIFO allocation with and without this one payment's entry in
+// the pool: whatever extra `covered` a debt gains BECAUSE this payment's cash is there is exactly
+// what this payment paid toward it. Pure/sync so a caller already holding one account's full entry
+// list (e.g. a finance-list page batching many payments for the same few students) can reuse it
+// without a second DB round-trip per payment.
+export const computeCoverageFromEntries = (entries, paymentEntryId) => {
+    const withPayment = foldReversalsAndAllocate(entries)
+    const withoutPayment = foldReversalsAndAllocate(entries.filter(e => String(e._id) !== String(paymentEntryId)))
+    const coveredBefore = new Map(withoutPayment.map(a => [String(a.entry._id), a.covered]))
+    const coverage = []
+    for (const a of withPayment) {
+        if (a.entry.kind !== 'debt') continue
+        const delta = a.covered - (coveredBefore.get(String(a.entry._id)) || 0)
+        if (delta > 0) {
+            coverage.push({
+                languageId: a.entry.languageId, levelId: a.entry.levelId, groupId: a.entry.groupId,
+                teacherId: a.entry.teacherId, amount: delta, periodStart: a.entry.periodStart, periodEnd: a.entry.periodEnd,
+            })
+        }
+    }
+    return coverage.sort((x, y) => y.amount - x.amount)
+}
+
+// DB-fetching convenience wrapper for a single payment detail page (list pages batch-fetch entries
+// themselves and call computeCoverageFromEntries directly - see financeOverview.service.js)
+export const computePaymentCoverage = async (accountId, paymentEntryId) => {
+    const entries = await LedgerEntry.find({
+        accountId: new mongoose.Types.ObjectId(accountId), kind: { $in: DISPLAY_KINDS },
+    }).sort({ date: 1, _id: 1 })
+    return computeCoverageFromEntries(entries, paymentEntryId)
+}
+
 // recognizes exactly ONE billing chunk for a student's course, if one is actually due - safe to call
 // unconditionally (the enrollment flow calls it once immediately; the daily job calls it for every
 // enrolled course every day) since it no-ops until the real-world date/state says a chunk is due:

@@ -130,6 +130,7 @@ export const TRANSLATIONS = {
     subscriptionUntilCol: 'Subscription until', refundBtn: 'Refund', refundedBadge: 'Refunded', noPaymentsRecorded: 'No payments recorded yet.',
     backToFinance: 'Back to Finance', paymentTransactionTitle: 'Payment', expenseTransactionTitle: 'Expense', transactionNotFound: 'Transaction not found.',
     transactionDetailsTitle: 'Details', coveredThroughLabel: 'Covers through', recordedByLabel: 'Recorded by', recordedAtLabel: 'Recorded at',
+    coversSectionTitle: 'Covers', coversNothingYet: 'Not covering anything yet', courseUnknown: 'Unknown course',
     noteLabel: 'Note', couldNotLoadTransaction: 'Could not load this transaction.',
 
     // Teachers
@@ -453,6 +454,7 @@ export const TRANSLATIONS = {
     subscriptionUntilCol: 'Подписка до', refundBtn: 'Вернуть', refundedBadge: 'Возвращено', noPaymentsRecorded: 'Платежи ещё не записаны.',
     backToFinance: 'Назад к финансам', paymentTransactionTitle: 'Платёж', expenseTransactionTitle: 'Расход', transactionNotFound: 'Транзакция не найдена.',
     transactionDetailsTitle: 'Детали', coveredThroughLabel: 'Покрывает до', recordedByLabel: 'Записал(а)', recordedAtLabel: 'Время записи',
+    coversSectionTitle: 'Покрывает', coversNothingYet: 'Пока ничего не покрывает', courseUnknown: 'Курс неизвестен',
     noteLabel: 'Заметка', couldNotLoadTransaction: 'Не удалось загрузить эту транзакцию.',
 
     teachersTitle: 'Учителя', teacherQrHint: 'живой код обновляется автоматически каждые пару минут - показывайте его на экране на ресепшене, не распечатывайте',
@@ -769,6 +771,7 @@ export const TRANSLATIONS = {
     subscriptionUntilCol: 'Obuna muddati', refundBtn: 'Qaytarish', refundedBadge: 'Qaytarilgan', noPaymentsRecorded: "Hozircha to'lovlar qayd etilmagan.",
     backToFinance: "Finance'ga qaytish", paymentTransactionTitle: "To'lov", expenseTransactionTitle: 'Xarajat', transactionNotFound: 'Tranzaksiya topilmadi.',
     transactionDetailsTitle: "Tafsilotlar", coveredThroughLabel: 'Qoplaydi', recordedByLabel: 'Kim yozgan', recordedAtLabel: 'Yozilgan vaqti',
+    coversSectionTitle: 'Qoplaydi', coversNothingYet: "Hali hech narsani qoplamaydi", courseUnknown: "Noma'lum kurs",
     noteLabel: 'Izoh', couldNotLoadTransaction: 'Bu tranzaksiyani yuklab bo\'lmadi.',
 
     teachersTitle: "O'qituvchilar", teacherQrHint: "jonli kod har bir necha daqiqada avtomatik yangilanadi - uni qabulxona ekranida ko'rsating, chop etmang",
@@ -1085,6 +1088,7 @@ export const TRANSLATIONS = {
     subscriptionUntilCol: 'Jazılıw múddeti', refundBtn: 'Qaytarıw', refundedBadge: 'Qaytarıldı', noPaymentsRecorded: "Ele tólemler jazılmaǵan.",
     backToFinance: "Finance'ge qaytıw", paymentTransactionTitle: "Tólem", expenseTransactionTitle: 'Shıǵın', transactionNotFound: 'Tranzaksiya tabılmadı.',
     transactionDetailsTitle: "Tolıq maǵlıwmat", coveredThroughLabel: 'Qaplaydı', recordedByLabel: 'Kim jazǵan', recordedAtLabel: 'Jazılǵan waqtı',
+    coversSectionTitle: 'Qaplaydı', coversNothingYet: "Áli heshnarseni qaplamaydı", courseUnknown: "Belgisiz kurs",
     noteLabel: 'Eskertpe', couldNotLoadTransaction: 'Bul tranzaksiyanı júklep bolmadı.',
 
     teachersTitle: "Oqıtıwshılar", teacherQrHint: "tiri kod hár bir eki-úsh minutta avtomat jańalanadı - onı qabıllaw bólimindegi ekranda kórsetiń, basıp shıǵarmań",

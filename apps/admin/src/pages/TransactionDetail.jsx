@@ -104,10 +104,27 @@ const TransactionDetail = ({ type }) => {
             <p className='text-ink font-medium mb-2'>{t('transactionDetailsTitle')}</p>
             <Row label={t('dateCol')} value={fullDate(record.date)} />
             <Row label={t('methodCol')} value={t(paymentMethodLabelKey(record.method))} />
-            <Row label={t('courseCol')} value={record.languageId ? `${record.languageId.name}${record.levelId?.name ? ' · ' + record.levelId.name : ''}` : '—'} />
-            <Row label={t('groupCol')} value={record.groupId ? `${record.groupId.schedulePattern} · ${record.groupId.time}` : '—'} />
-            <Row label={t('teacherCol')} value={record.teacherId?.name || '—'} />
-            <Row label={t('coveredThroughLabel')} value={record.subscriptionEnd ? new Date(record.subscriptionEnd).toLocaleDateString('en-GB') : '—'} />
+            <Row label={t('coveredThroughLabel')} value={record.coveredThrough ? new Date(record.coveredThrough).toLocaleDateString('en-GB') : '—'} />
+          </div>
+
+          {/* a payment is a deposit into the student's one shared wallet, never tied to a single
+              course (see Payment.js) - record.coverage is computed fresh from the ledger (which
+              debt(s) this exact payment's money ended up settling), not read off a stored field, so
+              it can legitimately list more than one course if this payment paid off more than one */}
+          <div className='bg-bg-elevated border border-hairline rounded-2xl p-5'>
+            <p className='text-ink font-medium mb-2'>{t('coversSectionTitle')}</p>
+            {record.coverage.length === 0 && <p className='text-muted text-sm'>{t('coversNothingYet')}</p>}
+            {record.coverage.map((c, i) => (
+              <div key={i} className='py-2.5 border-b border-hairline last:border-0'>
+                <div className='flex justify-between items-center'>
+                  <span className='text-ink text-sm font-medium'>{c.languageName ? `${c.languageName}${c.levelName ? ' · ' + c.levelName : ''}` : t('courseUnknown')}</span>
+                  <span className='text-ink text-sm font-mono'>{formatMoney(c.amount)}</span>
+                </div>
+                <p className='text-muted text-xs mt-0.5'>
+                  {t('groupCol')}: {c.groupLabel || '—'} · {t('teacherCol')}: {c.teacherName || '—'}
+                </p>
+              </div>
+            ))}
           </div>
 
           <div className='bg-bg-elevated border border-hairline rounded-2xl p-5'>

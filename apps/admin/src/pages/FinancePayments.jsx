@@ -246,7 +246,10 @@ const FinancePayments = () => {
                 <td className='px-4 py-4'>
                   <span className='text-xs font-medium px-2 py-1 rounded-full bg-hairline text-muted'>{t(paymentMethodLabelKey(p.method))}</span>
                 </td>
-                <td className='px-4 py-4 text-muted'>{p.currentTeacherId?.name || p.teacherId?.name || '—'}</td>
+                <td className='px-4 py-4 text-muted'>
+                  {p.currentTeacherId?.name || p.teacherId?.name || '—'}
+                  {p.coveredCourseLabel && <span className='block text-xs text-muted font-normal'>{p.coveredCourseLabel}</span>}
+                </td>
                 <td className='px-4 py-4 text-muted max-w-[200px]'>
                   {p.comment ? <span className='block truncate' title={p.comment}>{p.comment}</span> : '—'}
                 </td>
