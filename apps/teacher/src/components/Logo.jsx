@@ -14,17 +14,16 @@ const EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp']
 // page can render (sidebar + login, etc all share this one value during the same load).
 const CACHE_BUST = Date.now()
 
-// New Year mode's one hat-on-the-logo touch (see Sidebar.jsx's `festive` prop) - a simplified red
-// Santa hat perched on the top-left corner of the mark, tilted slightly. Pure decoration: sized off
-// the logo's own `size` so it scales with it, absolutely positioned so it never affects layout/flow.
+// New Year mode's one hat-on-the-logo touch (see Sidebar.jsx's `festive` prop) - a real photo-style
+// hat (public/images/santa-hat.png, transparent background) perched on the top-left corner of the
+// mark, tilted slightly. Pure decoration: sized off the logo's own `size` so it scales with it,
+// absolutely positioned so it never affects layout/flow.
 const SantaHat = ({ size }) => (
-  <svg width={size * 0.62} height={size * 0.62} viewBox='0 0 24 24'
-    style={{ position: 'absolute', top: -size * 0.32, left: -size * 0.22, transform: 'rotate(-18deg)', filter: 'drop-shadow(0 1px 1px rgba(0,0,0,0.3))' }}
-    aria-hidden='true'>
-    <path d='M4 20c0-9 5-16 13-16 1 0 2 3-1 5-2 1-3 3-1 5 3-2 6 0 6 3 0 4-6 7-11 7-3 0-6-1-6-4z' fill='#D7263D' />
-    <ellipse cx='9' cy='19.5' rx='7' ry='3' fill='#FFFFFF' />
-    <circle cx='18' cy='5' r='2.4' fill='#FFFFFF' />
-  </svg>
+  <img src='/images/santa-hat.png' alt='' aria-hidden='true' width={size * 0.85} height={size * 0.85}
+    style={{
+      position: 'absolute', top: -size * 0.42, left: -size * 0.3, width: size * 0.85, height: 'auto',
+      transform: 'rotate(-12deg)', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.35))', pointerEvents: 'none',
+    }} />
 )
 
 const PlaceholderMark = ({ size }) => (

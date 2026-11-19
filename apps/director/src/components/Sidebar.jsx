@@ -5,6 +5,7 @@ import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { useNewYear } from '../context/NewYearContext.jsx'
+import { GarlandWire, GarlandBulb, GarlandPlug } from './SidebarGarland.jsx'
 import Logo from './Logo.jsx'
 
 // below `lg`, this becomes a slide-in drawer (off-canvas by default, toggled by App.jsx's mobile
@@ -41,10 +42,12 @@ const Sidebar = ({ open, onClose }) => {
       <aside className={`w-60 fixed inset-y-0 left-0 z-50 bg-bg-elevated border-r border-hairline p-6 flex flex-col transition-transform duration-200 ease-out lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className='mb-1'><Logo size={60} festive={newYearEnabled} /></div>
         <p className='text-xs mb-8 ml-10' style={{ color: '#C9A15C' }}>{t('directorLabel')}</p>
-        <nav className='flex flex-col gap-1 flex-1 overflow-y-auto'>
-          {links.map(link => (
+        <nav className='relative flex flex-col gap-1 flex-1 overflow-y-auto'>
+          <GarlandWire />
+          {links.map((link, i) => (
             <NavLink key={link.to} to={link.to} end={link.to === '/'} onClick={onClose}
-              className={({ isActive }) => `px-3 py-2 rounded-lg text-sm font-medium ${isActive ? 'bg-accent-soft text-accent' : 'text-muted'}`}>
+              className={({ isActive }) => `relative px-3 py-2 rounded-lg text-sm font-medium ${isActive ? 'bg-accent-soft text-accent' : 'text-muted'}`}>
+              <span className='absolute top-1/2 -translate-y-1/2 -left-3'><GarlandBulb uid={i} lit={newYearEnabled} /></span>
               {link.label}
             </NavLink>
           ))}
@@ -62,6 +65,7 @@ const Sidebar = ({ open, onClose }) => {
           {isDark ? t('lightModeBtn') : t('darkModeBtn')}
         </button>
         <button onClick={logout} className='plain text-sm text-muted text-left px-3 py-2'>{t('signOut')}</button>
+        <div className='absolute bottom-3 left-2.5'><GarlandPlug pluggedIn={newYearEnabled} /></div>
       </aside>
     </>
   )

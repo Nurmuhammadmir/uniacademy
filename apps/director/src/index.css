@@ -188,16 +188,54 @@ table tbody tr:last-child td {
   box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
 }
 
-/* New Year mode's garland strip (see NewYearSnow.jsx) - a repeating red/green/gold "fairy light"
-   dot pattern plus a faint wire line, all one CSS background-image so it's a single paint, no DOM
-   per-bulb. */
-.new-year-garland {
-  height: 14px;
-  background-image:
-    radial-gradient(circle 4px at 12px 7px, #D7263D 95%, transparent 100%),
-    radial-gradient(circle 4px at 36px 7px, #2E7D32 95%, transparent 100%),
-    radial-gradient(circle 4px at 60px 7px, #D4AF37 95%, transparent 100%),
-    linear-gradient(to right, transparent 49%, rgba(0, 0, 0, 0.18) 50%, transparent 51%);
-  background-size: 72px 14px;
-  background-repeat: repeat-x;
+/* Sidebar nav garland (see SidebarGarland.jsx) - unlike every other New Year decoration, this one
+   is ALWAYS rendered (confirmed spec): it just "unplugs" - bulbs go dark/matte and the plug pulls
+   a few px out of its socket - instead of unmounting, so the sidebar keeps the same ornament year-
+   round, it's only ever the light/dark state that changes with the toggle. */
+.sidebar-garland-wire {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -12px;
+  width: 2px;
+  background: linear-gradient(to bottom, #3f3f3f, #2a2a2a);
+  border-radius: 1px;
+}
+.sidebar-garland-bulb {
+  display: inline-block;
+  line-height: 0;
+  transition: filter 0.4s ease, opacity 0.4s ease;
+}
+.sidebar-garland-bulb.lit {
+  filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+  animation: sidebar-bulb-twinkle 2.6s ease-in-out infinite;
+}
+.sidebar-garland-bulb.unlit {
+  opacity: 0.4;
+  filter: grayscale(0.7) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.15));
+}
+@keyframes sidebar-bulb-twinkle {
+  0%, 100% { filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25)); }
+  50% { filter: drop-shadow(0 0 1.5px currentColor) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25)); }
+}
+.sidebar-garland-plug-body {
+  transition: transform 0.4s ease;
+  transform: translateX(0);
+}
+.sidebar-garland-plug.unplugged .sidebar-garland-plug-body {
+  transform: translateX(-7px);
+}
+
+/* top-of-viewport pine garland (see TopGarland.jsx) - a warm, blurred glow sits under the lights
+   layer (feGaussianBlur in the SVG itself), and this adds the page-level drop shadow that makes
+   the whole strip read as physically hanging a little above the content underneath it. */
+.new-year-top-garland {
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.22));
+}
+.new-year-top-garland .tg-light {
+  animation: new-year-light-twinkle 2.2s ease-in-out infinite;
+}
+@keyframes new-year-light-twinkle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
 }
