@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL
 // tries every common image extension in turn - drop the real file in server/public/ named
@@ -13,6 +13,28 @@ const EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp']
 // navigation/refresh without defeating in-page caching for the multiple <Logo> instances a single
 // page can render (sidebar + login, etc all share this one value during the same load).
 const CACHE_BUST = Date.now()
+
+// New Year mode's one hat-on-the-logo touch (see Sidebar.jsx's `festive` prop) - reads
+// public/images/santa-hat.png, same "drop the file, no rebuild" convention as everything else in
+// New Year mode. A probe <img> is the only way to know the file exists before committing to it
+// (plain <img onError> would briefly show a broken-image icon); renders nothing until it's there.
+const SantaHat = ({ size }) => {
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    const probe = new Image()
+    probe.onload = () => setReady(true)
+    probe.onerror = () => setReady(false)
+    probe.src = '/images/santa-hat.png'
+  }, [])
+  if (!ready) return null
+  return (
+    <img src='/images/santa-hat.png' alt='' aria-hidden='true'
+      style={{
+        position: 'absolute', top: -size * 0.42, left: -size * 0.3, width: size * 0.85, height: 'auto',
+        transform: 'rotate(-12deg)', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.35))', pointerEvents: 'none',
+      }} />
+  )
+}
 
 const PlaceholderMark = ({ size }) => (
   <svg width={size} height={size} viewBox='0 0 40 40' fill='none' xmlns='http://www.w3.org/2000/svg' style={{ filter: 'drop-shadow(0 2px 4px rgba(75,79,224,0.35))' }}>
@@ -41,7 +63,7 @@ const PlaceholderMark = ({ size }) => (
 // wordmark deliberately uses Clash Display inline rather than the platform's own font-display
 // utility (Plus Jakarta Sans, see tailwind-preset) - Clash Display is reserved for the brand name
 // alone, not for section headings elsewhere in the UI.
-const Logo = ({ size = 32, withWordmark = true }) => {
+const Logo = ({ size = 32, withWordmark = true, festive = false }) => {
   const [extIndex, setExtIndex] = useState(0)
   const [exhausted, setExhausted] = useState(false)
 
@@ -52,16 +74,19 @@ const Logo = ({ size = 32, withWordmark = true }) => {
 
   return (
     <div className='flex items-center gap-2.5'>
-      {exhausted ? (
-        <PlaceholderMark size={size} />
-      ) : (
-        <img
-          src={`${backendUrl}/static/logoUniacademy.${EXTENSIONS[extIndex]}?v=${CACHE_BUST}`}
-          alt='UniAcademy' width={size} height={size}
-          style={{ objectFit: 'contain', borderRadius: 8 }}
-          onError={handleError}
-        />
-      )}
+      <div style={{ position: 'relative' }}>
+        {festive && <SantaHat size={size} />}
+        {exhausted ? (
+          <PlaceholderMark size={size} />
+        ) : (
+          <img
+            src={`${backendUrl}/static/logoUniacademy.${EXTENSIONS[extIndex]}?v=${CACHE_BUST}`}
+            alt='UniAcademy' width={size} height={size}
+            style={{ objectFit: 'contain', borderRadius: 8 }}
+            onError={handleError}
+          />
+        )}
+      </div>
       {withWordmark && <span className='text-lg text-ink leading-none' style={{ fontFamily: '"Clash Display", sans-serif' }}>UniAcademy</span>}
     </div>
   )
