@@ -1,17 +1,35 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
-// reads public/images/top-banner.png - same "drop the file, no rebuild" convention Logo.jsx and
-// NewYearMusic.jsx already use for logoUniacademy.<ext> / newYearMusic.mp3. Nothing shows until
-// that file actually exists (onError hides the whole strip instead of a broken-image icon) -
-// height:100% + width:auto means it's shown at its own real aspect ratio, centered, never
-// stretched/distorted to fit; on a viewport wider than the image itself, the page's own background
-// just shows through at the edges rather than the image being stretched to cover them.
+const TILE_SRC = '/images/top-banner-tile.png'
+
+// reads public/images/top-banner-tile.png - same "drop the file, no rebuild" convention Logo.jsx
+// and NewYearMusic.jsx already use. A single seamless tile, repeated horizontally via CSS
+// (background-repeat: repeat-x, background-size: auto 100%) rather than one giant stretched image -
+// works at any viewport width with no empty gutters and no distortion, and is realistically what an
+// AI image generator can actually produce well (a small repeating pattern, not one 3000px+ banner).
+// A hidden probe <img> is the only way to know the file exists at all before committing to a
+// background-image (which has no onError of its own) - shows nothing rather than a broken-image box
+// until a real tile is in place.
 const TopBanner = () => {
-  const [failed, setFailed] = useState(false)
-  if (failed) return null
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    const probe = new Image()
+    probe.onload = () => setReady(true)
+    probe.onerror = () => setReady(false)
+    probe.src = TILE_SRC
+  }, [])
+
+  if (!ready) return null
+
   return (
-    <img src='/images/top-banner.png' alt='' aria-hidden='true' onError={() => setFailed(true)}
-      style={{ height: '100%', width: 'auto', display: 'block', margin: '0 auto' }} />
+    <div style={{
+      height: '100%',
+      backgroundImage: `url(${TILE_SRC})`,
+      backgroundRepeat: 'repeat-x',
+      backgroundPosition: 'top center',
+      backgroundSize: 'auto 100%',
+    }} aria-hidden='true' />
   )
 }
 
