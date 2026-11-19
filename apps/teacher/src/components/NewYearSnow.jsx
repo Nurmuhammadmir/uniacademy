@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import TopGarland from './TopGarland.jsx'
+import TopBanner from './TopBanner.jsx'
 
 // purely decorative falling snow - CSS-only animation (no JS render loop), so it costs the main
 // thread essentially nothing. Fixed-size flake list computed once per mount, never reshuffled by a
@@ -20,11 +20,9 @@ const NewYearSnow = () => {
 
   return (
     <>
-      {/* a real pine-and-ornaments garland across the very top of the viewport (see TopGarland.jsx)
-          - one fixed element, so it shows up above every page in every one of these 3 apps without
-          touching each page's own header markup */}
-      <div className='fixed top-0 left-0 right-0 z-40' style={{ height: 72, pointerEvents: 'none' }} aria-hidden='true'>
-        <TopGarland />
+      {/* the user's own PNG banner (see TopBanner.jsx) across the very top of the viewport */}
+      <div className='fixed top-0 left-0 right-0 z-[60] overflow-hidden' style={{ height: 60, pointerEvents: 'none' }} aria-hidden='true'>
+        <TopBanner />
       </div>
       {!reduceMotion && (
         <div className='fixed inset-0 z-30 overflow-hidden' style={{ pointerEvents: 'none' }} aria-hidden='true'>

@@ -59,35 +59,7 @@ const App = () => {
           <NewYearSnowLayer />
           <div className='min-h-screen bg-bg flex'>
             <Sidebar open={navOpen} onClose={() => setNavOpen(false)} />
-            <div className='flex-1 flex flex-col min-w-0 lg:ml-60'>
-              <header className='lg:hidden sticky top-0 z-30 flex items-center gap-3 bg-bg-elevated border-b border-hairline px-4 py-3'>
-                <button onClick={() => setNavOpen(true)} aria-label='Menu' className='plain text-ink text-2xl leading-none px-1'>☰</button>
-                <Logo size={28} />
-              </header>
-              <main className='flex-1 p-4 sm:p-8'>
-                <Suspense fallback={<PageFallback />}>
-                  <Routes>
-                    <Route path='/' element={<Overview />} />
-                    <Route path='/branches' element={<Branches />} />
-                    <Route path='/students' element={<Students />} />
-                    <Route path='/students/:id' element={<StudentProfile />} />
-                    <Route path='/admins' element={<Admins />} />
-                    <Route path='/teachers' element={<Teachers />} />
-                    <Route path='/pricing' element={<Pricing />} />
-                    <Route path='/attendance' element={<Attendance />} />
-                    <Route path='/courses' element={<Courses />} />
-                    <Route path='/homework' element={<Homework />} />
-                    <Route path='/groups' element={<Groups />} />
-                    <Route path='/timetable' element={<Timetable />} />
-                    <Route path='/finance' element={<Finance />} />
-                    <Route path='/finance/payments/:id' element={<TransactionDetail />} />
-                    <Route path='/leads' element={<Leads />} />
-                    <Route path='/settings' element={<Settings />} />
-                    <Route path='*' element={<Navigate to='/' />} />
-                  </Routes>
-                </Suspense>
-              </main>
-            </div>
+            <ContentArea navOpen={navOpen} setNavOpen={setNavOpen} />
           </div>
         </NewYearProvider>
       )}
@@ -95,8 +67,47 @@ const App = () => {
   )
 }
 
-// split out only so it can call useNewYear() - needs to be inside NewYearProvider, which wraps
-// this same component's own parent return, so it can't read the context at that outer level
+// split out only so it (and NewYearSnowLayer below) can call useNewYear() - needs to be inside
+// NewYearProvider, which wraps this same component's own parent return, so it can't read the
+// context at that outer level. The 60px top margin/padding here is what keeps TopBanner.jsx's
+// fixed, full-width (deliberately above the sidebar in z-index) banner from covering the mobile
+// header's own logo or the top of whatever page is showing - see NewYearSnow.jsx's own comment.
+const ContentArea = ({ navOpen, setNavOpen }) => {
+  const { enabled: newYearEnabled } = useNewYear()
+  return (
+    <div className='flex-1 flex flex-col min-w-0 lg:ml-60'>
+      <header className='lg:hidden sticky z-30 flex items-center gap-3 bg-bg-elevated border-b border-hairline px-4 py-3'
+        style={{ top: newYearEnabled ? 60 : 0, transition: 'top 0.3s ease' }}>
+        <button onClick={() => setNavOpen(true)} aria-label='Menu' className='plain text-ink text-2xl leading-none px-1'>☰</button>
+        <Logo size={28} />
+      </header>
+      <main className='flex-1 p-4 sm:p-8' style={{ marginTop: newYearEnabled ? 60 : 0, transition: 'margin-top 0.3s ease' }}>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path='/' element={<Overview />} />
+            <Route path='/branches' element={<Branches />} />
+            <Route path='/students' element={<Students />} />
+            <Route path='/students/:id' element={<StudentProfile />} />
+            <Route path='/admins' element={<Admins />} />
+            <Route path='/teachers' element={<Teachers />} />
+            <Route path='/pricing' element={<Pricing />} />
+            <Route path='/attendance' element={<Attendance />} />
+            <Route path='/courses' element={<Courses />} />
+            <Route path='/homework' element={<Homework />} />
+            <Route path='/groups' element={<Groups />} />
+            <Route path='/timetable' element={<Timetable />} />
+            <Route path='/finance' element={<Finance />} />
+            <Route path='/finance/payments/:id' element={<TransactionDetail />} />
+            <Route path='/leads' element={<Leads />} />
+            <Route path='/settings' element={<Settings />} />
+            <Route path='*' element={<Navigate to='/' />} />
+          </Routes>
+        </Suspense>
+      </main>
+    </div>
+  )
+}
+
 const NewYearSnowLayer = () => {
   const { enabled } = useNewYear()
   return (

@@ -44,28 +44,37 @@ const App = () => {
       ) : (
         <NewYearProvider>
           <NewYearSnowLayer />
-          <div className='min-h-screen bg-bg'>
-            <Suspense fallback={<PageFallback />}>
-              <Routes>
-                <Route path='/' element={<MyGroups />} />
-                <Route path='/groups/:id' element={<GroupRoster />} />
-                <Route path='/groups/:id/students/:studentId' element={<StudentDetail />} />
-                <Route path='/groups/:id/attendance' element={<Attendance />} />
-                <Route path='/timetable' element={<Timetable />} />
-                <Route path='/my-attendance' element={<MyAttendance />} />
-                <Route path='/profile' element={<Profile />} />
-                <Route path='*' element={<Navigate to='/' />} />
-              </Routes>
-            </Suspense>
-          </div>
+          <ContentArea />
         </NewYearProvider>
       )}
     </LanguageProvider>
   )
 }
 
-// split out only so it can call useNewYear() - needs to be inside NewYearProvider, which wraps
-// this same component's own parent return, so it can't read the context at that outer level
+// split out only so it (and NewYearSnowLayer below) can call useNewYear() - needs to be inside
+// NewYearProvider, which wraps this same component's own parent return, so it can't read the
+// context at that outer level. The 60px top margin is what keeps TopBanner.jsx's fixed, full-
+// width banner from covering the top of whatever page is showing.
+const ContentArea = () => {
+  const { enabled: newYearEnabled } = useNewYear()
+  return (
+    <div className='min-h-screen bg-bg' style={{ paddingTop: newYearEnabled ? 60 : 0, transition: 'padding-top 0.3s ease' }}>
+      <Suspense fallback={<PageFallback />}>
+        <Routes>
+          <Route path='/' element={<MyGroups />} />
+          <Route path='/groups/:id' element={<GroupRoster />} />
+          <Route path='/groups/:id/students/:studentId' element={<StudentDetail />} />
+          <Route path='/groups/:id/attendance' element={<Attendance />} />
+          <Route path='/timetable' element={<Timetable />} />
+          <Route path='/my-attendance' element={<MyAttendance />} />
+          <Route path='/profile' element={<Profile />} />
+          <Route path='*' element={<Navigate to='/' />} />
+        </Routes>
+      </Suspense>
+    </div>
+  )
+}
+
 const NewYearSnowLayer = () => {
   const { enabled } = useNewYear()
   return enabled ? <NewYearSnow /> : null

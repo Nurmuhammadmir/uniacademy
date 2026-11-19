@@ -14,18 +14,6 @@ const EXTENSIONS = ['png', 'jpg', 'jpeg', 'svg', 'webp']
 // page can render (sidebar + login, etc all share this one value during the same load).
 const CACHE_BUST = Date.now()
 
-// New Year mode's one hat-on-the-logo touch (see Sidebar.jsx's `festive` prop) - a real photo-style
-// hat (public/images/santa-hat.png, transparent background) perched on the top-left corner of the
-// mark, tilted slightly. Pure decoration: sized off the logo's own `size` so it scales with it,
-// absolutely positioned so it never affects layout/flow.
-const SantaHat = ({ size }) => (
-  <img src='/images/santa-hat.png' alt='' aria-hidden='true' width={size * 0.85} height={size * 0.85}
-    style={{
-      position: 'absolute', top: -size * 0.42, left: -size * 0.3, width: size * 0.85, height: 'auto',
-      transform: 'rotate(-12deg)', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.35))', pointerEvents: 'none',
-    }} />
-)
-
 const PlaceholderMark = ({ size }) => (
   <svg width={size} height={size} viewBox='0 0 40 40' fill='none' xmlns='http://www.w3.org/2000/svg' style={{ filter: 'drop-shadow(0 2px 4px rgba(75,79,224,0.35))' }}>
     <defs>
@@ -53,7 +41,7 @@ const PlaceholderMark = ({ size }) => (
 // wordmark deliberately uses Clash Display inline rather than the platform's own font-display
 // utility (Plus Jakarta Sans, see tailwind-preset) - Clash Display is reserved for the brand name
 // alone, not for section headings elsewhere in the UI.
-const Logo = ({ size = 32, withWordmark = true, festive = false }) => {
+const Logo = ({ size = 32, withWordmark = true }) => {
   const [extIndex, setExtIndex] = useState(0)
   const [exhausted, setExhausted] = useState(false)
 
@@ -64,19 +52,16 @@ const Logo = ({ size = 32, withWordmark = true, festive = false }) => {
 
   return (
     <div className='flex items-center gap-2.5'>
-      <div style={{ position: 'relative' }}>
-        {festive && <SantaHat size={size} />}
-        {exhausted ? (
-          <PlaceholderMark size={size} />
-        ) : (
-          <img
-            src={`${backendUrl}/static/logoUniacademy.${EXTENSIONS[extIndex]}?v=${CACHE_BUST}`}
-            alt='UniAcademy' width={size} height={size}
-            style={{ objectFit: 'contain', borderRadius: 8 }}
-            onError={handleError}
-          />
-        )}
-      </div>
+      {exhausted ? (
+        <PlaceholderMark size={size} />
+      ) : (
+        <img
+          src={`${backendUrl}/static/logoUniacademy.${EXTENSIONS[extIndex]}?v=${CACHE_BUST}`}
+          alt='UniAcademy' width={size} height={size}
+          style={{ objectFit: 'contain', borderRadius: 8 }}
+          onError={handleError}
+        />
+      )}
       {withWordmark && <span className='text-lg text-ink leading-none' style={{ fontFamily: '"Clash Display", sans-serif' }}>UniAcademy</span>}
     </div>
   )

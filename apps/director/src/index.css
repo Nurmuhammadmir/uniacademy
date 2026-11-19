@@ -225,17 +225,3 @@ table tbody tr:last-child td {
 .sidebar-garland-plug.unplugged .sidebar-garland-plug-body {
   transform: translateX(-7px);
 }
-
-/* top-of-viewport pine garland (see TopGarland.jsx) - a warm, blurred glow sits under the lights
-   layer (feGaussianBlur in the SVG itself), and this adds the page-level drop shadow that makes
-   the whole strip read as physically hanging a little above the content underneath it. */
-.new-year-top-garland {
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.22));
-}
-.new-year-top-garland .tg-light {
-  animation: new-year-light-twinkle 2.2s ease-in-out infinite;
-}
-@keyframes new-year-light-twinkle {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
-}
