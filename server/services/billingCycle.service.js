@@ -189,6 +189,16 @@ export const recognizeNextPeriod = async (student, course, { createdBy = null, e
     const windowStart = course.recognizedThrough ? startOfNextMonthUTC(course.recognizedThrough) : firstWindowStart
     if (windowStart > today) return null // not due yet
     if (windowStart > group.endDate) return null // course's billing window is over
+    // confirmed real bug, found live 2026-11-19: group.endDate is a separate, admin-typed contract
+    // date (see Group.js) that has no automatic relationship to the level actually finishing -
+    // promoteGroupIfLevelComplete/the daily sweep (groupPromotion.service.js) stamps
+    // levelCompletedAt the moment the level's own lesson count runs out, same signal
+    // subscription.service.js and loadBalance.service.js already gate on, but this function never
+    // checked it, so every group that finished its level before its (often much later) endDate kept
+    // getting billed a fresh month indefinitely. Only blocks a period that starts AFTER completion -
+    // whatever period was already open the moment the level finished still bills in full, same as
+    // before (not retroactively prorated down - that's a separate feature, not this bug).
+    if (group.levelCompletedAt && windowStart > group.levelCompletedAt) return null
     if (student.frozen) return null // freeze pauses billing only, whole-account - nothing posts, recognizedThrough does NOT advance, so the paused period is picked back up whenever unfrozen
 
     // course price is never discounted here (confirmed spec) - a discount is a separate, immediate
