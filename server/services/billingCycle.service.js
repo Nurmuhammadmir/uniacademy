@@ -225,16 +225,18 @@ export const recognizeNextPeriod = async (student, course, { createdBy = null, e
     const windowStart = course.recognizedThrough ? startOfNextMonthUTC(course.recognizedThrough) : firstWindowStart
     if (windowStart > today) return null // not due yet
     if (windowStart > group.endDate) return null // course's billing window is over
-    // confirmed real bug, found live 2026-11-19: group.endDate is a separate, admin-typed contract
-    // date (see Group.js) that has no automatic relationship to the level actually finishing -
-    // promoteGroupIfLevelComplete/the daily sweep (groupPromotion.service.js) stamps
-    // levelCompletedAt the moment the level's own lesson count runs out, same signal
-    // subscription.service.js and loadBalance.service.js already gate on, but this function never
-    // checked it, so every group that finished its level before its (often much later) endDate kept
-    // getting billed a fresh month indefinitely. Only blocks a period that starts AFTER completion -
-    // whatever period was already open the moment the level finished still bills in full, same as
-    // before (not retroactively prorated down - that's a separate feature, not this bug).
-    if (group.levelCompletedAt && windowStart > group.levelCompletedAt) return null
+    // deliberately does NOT also stop once group.levelCompletedAt is set (tried this 2026-11-19,
+    // reverted same day - see git history): levelCompletedAt means the level's LESSON CONTENT is
+    // exhausted, not that the group stopped meeting. Confirmed live on real data: two groups
+    // (Egamberganova Nurziya's "Nurziyo" streams) kept getting real QR attendance scans into
+    // mid-November, two weeks after levelCompletedAt, because nobody had migrated the roster to a
+    // next-level group yet - the class just kept being taught under the same old group in the
+    // meantime. Billing stopping there would mean the school teaches for free until an admin
+    // notices and creates the next-level group, which can take a while since nothing in the UI
+    // flags a group as level-complete at all. Confirmed spec: group.endDate (an admin-typed
+    // contract date, checked above) is the only thing that should ever stop this - as long as a
+    // group keeps a live roster and hasn't hit its own endDate, it keeps billing regardless of
+    // curriculum/level progress.
     if (student.frozen) return null // freeze pauses billing only, whole-account - nothing posts, recognizedThrough does NOT advance, so the paused period is picked back up whenever unfrozen
 
     // course price is never discounted here (confirmed spec) - a discount is a separate, immediate

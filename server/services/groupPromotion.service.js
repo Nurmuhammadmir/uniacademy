@@ -19,9 +19,18 @@ import { isPastLevelEnd } from "./dayCounter.service.js"
 // admin/director dashboards and timetables, parent views) should keep treating it exactly like a
 // normal active group as long as its roster isn't actually empty. Only a group an admin has
 // already fully migrated away (0 students left) should drop out of those. This is deliberately
-// NOT used by anything that decides what HOMEWORK/BILLING content to serve (studentController,
-// subscription.service, loadBalance.service) - that correctly stops once the level's content is
-// exhausted, regardless of roster size.
+// NOT used by anything that decides what HOMEWORK content to serve (studentController,
+// subscription.service, loadBalance.service) - new homework correctly stops once the level's
+// content is exhausted, regardless of roster size.
+//
+// BILLING IS THE ONE EXCEPTION, confirmed spec 2026-11-19 (tried gating it on levelCompletedAt
+// the same day, reverted hours later): levelCompletedAt tells you the curriculum ran out, not that
+// the class stopped meeting. Confirmed live on real data - two groups kept getting real QR
+// attendance scans two weeks after levelCompletedAt, because nobody had created/moved the roster
+// to a next-level group yet, and the teacher just kept teaching the same old group in the
+// meantime. billingCycle.service.js's recognizeNextPeriod deliberately does NOT check
+// levelCompletedAt - only group.endDate (an admin-typed contract date) stops billing. Don't
+// "fix" this again without re-confirming with the director first.
 export const STILL_ACTIVE_GROUP_MATCH = { status: 'active', $or: [{ levelCompletedAt: null }, { 'studentIds.0': { $exists: true } }] }
 export const stillHasLiveRoster = (group) => group.status === 'active' && (!group.levelCompletedAt || group.studentIds.length > 0)
 
