@@ -5,7 +5,7 @@ import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { useNewYear } from '../context/NewYearContext.jsx'
-import { GarlandWire, GarlandBulb, GarlandPlug } from './SidebarGarland.jsx'
+import { GarlandStrip, GarlandPlug } from './SidebarGarland.jsx'
 import Logo from './Logo.jsx'
 
 // below `lg`, this becomes a slide-in drawer (off-canvas by default, toggled by App.jsx's mobile
@@ -36,18 +36,17 @@ const Sidebar = ({ open, onClose }) => {
 
       <aside className={`w-60 fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#161F30] border-r border-slate-100 dark:border-slate-800/80 p-6 flex flex-col transition-transform duration-200 ease-out lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className='mb-8' style={{ marginTop: newYearEnabled ? 60 : 0, transition: 'margin-top 0.3s ease' }}><Logo size={60} festive={newYearEnabled} /></div>
-        {/* the garland wire lives here, not per-button - one continuous line spanning the real
+        {/* the garland image lives here, not per-button - one continuous strip spanning the real
             (dynamic) height of the 9-item list, instead of hand-measured pixel positions */}
         <nav className='relative flex flex-col gap-1.5 flex-1 overflow-y-auto'>
-          <GarlandWire />
-          {links.map((link, i) => {
+          <GarlandStrip lit={newYearEnabled} />
+          {links.map(link => {
             const Icon = link.icon
             return (
               <NavLink key={link.to} to={link.to} end={link.to === '/'} onClick={onClose}
-                className={({ isActive }) => `relative flex items-center gap-3 py-3 px-4 rounded-xl text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-accent/40 transition-colors ${isActive
+                className={({ isActive }) => `flex items-center gap-3 py-3 px-4 rounded-xl text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-accent/40 transition-colors ${isActive
                   ? 'bg-indigo-50 text-indigo-600 font-semibold tracking-tight dark:bg-[#4F46E5] dark:text-white dark:shadow-md dark:shadow-indigo-500/5'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 font-medium dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-[#1E293B]'}`}>
-                <span className='absolute top-1/2 -translate-y-1/2 -left-3'><GarlandBulb uid={i} lit={newYearEnabled} /></span>
                 <Icon size={20} strokeWidth={1.75} className='w-5 h-5 flex-shrink-0' />
                 {link.label}
               </NavLink>

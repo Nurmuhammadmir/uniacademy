@@ -2,12 +2,16 @@ import React, { useEffect, useRef } from 'react'
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL
 // same "drop the file on the server, no rebuild needed" convention Logo.jsx already uses for
-// logoUniacademy.<ext> - an admin can swap the track by replacing server/public/newYearMusic.mp3,
-// no redeploy of either app. No cache-busting query param on purpose, unlike Logo's: that file is
-// tiny and worth always refetching, this one is large and worth letting the browser cache for real
-// across sessions (server.js's /static route already sets a 7-day maxAge) - bump the filename
-// itself (e.g. newYearMusic2.mp3) if the track is ever replaced and old caches need busting.
-const MUSIC_SRC = `${backendUrl}/static/newYearMusic.mp3`
+// logoUniacademy.<ext> - an admin can swap the track by replacing server/public/newYearMusic.webm,
+// no redeploy of either app. No cache-busting query param on purpose, unlike Logo's: this file is
+// large and worth letting the browser cache for real across sessions (server.js's /static route
+// already sets a 7-day maxAge) - bump the filename itself if the track is ever replaced and old
+// caches need busting.
+//
+// WebM/Opus only (confirmed spec) - smaller than MP3 at the same quality (2.36MB vs 5.3MB for this
+// track), at the cost of Safari's WebM support being unreliable; no MP3 fallback, so a browser that
+// can't play this simply plays nothing, by choice.
+const MUSIC_SRC_WEBM = `${backendUrl}/static/newYearMusic.webm`
 const POSITION_KEY = 'uniacademy_director_new_year_music_position_v1'
 const SAVE_INTERVAL_SECONDS = 4
 
@@ -60,7 +64,7 @@ const NewYearMusic = ({ enabled }) => {
     }
   }, [enabled])
 
-  return <audio ref={audioRef} src={MUSIC_SRC} loop preload={enabled ? 'auto' : 'none'} style={{ display: 'none' }} />
+  return <audio ref={audioRef} src={MUSIC_SRC_WEBM} loop preload={enabled ? 'auto' : 'none'} style={{ display: 'none' }} />
 }
 
 export default NewYearMusic

@@ -5,7 +5,7 @@ import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { useNewYear } from '../context/NewYearContext.jsx'
-import { GarlandWire, GarlandBulb, GarlandPlug } from './SidebarGarland.jsx'
+import { GarlandStrip, GarlandPlug } from './SidebarGarland.jsx'
 import Logo from './Logo.jsx'
 
 // below `lg`, this becomes a slide-in drawer (off-canvas by default, toggled by App.jsx's mobile
@@ -43,11 +43,10 @@ const Sidebar = ({ open, onClose }) => {
         <div className='mb-1' style={{ marginTop: newYearEnabled ? 60 : 0, transition: 'margin-top 0.3s ease' }}><Logo size={60} festive={newYearEnabled} /></div>
         <p className='text-xs mb-8 ml-10' style={{ color: '#C9A15C' }}>{t('directorLabel')}</p>
         <nav className='relative flex flex-col gap-1 flex-1 overflow-y-auto'>
-          <GarlandWire />
-          {links.map((link, i) => (
+          <GarlandStrip lit={newYearEnabled} />
+          {links.map(link => (
             <NavLink key={link.to} to={link.to} end={link.to === '/'} onClick={onClose}
-              className={({ isActive }) => `relative px-3 py-2 rounded-lg text-sm font-medium ${isActive ? 'bg-accent-soft text-accent' : 'text-muted'}`}>
-              <span className='absolute top-1/2 -translate-y-1/2 -left-3'><GarlandBulb uid={i} lit={newYearEnabled} /></span>
+              className={({ isActive }) => `px-3 py-2 rounded-lg text-sm font-medium ${isActive ? 'bg-accent-soft text-accent' : 'text-muted'}`}>
               {link.label}
             </NavLink>
           ))}
