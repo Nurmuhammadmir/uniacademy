@@ -5,7 +5,43 @@ import { AdminContext } from '../context/AdminContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { useNewYear } from '../context/NewYearContext.jsx'
+import { SnowCap, PineBranch, BellBow, ChristmasSock, GarlandStrip } from './FestiveDecor.jsx'
 import Logo from './Logo.jsx'
+
+// New Year mode's 9 main nav buttons, each a distinct color+ornament combo (confirmed spec: no two
+// alike) - cycles 5 base colors and varies which corner ornaments each gets, same order as `links`
+// below. Kept as plain data (not computed) so which button looks like what is easy to eyeball/tweak
+// here without touching the render logic itself.
+const FESTIVE_LINK_STYLE = [
+  { color: 'festive-nav-red', decor: ['bellbow-tl', 'snowcap'] }, // Students
+  { color: 'festive-nav-green', decor: ['pine-bl', 'pine-br'] }, // Groups
+  { color: 'festive-nav-gold', decor: ['garland-top', 'bellbow-tr'] }, // Finance
+  { color: 'festive-nav-orange', decor: ['sock-br', 'snowcap'] }, // Leads
+  { color: 'festive-nav-burgundy', decor: ['bellbow-r', 'pine-bl'] }, // Teachers
+  { color: 'festive-nav-green', decor: ['snowcap', 'garland-top'] }, // Timetable
+  { color: 'festive-nav-red', decor: ['pine-tl', 'pine-tr', 'sock-bl'] }, // Courses/Pricing
+  { color: 'festive-nav-gold', decor: ['snowcap', 'bellbow-tl'] }, // Notes
+  { color: 'festive-nav-burgundy', decor: ['garland-top'] }, // Profile
+]
+
+// one small ornament, positioned in a corner/edge by `type` - never affects layout (always
+// absolute), never covers the icon+label in the middle (every position hugs an edge/corner only).
+const FestiveDecorPiece = ({ type, decorKey }) => {
+  switch (type) {
+    case 'snowcap': return <SnowCap key={decorKey} className='absolute -top-px left-1 right-1 h-3 festive-decor-corner' />
+    case 'garland-top': return <GarlandStrip key={decorKey} className='absolute -top-px left-2 right-2 h-2.5 festive-decor-corner festive-decor-glow' />
+    case 'bellbow-tl': return <BellBow key={decorKey} className='absolute -top-2 left-2 w-6 h-6 festive-decor-corner festive-decor-wiggle' />
+    case 'bellbow-tr': return <BellBow key={decorKey} className='absolute -top-2 right-2 w-6 h-6 festive-decor-corner festive-decor-wiggle' />
+    case 'bellbow-r': return <BellBow key={decorKey} className='absolute top-1/2 -translate-y-1/2 -right-1 w-6 h-6 festive-decor-corner festive-decor-wiggle' />
+    case 'pine-bl': return <PineBranch key={decorKey} className='absolute -bottom-1 -left-1 w-6 h-6 festive-decor-corner' />
+    case 'pine-br': return <PineBranch key={decorKey} className='absolute -bottom-1 -right-1 w-6 h-6 festive-decor-corner' style={{ transform: 'scaleX(-1)' }} />
+    case 'pine-tl': return <PineBranch key={decorKey} className='absolute -top-1 -left-1 w-5 h-5 festive-decor-corner' style={{ transform: 'rotate(180deg)' }} />
+    case 'pine-tr': return <PineBranch key={decorKey} className='absolute -top-1 -right-1 w-5 h-5 festive-decor-corner' style={{ transform: 'rotate(180deg) scaleX(-1)' }} />
+    case 'sock-br': return <ChristmasSock key={decorKey} className='absolute -bottom-2 right-3 w-5 h-5 festive-decor-corner festive-decor-wiggle' />
+    case 'sock-bl': return <ChristmasSock key={decorKey} className='absolute -bottom-2 left-3 w-5 h-5 festive-decor-corner festive-decor-wiggle' style={{ transform: 'scaleX(-1)' }} />
+    default: return null
+  }
+}
 
 // below `lg`, this becomes a slide-in drawer (off-canvas by default, toggled by App.jsx's mobile
 // top bar) with a tap-to-close backdrop; at `lg` and up it's always the fixed 240px column it always
@@ -36,15 +72,19 @@ const Sidebar = ({ open, onClose }) => {
       <aside className={`w-60 fixed inset-y-0 left-0 z-50 bg-white dark:bg-[#161F30] border-r border-slate-100 dark:border-slate-800/80 p-6 flex flex-col transition-transform duration-200 ease-out lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className='mb-8'><Logo size={60} festive={newYearEnabled} /></div>
         <nav className='flex flex-col gap-1.5 flex-1 overflow-y-auto'>
-          {links.map(link => {
+          {links.map((link, i) => {
             const Icon = link.icon
+            const festive = newYearEnabled ? FESTIVE_LINK_STYLE[i] : null
             return (
               <NavLink key={link.to} to={link.to} end={link.to === '/'} onClick={onClose}
-                className={({ isActive }) => `flex items-center gap-3 py-3 px-4 rounded-xl text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-accent/40 transition-colors ${isActive
-                  ? 'bg-indigo-50 text-indigo-600 font-semibold tracking-tight dark:bg-[#4F46E5] dark:text-white dark:shadow-md dark:shadow-indigo-500/5'
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 font-medium dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-[#1E293B]'}`}>
-                <Icon size={20} strokeWidth={1.75} className='w-5 h-5 flex-shrink-0' />
-                {link.label}
+                className={({ isActive }) => festive
+                  ? `festive-nav-btn ${festive.color} flex items-center gap-3 py-3 px-4 text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${isActive ? 'active' : ''}`
+                  : `flex items-center gap-3 py-3 px-4 rounded-xl text-[15px] outline-none focus-visible:ring-2 focus-visible:ring-accent/40 transition-colors ${isActive
+                    ? 'bg-indigo-50 text-indigo-600 font-semibold tracking-tight dark:bg-[#4F46E5] dark:text-white dark:shadow-md dark:shadow-indigo-500/5'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 font-medium dark:text-slate-400 dark:hover:text-slate-100 dark:hover:bg-[#1E293B]'}`}>
+                {festive?.decor.map((type, di) => <FestiveDecorPiece key={di} type={type} decorKey={di} />)}
+                <Icon size={20} strokeWidth={1.75} className='w-5 h-5 flex-shrink-0 relative z-10' />
+                <span className='relative z-10'>{link.label}</span>
               </NavLink>
             )
           })}

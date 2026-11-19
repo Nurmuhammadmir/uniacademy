@@ -5,8 +5,14 @@ const KEY = 'uniacademy_director_new_year_v1'
 const CHIME_SRC = '/sounds/sleigh-bells.mp3'
 
 export const NewYearProvider = ({ children }) => {
+  // on by default for everyone, until a person explicitly turns it off themselves - only an
+  // explicit stored '0' (a real past toggle-off) ever starts it disabled; "nothing stored yet"
+  // (a brand new browser/profile) defaults to on, not off.
   const [enabled, setEnabled] = useState(() => {
-    try { return localStorage.getItem(KEY) === '1' } catch { return false }
+    try {
+      const stored = localStorage.getItem(KEY)
+      return stored === null ? true : stored === '1'
+    } catch { return true }
   })
 
   useEffect(() => {

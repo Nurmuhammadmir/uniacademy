@@ -353,6 +353,53 @@ table tbody tr:last-child td {
   box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
 }
 
+/* New Year mode's 9 main sidebar nav buttons (see Sidebar.jsx's FESTIVE_LINK_STYLE +
+   FestiveDecor.jsx) - a 3D "ornament" look via layered box-shadow (inset highlight/shadow + a
+   real drop shadow) plus a dashed border, never border-radius 0 so it keeps reading as a button.
+   Corner ornaments are real children, not ::before/::after (lets each one carry its own small SVG
+   and its own wiggle/glow animation independently) - .relative/.z-10 on the icon+label in
+   Sidebar.jsx keeps them above the ornaments regardless of DOM order. */
+.festive-nav-btn {
+  position: relative;
+  border-radius: 14px;
+  border: 2px dashed rgba(255, 255, 255, 0.55);
+  color: #ffffff !important;
+  overflow: visible;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.25),
+    0 3px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.festive-nav-btn:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.25),
+    0 5px 10px rgba(0, 0, 0, 0.3),
+    0 0 10px rgba(255, 255, 255, 0.3);
+}
+.festive-nav-btn.active {
+  border-style: solid;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -3px 5px rgba(0, 0, 0, 0.3),
+    0 0 0 2px rgba(255, 255, 255, 0.75),
+    0 4px 10px rgba(0, 0, 0, 0.3);
+}
+.festive-nav-red { background: linear-gradient(145deg, #c62839, #7a1420); }
+.festive-nav-green { background: linear-gradient(145deg, #2d6a4f, #163d2b); }
+.festive-nav-gold { background: linear-gradient(145deg, #d4af37, #8a6b1b); }
+.festive-nav-orange { background: linear-gradient(145deg, #ea580c, #9a3a08); }
+.festive-nav-burgundy { background: linear-gradient(145deg, #83294a, #4a1221); }
+
+.festive-decor-corner {
+  pointer-events: none;
+  transition: transform 0.25s ease, filter 0.25s ease;
+}
+.festive-nav-btn:hover .festive-decor-wiggle { transform: rotate(-10deg); }
+.festive-nav-btn:hover .festive-decor-glow { filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.85)); }
+
 /* New Year mode's garland strip (see NewYearSnow.jsx) - a repeating red/green/gold "fairy light"
    dot pattern plus a faint wire line, all one CSS background-image so it's a single paint, no DOM
    per-bulb. */
