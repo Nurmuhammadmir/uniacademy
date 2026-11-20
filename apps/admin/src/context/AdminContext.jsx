@@ -928,6 +928,18 @@ const AdminContextProvider = (props) => {
         }
     }
 
+    // New Year mode's "letter to Ded Moroz" - visible on the director's side (directorController.js's
+    // listSantaLetters), never editable/deletable from here once sent
+    const createSantaLetter = async (fromName, wish) => {
+        try {
+            await axios.post(backendUrl + '/api/admin/santa-letters', { fromName, wish }, authHeader)
+            return true
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotSendSantaLetter'))
+            return false
+        }
+    }
+
     const getGroupExamsTab = async (id) => {
         try {
             const { data } = await axios.get(backendUrl + `/api/admin/groups/${id}/exams-tab`, authHeader)
@@ -1348,6 +1360,7 @@ const AdminContextProvider = (props) => {
         getStudentComments, addStudentComment, updateStudentComment, deleteStudentComment,
         getExtraLessons, createExtraLesson, deleteExtraLesson,
         getMyNotes, createMyNote, deleteMyNote,
+        createSantaLetter,
         getGroupExamsTab, getTimetable,
         getLeadsBoard, createLeadColumn, updateLeadColumn, deleteLeadColumn,
         createLeadSubgroup, updateLeadSubgroup, deleteLeadSubgroup,

@@ -413,6 +413,18 @@ const DirectorContextProvider = (props) => {
         }
     }
 
+    // New Year mode's "letters to Ded Moroz" - admins write these (adminController.js's
+    // createSantaLetter); this just reads every one of them, across all branches, director-only
+    const getSantaLetters = async () => {
+        try {
+            const { data } = await axios.get(backendUrl + '/api/director/santa-letters', authHeader)
+            return data.letters
+        } catch (error) {
+            toast.error(error.response?.data?.error || t('couldNotLoadSantaLetters'))
+            return []
+        }
+    }
+
     const getPayRates = async (branchId) => {
         if (!branchId) { setPayRatesState([]); return }
         try {
@@ -1251,6 +1263,7 @@ const DirectorContextProvider = (props) => {
         settings, getSettings, updateSettings,
         allGroups, getAllGroups, updateGroupLimits,
         getFinanceOverview, getPaymentDetail, updatePayment, deletePayment, getBusinessLedger, updateCourseEnrollmentDate,
+        getSantaLetters,
         expenseCategories, getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
         getExpensesOverview, createExpense, updateExpense, deleteExpense,
         payRates, getPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, prepaySalary,

@@ -14,6 +14,7 @@ import {
     getFinanceOverview, getPaymentDetail, updatePaymentDirector, deletePaymentDirector, listPayRates, setPayRate, deletePayRate, calculateSalary, getSalaryDetail, paySalary, prepaySalary, getBusinessLedger,
     listExpenseCategoriesDirector, createExpenseCategoryDirector, updateExpenseCategoryDirector, deleteExpenseCategoryDirector,
     getExpensesOverviewDirector, getExpenseDetailDirector, createExpenseDirector, updateExpenseDirector, deleteExpenseDirector,
+    listSantaLetters,
 } from "../controllers/directorController.js"
 import { listLanguages, listLevels, listBranches, getSettings } from "../controllers/catalogController.js"
 import {
@@ -169,5 +170,7 @@ directorRouter.get('/leads/forms/:id', getLeadForm)
 directorRouter.post('/leads/forms', createLeadForm)
 directorRouter.put('/leads/forms/:id', updateLeadForm)
 directorRouter.delete('/leads/forms/:id', deleteLeadForm)
+
+directorRouter.get('/santa-letters', directorOnly, listSantaLetters)
 
 export default directorRouter

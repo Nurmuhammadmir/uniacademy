@@ -1,11 +1,12 @@
-import React, { useContext } from 'react'
+import React, { useContext, useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Sun, Moon, CloudSnow } from 'lucide-react'
+import { Sun, Moon, CloudSnow, Gift } from 'lucide-react'
 import { DirectorContext } from '../context/DirectorContext.jsx'
 import { useLanguage } from '../i18n/LanguageContext.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import { useNewYear } from '../context/NewYearContext.jsx'
 import { GarlandStrip, GarlandPlug } from './SidebarGarland.jsx'
+import SantaLettersModal from './SantaLettersModal.jsx'
 import Logo from './Logo.jsx'
 
 // below `lg`, this becomes a slide-in drawer (off-canvas by default, toggled by App.jsx's mobile
@@ -17,6 +18,7 @@ const Sidebar = ({ open, onClose }) => {
   const { t } = useLanguage()
   const { isDark, toggleTheme } = useTheme()
   const { enabled: newYearEnabled, toggle: toggleNewYear } = useNewYear()
+  const [showSantaLetters, setShowSantaLetters] = useState(false)
 
   const links = [
     { to: '/', label: t('navOverview') },
@@ -40,7 +42,7 @@ const Sidebar = ({ open, onClose }) => {
       {open && <div onClick={onClose} className='fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-md dark:bg-[#0B0F19]/60 dark:backdrop-blur-lg transition-all duration-300 lg:hidden' />}
 
       <aside className={`w-60 fixed inset-y-0 left-0 z-50 bg-bg-elevated border-r border-hairline p-6 flex flex-col transition-transform duration-200 ease-out lg:translate-x-0 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className='mb-1' style={{ marginTop: newYearEnabled ? 60 : 0, transition: 'margin-top 0.3s ease' }}><Logo size={60} festive={newYearEnabled} /></div>
+        <div className='mb-1'><Logo size={60} festive={newYearEnabled} /></div>
         <p className='text-xs mb-8 ml-10' style={{ color: '#C9A15C' }}>{t('directorLabel')}</p>
         <nav className='relative flex flex-col gap-1 flex-1 overflow-y-auto'>
           <GarlandStrip lit={newYearEnabled} />
@@ -51,11 +53,15 @@ const Sidebar = ({ open, onClose }) => {
             </NavLink>
           ))}
         </nav>
-        {/* mt-auto lives here (not on the logout button below) so this row sits directly above
-            the sign-out button as one settled-in group at the bottom - same placement convention
-            as the admin app's ThemeContext rollout */}
+        {/* mt-auto lives here (not on any button below) so this row anchors the bottom-settled
+            group - Santa letters, New Year toggle, theme, sign-out - all together at the bottom */}
+        <button onClick={() => setShowSantaLetters(true)}
+          className='plain mt-auto flex items-center gap-2 text-sm text-left px-3 py-2 text-muted'>
+          <Gift size={16} strokeWidth={1.75} />
+          {t('santaLettersNavBtn')}
+        </button>
         <button onClick={toggleNewYear}
-          className={`plain mt-auto flex items-center gap-2 text-sm text-left px-3 py-2 ${newYearEnabled ? 'text-accent font-medium' : 'text-muted'}`}>
+          className={`plain flex items-center gap-2 text-sm text-left px-3 py-2 ${newYearEnabled ? 'text-accent font-medium' : 'text-muted'}`}>
           <CloudSnow size={16} strokeWidth={1.75} />
           {t('newYearModeBtn')}
         </button>
@@ -66,6 +72,7 @@ const Sidebar = ({ open, onClose }) => {
         <button onClick={logout} className='plain text-sm text-muted text-left px-3 py-2'>{t('signOut')}</button>
         <div className='absolute bottom-3 left-2.5'><GarlandPlug pluggedIn={newYearEnabled} /></div>
       </aside>
+      {showSantaLetters && <SantaLettersModal onClose={() => setShowSantaLetters(false)} />}
     </>
   )
 }

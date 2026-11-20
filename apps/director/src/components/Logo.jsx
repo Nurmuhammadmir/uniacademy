@@ -30,8 +30,8 @@ const SantaHat = ({ size }) => {
   return (
     <img src='/images/santa-hat.png' alt='' aria-hidden='true'
       style={{
-        position: 'absolute', top: -size * 0.42, left: -size * 0.3, width: size * 0.85, height: 'auto',
-        transform: 'rotate(-12deg)', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.35))', pointerEvents: 'none',
+        position: 'absolute', top: -size * 0.3, left: size * 0.1, width: size * 0.85, height: 'auto',
+        transform: 'rotate(-6deg)', filter: 'drop-shadow(0 2px 2px rgba(0,0,0,0.35))', pointerEvents: 'none',
       }} />
   )
 }

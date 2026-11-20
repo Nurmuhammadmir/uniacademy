@@ -20,11 +20,11 @@ const NewYearSnow = () => {
 
   return (
     <>
-      {/* the user's own PNG banner (see TopBanner.jsx) across the very top of the viewport - z-[60]
-          is deliberately ABOVE the sidebar (z-50) so it spans the full viewport width uninterrupted,
-          which is why Sidebar.jsx/App.jsx push their own top content down by the same 60px instead
-          of relying on stacking order to keep it clear */}
-      <div className='fixed top-0 left-0 right-0 z-[60] overflow-hidden' style={{ height: 60, pointerEvents: 'none' }} aria-hidden='true'>
+      {/* the user's own PNG banner (see TopBanner.jsx) across the top of the main content area only
+          (confirmed spec: not over the sidebar) - lg:left-60 matches ContentArea's own lg:ml-60, so
+          it starts exactly where the sidebar ends on desktop; on mobile (sidebar off-canvas by
+          default) it's full width, same as the content area itself */}
+      <div className='fixed top-0 left-0 lg:left-60 right-0 z-40 overflow-hidden' style={{ height: 120, pointerEvents: 'none' }} aria-hidden='true'>
         <TopBanner />
       </div>
       {!reduceMotion && (

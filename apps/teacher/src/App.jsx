@@ -58,7 +58,7 @@ const App = () => {
 const ContentArea = () => {
   const { enabled: newYearEnabled } = useNewYear()
   return (
-    <div className='min-h-screen bg-bg' style={{ paddingTop: newYearEnabled ? 60 : 0, transition: 'padding-top 0.3s ease' }}>
+    <div className='min-h-screen bg-bg' style={{ paddingTop: newYearEnabled ? 120 : 0, transition: 'padding-top 0.3s ease' }}>
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path='/' element={<MyGroups />} />

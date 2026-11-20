@@ -23,6 +23,7 @@ import Room from "../models/Room.js"
 import Account from "../models/Account.js"
 import LedgerEntry from "../models/LedgerEntry.js"
 import AdminNote from "../models/AdminNote.js"
+import SantaLetter from "../models/SantaLetter.js"
 import GroupMembership from "../models/GroupMembership.js"
 import { ensureLessonsGenerated } from "../services/lessonGenerator.service.js"
 import { assertNoScheduleConflict } from "../services/scheduleConflict.service.js"
@@ -1973,6 +1974,26 @@ export const deleteMyNote = async (req, res) => {
     try {
         await AdminNote.findOneAndDelete({ _id: req.params.id, adminId: req.auth.userId })
         res.json({ deleted: true })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// New Year mode's "write to Ded Moroz" (really the director) feature - an admin signs their own
+// name and writes a wish; every one ever sent is visible on the director's side (listSantaLetters,
+// directorController.js), never editable/deletable from here once sent.
+export const createSantaLetter = async (req, res) => {
+    try {
+        const { fromName, wish } = req.body
+        if (!fromName?.trim() || !wish?.trim()) return res.status(400).json({ error: 'missing_fields' })
+        const letter = await SantaLetter.create({
+            fromName: fromName.trim().slice(0, 200),
+            wish: wish.trim().slice(0, 2000),
+            branchId: req.auth.branchId,
+            createdBy: req.auth.userId,
+        })
+        res.status(201).json({ letter })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })

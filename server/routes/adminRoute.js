@@ -11,6 +11,7 @@ import {
     getStudentStatement, getReconciliation, getBusinessLedger, applyDiscount, deleteDiscount, listDiscounts, setStudentFreeze,
     listPricingForAdmin,
     listMyNotes, createMyNote, deleteMyNote,
+    createSantaLetter,
 } from "../controllers/adminController.js"
 import { listLanguages, listLevels, getSettings } from "../controllers/catalogController.js"
 import {
@@ -158,5 +159,7 @@ adminRouter.post('/expenses', createExpense)
 adminRouter.get('/expenses/:id', getExpenseDetail)
 adminRouter.put('/expenses/:id', updateExpense)
 adminRouter.delete('/expenses/:id', deleteExpense)
+
+adminRouter.post('/santa-letters', createSantaLetter)
 
 export default adminRouter

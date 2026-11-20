@@ -96,11 +96,11 @@ const ContentArea = ({ navOpen, setNavOpen }) => {
   return (
     <div className='flex-1 flex flex-col min-w-0 lg:ml-60'>
       <header className='lg:hidden sticky z-30 flex items-center gap-3 bg-bg-elevated border-b border-hairline pt-4 pb-2 px-4'
-        style={{ top: newYearEnabled ? 60 : 0, transition: 'top 0.3s ease' }}>
+        style={{ top: newYearEnabled ? 120 : 0, transition: 'top 0.3s ease' }}>
         <button onClick={() => setNavOpen(true)} aria-label='Menu' className='plain text-ink text-2xl leading-none px-1'>☰</button>
         <Logo size={28} />
       </header>
-      <main className='flex-1 p-4 sm:p-8' style={{ marginTop: newYearEnabled ? 60 : 0, transition: 'margin-top 0.3s ease' }}>
+      <main className='flex-1 p-4 sm:p-8' style={{ marginTop: newYearEnabled ? 120 : 0, transition: 'margin-top 0.3s ease' }}>
         <Suspense fallback={<PageFallback />}>
           <Routes>
             <Route path='/' element={<Students />} />

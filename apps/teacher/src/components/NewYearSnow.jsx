@@ -20,8 +20,9 @@ const NewYearSnow = () => {
 
   return (
     <>
-      {/* the user's own PNG banner (see TopBanner.jsx) across the very top of the viewport */}
-      <div className='fixed top-0 left-0 right-0 z-[60] overflow-hidden' style={{ height: 60, pointerEvents: 'none' }} aria-hidden='true'>
+      {/* the user's own PNG banner (see TopBanner.jsx) across the top of the viewport - teacher has
+          no sidebar, so unlike admin/director this is always full width */}
+      <div className='fixed top-0 left-0 right-0 z-40 overflow-hidden' style={{ height: 120, pointerEvents: 'none' }} aria-hidden='true'>
         <TopBanner />
       </div>
       {!reduceMotion && (

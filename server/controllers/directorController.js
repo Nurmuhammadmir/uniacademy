@@ -26,6 +26,7 @@ import TeacherPayRate, { PAY_RATE_TYPES } from "../models/TeacherPayRate.js"
 import Expense, { EXPENSE_METHODS } from "../models/Expense.js"
 import ExpenseCategory from "../models/ExpenseCategory.js"
 import LedgerEntry from "../models/LedgerEntry.js"
+import SantaLetter from "../models/SantaLetter.js"
 import { assertNoScheduleConflict } from "../services/scheduleConflict.service.js"
 import { computeDayCounter } from "../services/dayCounter.service.js"
 import { earliestLessonTimeOnDate, isLateCheckIn } from "../services/scheduleDays.service.js"
@@ -1859,6 +1860,19 @@ export const prepaySalary = async (req, res) => {
         })
 
         res.status(201).json({ expense })
+    } catch (error) {
+        console.log(error)
+        res.status(500).json({ error: 'server_error' })
+    }
+}
+
+// New Year mode's "letters to Ded Moroz" (admin side writes them - adminController.js's
+// createSantaLetter) - every branch's letters together, newest first, director-only (not
+// sub_director - see directorRoute.js) since these are addressed to the director personally.
+export const listSantaLetters = async (req, res) => {
+    try {
+        const letters = await SantaLetter.find().sort({ createdAt: -1 }).populate('branchId', 'name').lean()
+        res.json({ letters })
     } catch (error) {
         console.log(error)
         res.status(500).json({ error: 'server_error' })
