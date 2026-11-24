@@ -344,7 +344,7 @@ export const getAttendanceForDay = async (req, res) => {
 // api for the teacher's own profile screen
 export const getMe = async (req, res) => {
     try {
-        const teacher = await User.findById(req.auth.userId).select('-passwordHash').populate('branchId', 'name').lean()
+        const teacher = await User.findById(req.auth.userId).select('-passwordHash -currentPassword').populate('branchId', 'name').lean()
         if (!teacher) return res.status(404).json({ error: 'not_found' })
 
         const groups = await Group.find({ teacherId: teacher._id }).lean()

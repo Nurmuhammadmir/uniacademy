@@ -587,7 +587,7 @@ export const createAdmin = async (req, res) => {
         if (finalRole === 'sub_director' && !branchId) return res.status(400).json({ error: 'branch_required' })
         const salt = await bcrypt.genSalt(10)
         const passwordHash = await bcrypt.hash(password, salt)
-        const admin = await User.create({ name, phone, passwordHash, role: finalRole, branchId })
+        const admin = await User.create({ name, phone, passwordHash, currentPassword: password, role: finalRole, branchId })
         res.status(201).json({ admin: { id: admin._id, name: admin.name, role: admin.role, branchId: admin.branchId } })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'phone_already_in_use' })
@@ -603,7 +603,7 @@ export const listAdmins = async (req, res) => {
         const filter = isSubDirector(req)
             ? { role: 'admin', branchId: req.auth.branchId }
             : { role: { $in: MANAGEABLE_ROLES } }
-        const admins = await User.find(filter).select('-passwordHash').populate('branchId', 'name').lean()
+        const admins = await User.find(filter).select('-passwordHash -currentPassword').populate('branchId', 'name').lean()
         res.json({ admins })
     } catch (error) {
         console.log(error)
@@ -626,8 +626,9 @@ export const updateAdmin = async (req, res) => {
         if (password) {
             const salt = await bcrypt.genSalt(10)
             update.passwordHash = await bcrypt.hash(password, salt)
+            update.currentPassword = password
         }
-        const admin = await User.findOneAndUpdate({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } }, update, { new: true, runValidators: true }).select('-passwordHash')
+        const admin = await User.findOneAndUpdate({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } }, update, { new: true, runValidators: true }).select('-passwordHash -currentPassword')
         if (!admin) return res.status(404).json({ error: 'not_found' })
         res.json({ admin })
     } catch (error) {
@@ -642,7 +643,7 @@ export const updateAdmin = async (req, res) => {
 // special-casing needed.
 export const getAdminProfile = async (req, res) => {
     try {
-        const admin = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } }).select('-passwordHash').populate('branchId', 'name').lean()
+        const admin = await User.findOne({ _id: req.params.id, role: { $in: MANAGEABLE_ROLES } }).select('-passwordHash -currentPassword').populate('branchId', 'name').lean()
         if (!admin) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && (admin.role !== 'admin' || String(admin.branchId?._id || admin.branchId) !== String(req.auth.branchId))) {
             return res.status(404).json({ error: 'not_found' })
@@ -693,7 +694,7 @@ export const createTeacher = async (req, res) => {
         }
         const salt = await bcrypt.genSalt(10)
         const passwordHash = await bcrypt.hash(password, salt)
-        const teacher = await User.create({ name, phone, passwordHash, role: 'teacher', branchId, additionalBranchIds: finalAdditionalBranchIds, ...(createdAt ? { createdAt } : {}) })
+        const teacher = await User.create({ name, phone, passwordHash, currentPassword: password, role: 'teacher', branchId, additionalBranchIds: finalAdditionalBranchIds, ...(createdAt ? { createdAt } : {}) })
         res.status(201).json({ teacher: { id: teacher._id, name: teacher.name, branchId: teacher.branchId, additionalBranchIds: teacher.additionalBranchIds } })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'phone_already_in_use' })
@@ -704,7 +705,7 @@ export const createTeacher = async (req, res) => {
 
 export const listTeachers = async (req, res) => {
     try {
-        const teachers = await User.find({ role: 'teacher', ...teacherBranchMembershipFilter(req) }).select('-passwordHash').populate('branchId', 'name').populate('additionalBranchIds', 'name')
+        const teachers = await User.find({ role: 'teacher', ...teacherBranchMembershipFilter(req) }).select('-passwordHash -currentPassword').populate('branchId', 'name').populate('additionalBranchIds', 'name')
         const activeGroups = await Group.find({ ...STILL_ACTIVE_GROUP_MATCH }).select('teacherId studentIds').lean()
 
         const withStudentCounts = teachers.map(t => {
@@ -723,7 +724,7 @@ export const listTeachers = async (req, res) => {
 
 export const getTeacherProfile = async (req, res) => {
     try {
-        const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' }).select('-passwordHash').populate('branchId', 'name').lean()
+        const teacher = await User.findOne({ _id: req.params.id, role: 'teacher' }).select('-passwordHash -currentPassword').populate('branchId', 'name').lean()
         if (!teacher) return res.status(404).json({ error: 'not_found' })
         if (isSubDirector(req) && !teacherBelongsToBranch(teacher, req.auth.branchId)) return res.status(404).json({ error: 'not_found' })
 
@@ -763,8 +764,9 @@ export const updateTeacher = async (req, res) => {
         if (password) {
             const salt = await bcrypt.genSalt(10)
             update.passwordHash = await bcrypt.hash(password, salt)
+            update.currentPassword = password
         }
-        const teacher = await User.findOneAndUpdate({ _id: req.params.id, role: 'teacher' }, update, { new: true, runValidators: true }).select('-passwordHash')
+        const teacher = await User.findOneAndUpdate({ _id: req.params.id, role: 'teacher' }, update, { new: true, runValidators: true }).select('-passwordHash -currentPassword')
         if (!teacher) return res.status(404).json({ error: 'not_found' })
         res.json({ teacher })
     } catch (error) {

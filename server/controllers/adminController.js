@@ -54,7 +54,7 @@ export const getTeacherProfile = async (req, res) => {
         const teacher = await User.findOne({
             _id: req.params.id, role: 'teacher',
             $or: [{ branchId: req.auth.branchId }, { additionalBranchIds: req.auth.branchId }],
-        }).select('-passwordHash').lean()
+        }).select('-passwordHash -currentPassword').lean()
         if (!teacher) return res.status(404).json({ error: 'not_found' })
 
         const groups = await Group.find({ teacherId: teacher._id, branchId: req.auth.branchId })
@@ -321,7 +321,7 @@ export const createTeacher = async (req, res) => {
         }
         const salt = await bcrypt.genSalt(10)
         const passwordHash = await bcrypt.hash(password, salt)
-        const teacher = await User.create({ name, phone, passwordHash, role: 'teacher', branchId: req.auth.branchId, ...(createdAt ? { createdAt } : {}) })
+        const teacher = await User.create({ name, phone, passwordHash, currentPassword: password, role: 'teacher', branchId: req.auth.branchId, ...(createdAt ? { createdAt } : {}) })
         res.status(201).json({ teacher: { id: teacher._id, name: teacher.name, branchId: teacher.branchId } })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'phone_already_in_use' })
@@ -340,8 +340,9 @@ export const updateTeacher = async (req, res) => {
         if (password) {
             const salt = await bcrypt.genSalt(10)
             update.passwordHash = await bcrypt.hash(password, salt)
+            update.currentPassword = password
         }
-        const teacher = await User.findOneAndUpdate({ _id: req.params.id, role: 'teacher' }, update, { new: true, runValidators: true }).select('-passwordHash')
+        const teacher = await User.findOneAndUpdate({ _id: req.params.id, role: 'teacher' }, update, { new: true, runValidators: true }).select('-passwordHash -currentPassword')
         res.json({ teacher })
     } catch (error) {
         if (error.code === 11000) return res.status(409).json({ error: 'phone_already_in_use' })
@@ -1710,7 +1711,7 @@ export const retakeExam = async (req, res) => {
 // api for the admin's own profile screen
 export const getMe = async (req, res) => {
     try {
-        const admin = await User.findById(req.auth.userId).select('-passwordHash').populate('branchId', 'name').lean()
+        const admin = await User.findById(req.auth.userId).select('-passwordHash -currentPassword').populate('branchId', 'name').lean()
         if (!admin) return res.status(404).json({ error: 'not_found' })
 
         const studentCount = await User.countDocuments({ role: 'student', branchId: req.auth.branchId })

@@ -52,6 +52,13 @@ const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     phone: { type: String, required: true, unique: true },
     passwordHash: { type: String, required: true },
+    // admin/teacher-only: plaintext mirror of their current password, written alongside passwordHash
+    // every time one of those two roles' passwords is set - exists purely so the director can read it
+    // straight out of Mongo (requested explicitly, no encryption). Login still checks passwordHash,
+    // never this field, and every controller select() below excludes it from API responses - it's
+    // meant to be read via direct DB access only. Null for older accounts until their password is
+    // next changed (can't be backfilled - the original plaintext was never stored).
+    currentPassword: { type: String, default: null },
     role: { type: String, enum: ['director', 'sub_director', 'admin', 'teacher', 'student', 'parent'], required: true },
     // student-only: archiving replaces hard-deleting a student - their payment/course/exam history
     // stays intact (a hard delete would orphan every Payment/CoursePeriod row that references them),
