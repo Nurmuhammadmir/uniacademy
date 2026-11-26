@@ -1116,10 +1116,17 @@ export const getPaymentDetail = async (req, res) => {
             const paymentEntry = await LedgerEntry.findOne({ accountId: studentAccount._id, kind: 'payment', sourceId: payment._id }).lean()
             if (paymentEntry) {
                 const rawCoverage = await computePaymentCoverage(studentAccount._id, paymentEntry._id)
-                const languageIds = [...new Set(rawCoverage.map(c => String(c.languageId)).filter(Boolean))]
-                const levelIds = [...new Set(rawCoverage.map(c => String(c.levelId)).filter(Boolean))]
-                const groupIds = [...new Set(rawCoverage.map(c => String(c.groupId)).filter(Boolean))]
-                const teacherIds = [...new Set(rawCoverage.map(c => String(c.teacherId)).filter(Boolean))]
+                // filter the raw (possibly-null) id BEFORE stringifying - String(null) is the
+                // truthy, non-empty string "null", so filtering after String() let that literal
+                // 4-char string slip into the $in below (a debt with no level/group/teacher is
+                // common: a course with no level assigned yet, or an old course-less manual debt -
+                // see billingCycle.service.js's own comments on both). Mongoose then tried to cast
+                // "null" to an ObjectId and threw, 500ing this entire endpoint - confirmed live: the
+                // "print receipt" button failing with a server error for exactly these students.
+                const languageIds = [...new Set(rawCoverage.map(c => c.languageId).filter(Boolean).map(String))]
+                const levelIds = [...new Set(rawCoverage.map(c => c.levelId).filter(Boolean).map(String))]
+                const groupIds = [...new Set(rawCoverage.map(c => c.groupId).filter(Boolean).map(String))]
+                const teacherIds = [...new Set(rawCoverage.map(c => c.teacherId).filter(Boolean).map(String))]
                 const [languages, levels, groups, teachers] = await Promise.all([
                     languageIds.length ? Language.find({ _id: { $in: languageIds } }).select('name').lean() : [],
                     levelIds.length ? Level.find({ _id: { $in: levelIds } }).select('name').lean() : [],
